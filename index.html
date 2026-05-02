@@ -64,6 +64,11 @@
 			.break-word { word-wrap: break-word; }
 			.wallet-unconfirmed { font-size: 13px; display: block; margin-top: 2px; }
 			.saved-wallet-hint { font-size: 13px; color: #6c757d; margin-top: 6px; }
+			.history-item { font-size: 13px; padding: 6px 0; }
+			.history-item:last-child { border-bottom: none !important; }
+			#history-list { max-height: 320px; overflow-y: auto; }
+			.pin-login-card .card-body { padding: 1.5rem; }
+			.pin-login-title { font-size: 15px; color: #495057; margin-bottom: 12px; text-align: center; }
 		</style>
 		<title>Wallet</title>
 		<meta name="description" content="Bitweb Web Wallet">
@@ -108,6 +113,27 @@
 		<!-- Home page -->
 		<div id="homepage" class="router-page">
 			<div class="container">
+				<!-- PIN login (shown instead of open-block when wallet is saved) -->
+				<div id="pin-login-block" class="d-none">
+					<div class="card mb-3 pin-login-card">
+						<div class="card-body">
+							<p class="pin-login-title"><span class="entypo lock"></span> Saved wallet found</p>
+							<div class="input-group mb-2">
+								<input id="pin-login-input" type="password" class="form-control" placeholder="Enter PIN to open" maxlength="16" autocomplete="current-password">
+								<div class="input-group-append">
+									<button id="pin-login-btn" class="btn btn-primary b-width">Open</button>
+								</div>
+							</div>
+							<div id="pin-login-error" class="text-danger small mb-2 d-none">Wrong PIN, try again.</div>
+							<div class="text-center">
+								<a href="#" id="pin-login-manual" class="text-muted small">Enter credentials manually</a>
+								<span class="text-muted small mx-2">·</span>
+								<a href="#" id="pin-login-forget" class="text-muted small">Forget saved wallet</a>
+							</div>
+						</div>
+					</div>
+				</div>
+
 				<div id="open-block">
 					<div class="card mb-3">
 						<div class="card-header">
@@ -123,7 +149,7 @@
 						<div class="card-body">
 							<form id="open-regular-form" class="open-form tab-item" data-tab="open-regular">
 								<div class="input-group pb-2">
-									<input id="open-email" name="open-email" class="form-control" type="text" tkey="email-address">
+									<input id="open-email" name="open-email" class="form-control" type="text" placeholder="Email or other text (min 3 chars)">
 								</div>
 								<div class="input-group">
 									<input id="open-password" name="open-password" class="form-control" type="password" tkey="password">
@@ -167,7 +193,7 @@
 									<a class="nav-link tab-link" data-tab-name="wallet-send" data-tab-family="wallet-block" href="#" tkey="send"></a>
 								</li>
 								<li class="nav-item mr-2">
-									<a id="history-link" class="nav-link" target="_blank" href="https://webwallet.bitwebcore.net/#/address/" tkey="history"></a>
+									<a id="history-tab-link" class="nav-link tab-link" data-tab-name="wallet-history" data-tab-family="wallet-block" href="#" tkey="history"></a>
 								</li>
 								<li class="nav-item">
 									<a class="nav-link tab-link" data-tab-name="wallet-keys" data-tab-family="wallet-block" href="#" tkey="keys"></a>
@@ -254,6 +280,13 @@
 											<input class="form-control" readonly type="text">
 										</div>
 									</div>
+								</div>
+							</div>
+
+							<!-- History tab -->
+							<div class="tab-item d-none" data-tab="wallet-history">
+								<div id="history-list">
+									<div class="text-muted text-center py-3 small">Loading history…</div>
 								</div>
 							</div>
 						</div>
@@ -517,7 +550,7 @@
 			// ================================================================
 			// ЗАШИФРОВАННОЕ ХРАНИЛИЩЕ (WebCrypto AES-GCM + PBKDF2)
 			// ================================================================
-			var STORAGE_KEY = 'bte_wallet_v1'
+			var STORAGE_KEY = 'bte_wallet_v2'
 
 			async function deriveKey(pin, salt) {
 				var enc = new TextEncoder()
@@ -533,12 +566,14 @@
 				)
 			}
 
-			async function saveWallet(wif, pin) {
-				var enc  = new TextEncoder()
-				var salt = crypto.getRandomValues(new Uint8Array(16))
-				var iv   = crypto.getRandomValues(new Uint8Array(12))
-				var key  = await deriveKey(pin, salt)
-				var ct   = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, enc.encode(wif))
+			// Сохранить credentials (identity + password) зашифровано по PIN
+			async function saveCredentials(identity, password, pin) {
+				var enc     = new TextEncoder()
+				var salt    = crypto.getRandomValues(new Uint8Array(16))
+				var iv      = crypto.getRandomValues(new Uint8Array(12))
+				var key     = await deriveKey(pin, salt)
+				var payload = JSON.stringify({ type: 'credentials', identity: identity, password: password })
+				var ct      = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, enc.encode(payload))
 				localStorage.setItem(STORAGE_KEY, JSON.stringify({
 					salt: Array.from(salt),
 					iv:   Array.from(iv),
@@ -546,7 +581,8 @@
 				}))
 			}
 
-			async function loadWallet(pin) {
+			// Загрузить credentials по PIN — возвращает {type, identity, password} или null
+			async function loadCredentials(pin) {
 				var raw = localStorage.getItem(STORAGE_KEY)
 				if (!raw) return null
 				var blob = JSON.parse(raw)
@@ -557,10 +593,32 @@
 						key,
 						new Uint8Array(blob.data)
 					)
-					return new TextDecoder().decode(pt)
+					return JSON.parse(new TextDecoder().decode(pt))
 				} catch(e) {
 					return null   // неверный PIN
 				}
+			}
+
+			// Воспроизвести ключ из credentials и открыть кошелёк
+			function openFromCredentials(creds) {
+				if (!creds || creds.type !== 'credentials') return false
+				var identity = creds.identity
+				var pass     = creds.password
+				var s = identity
+				s += '|' + pass + '|'
+				s += s.length + '|!@' + ((pass.length * 7) + identity.length) * 7
+				var regchars   = (pass.match(/[a-z]+/g)) ? pass.match(/[a-z]+/g).length   : 1
+				var regupchars = (pass.match(/[A-Z]+/g)) ? pass.match(/[A-Z]+/g).length   : 1
+				var regnums    = (pass.match(/[0-9]+/g)) ? pass.match(/[0-9]+/g).length   : 1
+				s += ((regnums + regchars) + regupchars) * pass.length + '3571'
+				s += (s + '' + s)
+				for (var i = 0; i <= 51; i++) s = sha256.update(s).hex()
+				globalData.keys = bitcoin.ECPair.fromPrivateKey(
+					bitcoin.Buffer.from(s, 'hex'),
+					{ 'network': getConfig()['network'] }
+				)
+				openWallet(globalData.keys, null, null)
+				return true
 			}
 
 			function hasSavedWallet() {
@@ -574,9 +632,13 @@
 
 			function updateSavedWalletUI() {
 				if (hasSavedWallet()) {
+					$('#pin-login-block').removeClass('d-none')
+					$('#open-block').addClass('d-none')
 					$('#saved-wallet-hint').removeClass('d-none')
 					$('#forget-wallet-section').removeClass('d-none')
 				} else {
+					$('#pin-login-block').addClass('d-none')
+					$('#open-block').removeClass('d-none')
 					$('#saved-wallet-hint').addClass('d-none')
 					$('#forget-wallet-section').addClass('d-none')
 				}
@@ -860,6 +922,63 @@
 			}
 
 			// ================================================================
+			// История транзакций
+			// ================================================================
+			function getHistory(address) {
+				return Promise.resolve($.ajax({ url: getBackend() + '/history/' + address }))
+			}
+
+			function loadHistory() {
+				var key = 'bte_history_' + globalData.address
+				try { return JSON.parse(localStorage.getItem(key) || '[]') } catch(e) { return [] }
+			}
+
+			function saveHistory(txs) {
+				localStorage.setItem('bte_history_' + globalData.address, JSON.stringify(txs))
+			}
+
+			function updateHistory() {
+				if (!globalData.address) return
+				getHistory(globalData.address).then(function(data) {
+					if (!data || data.error !== null) return
+					var txs = data.result || []
+					saveHistory(txs)
+					renderHistory(txs)
+				}).catch(function() {})
+			}
+
+			function renderHistory(txs) {
+				if (!txs || txs.length === 0) {
+					$('#history-list').html('<div class="text-muted text-center py-3 small">No transactions yet</div>')
+					return
+				}
+				var list = txs.slice().reverse()
+				var html = ''
+				list.forEach(function(tx) {
+					var confirmed = tx.height !== 0
+					var confs = confirmed
+						? (globalData.height > 0 ? (globalData.height - tx.height + 1) + ' conf' : 'confirmed')
+						: 'pending'
+					var badge = confirmed
+						? '<span class="badge badge-success">' + confs + '</span>'
+						: '<span class="badge badge-warning">pending</span>'
+					var blockStr = tx.height === 0 ? 'mempool' : 'block #' + tx.height
+					var txUrl    = blockExplorer.tx(tx.tx_hash)
+					var shortHash = tx.tx_hash.substr(0, 14) + '…' + tx.tx_hash.substr(-8)
+					html += '<div class="history-item d-flex justify-content-between align-items-center border-bottom">' +
+						'<div style="min-width:0">' +
+						'<div class="text-monospace" style="font-size:11px;overflow:hidden;text-overflow:ellipsis">' +
+						'<a href="' + txUrl + '" target="_blank">' + shortHash + '</a>' +
+						'</div>' +
+						'<small class="text-muted">' + blockStr + '</small>' +
+						'</div>' +
+						'<div class="ml-2 flex-shrink-0">' + badge + '</div>' +
+						'</div>'
+				})
+				$('#history-list').html(html)
+			}
+
+			// ================================================================
 			// Wallet balance — с конфирмами и высотой сети
 			// ================================================================
 			function walletBalance() {
@@ -880,16 +999,23 @@
 
 					var balance = '0.00'
 					if (balanceData && balanceData.error == null) {
-						var res = balanceData.result
+						var res        = balanceData.result
+						var prevBal    = globalData.balance
 						globalData.balance = res.balance
 						balance = amountFormat(res.balance)
+
+						// Если баланс изменился — обновить историю
+						if (res.balance !== prevBal && globalData.address) updateHistory()
 
 						// Показываем неподтверждённый остаток
 						var unconf = res.unconfirmed || 0
 						if (unconf !== 0) {
-							var sign           = unconf > 0 ? '+' : '-'
-							var unconfFormatted = sign + amountFormat(Math.abs(unconf)) + ' ' + getConfig()['ticker']
-							$('.wallet-unconfirmed').text('(' + unconfFormatted + ' unconfirmed)').removeClass('d-none')
+							var absVal  = amountFormat(Math.abs(unconf))
+							var ticker  = getConfig()['ticker']
+							var label   = unconf > 0
+								? ('+' + absVal + ' ' + ticker + ' incoming, pending')
+								: (absVal + ' ' + ticker + ' sending, pending')
+							$('.wallet-unconfirmed').text(label).removeClass('d-none')
 						} else {
 							$('.wallet-unconfirmed').addClass('d-none')
 						}
@@ -921,7 +1047,8 @@
 			// ================================================================
 			// Open wallet
 			// ================================================================
-			function openWallet(keys) {
+			// identity, password — только при входе через credentials-форму, null иначе
+			function openWallet(keys, identity, password) {
 				globalData.address = getAddress(keys)
 				var pubkey = keys.publicKey.toString('hex')
 				var wif    = keys.toWIF()
@@ -932,25 +1059,28 @@
 				$('#wallet-keys-script input').val(redeem)
 
 				$('#wallet-address').html(globalData.address)
+				$('#pin-login-block').addClass('d-none')
 				$('#open-block').addClass('d-none')
 				$('#wallet-block').removeClass('d-none')
-				$('#history-link').attr('href', blockExplorer.address(globalData.address))
 				$('#send-fee').attr('placeholder', getText('fee') + ' (' + getText('recommended') + ' ' + globalData.rfee + ' ' + getConfig()['ticker'] + ')')
 				showQrAddress(getConfig()['uri'] + globalData.address)
+
+				// Загружаем историю из localStorage
+				renderHistory(loadHistory())
 
 				walletBalance()
 				checkBalanceLoop()
 				setHomeTitle()
 
-				// Предложить сохранить если ещё не сохранён
-				if (!hasSavedWallet()) {
+				// Предложить сохранить только если credentials переданы и ещё не сохранено
+				if (identity && !hasSavedWallet()) {
 					setTimeout(function() {
 						askPin(
 							'Save wallet',
-							'Enter a PIN to encrypt and save your wallet locally. Leave empty and press Cancel to skip.'
+							'Enter a PIN to save your wallet. Next time you will only need the PIN to open it.'
 						).then(function(pin) {
 							if (pin && pin.length >= 4) {
-								saveWallet(wif, pin).then(function() {
+								saveCredentials(identity, password, pin).then(function() {
 									showMessage('Wallet saved. Next time just enter your PIN.')
 									updateSavedWalletUI()
 								})
@@ -962,10 +1092,10 @@
 
 			function closeWallet() {
 				clearTimeout(walletTimer)
-				$('#open-block').removeClass('d-none')
 				$('#wallet-block').addClass('d-none')
 				$('.wallet-unconfirmed').addClass('d-none')
 				globalData.clear()
+				updateSavedWalletUI()
 				setHomeTitle()
 			}
 
@@ -1222,25 +1352,52 @@
 					if (e.key === 'Enter') $('#pin-confirm').click()
 				})
 
-				// Открыть сохранённый кошелёк
+				// PIN-login block — главная кнопка открытия
+				function doPinLogin() {
+					var pin = $('#pin-login-input').val()
+					if (!pin || pin.length < 4) {
+						$('#pin-login-error').text('PIN must be at least 4 characters.').removeClass('d-none')
+						return
+					}
+					$('#pin-login-btn').prop('disabled', true).text('Opening…')
+					loadCredentials(pin).then(function(creds) {
+						$('#pin-login-btn').prop('disabled', false).text('Open')
+						if (!creds) {
+							$('#pin-login-error').text('Wrong PIN, try again.').removeClass('d-none')
+							$('#pin-login-input').val('').focus()
+							return
+						}
+						$('#pin-login-error').addClass('d-none')
+						$('#pin-login-input').val('')
+						if (!openFromCredentials(creds)) {
+							showMessage('Saved wallet is corrupted. Please re-open manually.')
+							forgetSavedWallet()
+						}
+					}).catch(function() {
+						$('#pin-login-btn').prop('disabled', false).text('Open')
+						$('#pin-login-error').text('Wrong PIN, try again.').removeClass('d-none')
+					})
+				}
+
+				$('#pin-login-btn').click(doPinLogin)
+				$('#pin-login-input').on('keydown', function(e) { if (e.key === 'Enter') doPinLogin() })
+
+				$('#pin-login-manual').click(function(e) {
+					e.preventDefault()
+					$('#pin-login-block').addClass('d-none')
+					$('#open-block').removeClass('d-none')
+				})
+
+				$('#pin-login-forget').click(function(e) {
+					e.preventDefault()
+					forgetSavedWallet()
+					showMessage('Saved wallet deleted.')
+				})
+
+				// Открыть сохранённый кошелёк (legacy link из footer подсказки)
 				$('#open-saved-wallet').click(function(e) {
 					e.preventDefault()
-					askPin('Open saved wallet', 'Enter your PIN to decrypt the saved wallet.').then(function(pin) {
-						if (!pin) return
-						loadWallet(pin).then(function(wif) {
-							if (!wif) {
-								showMessage('Wrong PIN.')
-								return
-							}
-							try {
-								globalData.keys = bitcoin.ECPair.fromWIF(wif, getConfig()['network'])
-								openWallet(globalData.keys)
-							} catch(err) {
-								showMessage('Saved wallet is corrupted. Please re-open manually.')
-								forgetSavedWallet()
-							}
-						})
-					})
+					$('#pin-login-input').focus()
 				})
 
 				// Забыть сохранённый кошелёк (на странице входа)
@@ -1264,6 +1421,8 @@
 					$('#' + tabFamily + ' .card-header .card-header-tabs .nav-link').removeClass('active')
 					$('#' + tabFamily + ' [data-tab=' + tabName + ']').removeClass('d-none')
 					$(this).addClass('active')
+					// При открытии вкладки истории — обновляем с API
+					if (tabName === 'wallet-history') updateHistory()
 					e.preventDefault()
 				})
 
@@ -1314,17 +1473,17 @@
 					e.preventDefault()
 				})
 
-				// Open by email+password
+				// Open by identity+password (email or any text)
 				$('#open-regular-form').submit(function(e) {
-					var email       = $('#open-email').val().toLowerCase()
+					var identity    = $('#open-email').val().trim()
 					var pass        = $('#open-password').val()
 					var passConfirm = $('#open-password-confirm').val()
-					if (email.match(/[\s\w\d]+@[\s\w\d]+/g)) {
+					if (identity.length >= 3) {
 						if (pass.length >= 10) {
 							if (pass == passConfirm) {
-								var s = email
+								var s = identity.toLowerCase()
 								s += '|' + pass + '|'
-								s += s.length + '|!@' + ((pass.length * 7) + email.length) * 7
+								s += s.length + '|!@' + ((pass.length * 7) + identity.length) * 7
 								var regchars   = (pass.match(/[a-z]+/g)) ? pass.match(/[a-z]+/g).length   : 1
 								var regupchars = (pass.match(/[A-Z]+/g)) ? pass.match(/[A-Z]+/g).length   : 1
 								var regnums    = (pass.match(/[0-9]+/g)) ? pass.match(/[0-9]+/g).length   : 1
@@ -1338,10 +1497,11 @@
 									bitcoin.Buffer.from(s, 'hex'),
 									{ 'network': getConfig()['network'] }
 								)
-								openWallet(globalData.keys)
+								// Передаём identity+pass — openWallet предложит сохранить через PIN
+								openWallet(globalData.keys, identity.toLowerCase(), pass)
 							} else { showMessage(messages.error['pass-not-match']) }
 						} else { showMessage(messages.error['pass-too-short']) }
-					} else { showMessage(messages.error['bad-email']) }
+					} else { showMessage('Identity must be at least 3 characters.') }
 					e.preventDefault()
 				})
 
