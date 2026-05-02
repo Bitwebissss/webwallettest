@@ -204,12 +204,7 @@
 							<div class="text-center">
 								<div class="tab-item" data-tab="wallet-balance">
 									<div id="qr-code-addres" class="qr-code"></div>
-									<div class="d-inline-flex align-items-center justify-content-center" style="gap:5px;max-width:100%">
-										<div id="wallet-address" class="break-word" style="font-size:13px;word-break:break-all"></div>
-										<button id="copy-address-btn" class="btn btn-sm btn-outline-secondary flex-shrink-0" title="Copy address" style="padding:1px 7px;font-size:12px;line-height:1.6">
-											<span class="fa fa-copy" id="copy-address-icon"></span>
-										</button>
-									</div>
+									<div id="wallet-address"></div>
 									<div class="wallet-balance mb-0 pb-0 c-pointer">
 										<span class="text-monospace amount"></span>
 										<span class="ticker" tkey="loading"></span>
@@ -905,39 +900,7 @@
 			}
 
 			// ================================================================
-			// Copy to clipboard — works on HTTPS mobile + desktop
-			// Falls back to execCommand for old browsers
-			// ================================================================
-			function copyToClipboard(text, $btn) {
-				var doFeedback = function(ok) {
-					var $icon = $btn.find('#copy-address-icon')
-					$icon.removeClass('fa-copy').addClass(ok ? 'fa-check' : 'fa-times')
-					$btn.addClass(ok ? 'btn-success' : 'btn-danger').removeClass('btn-outline-secondary')
-					setTimeout(function() {
-						$icon.removeClass('fa-check fa-times').addClass('fa-copy')
-						$btn.removeClass('btn-success btn-danger').addClass('btn-outline-secondary')
-					}, 1500)
-				}
-				if (navigator.clipboard && navigator.clipboard.writeText) {
-					navigator.clipboard.writeText(text).then(function() {
-						doFeedback(true)
-					}).catch(function() {
-						doFeedback(false)
-					})
-				} else {
-					// Fallback: hidden textarea + execCommand
-					var ta = document.createElement('textarea')
-					ta.value = text
-					ta.style.position = 'fixed'
-					ta.style.opacity  = '0'
-					document.body.appendChild(ta)
-					ta.focus(); ta.select()
-					var ok = false
-					try { ok = document.execCommand('copy') } catch(e) {}
-					document.body.removeChild(ta)
-					doFeedback(ok)
-				}
-			}
+			// Coinbase maturity logic (mirrors Bitweb consensus/consensus.h)
 			// ================================================================
 
 			// Returns required depth (confirmations) for a coinbase UTXO to be spendable.
@@ -2112,11 +2075,6 @@
 				})
 
 				$('#scan-modal').on('hide.bs.modal', function() { stopStream() })
-
-				// Copy address to clipboard
-				$('#copy-address-btn').click(function() {
-					if (globalData.address) copyToClipboard(globalData.address, $(this))
-				})
 			})
 		</script>
 	</body>
