@@ -474,7 +474,7 @@
 					'api': 'wss://electrum.bitwebcore.net:20003',
 					'ticker': 'BTE',
 					'decimals': 8,
-					'fee': 0.0001,
+					'fee': 0.001,
 					'network': {
 						'messagePrefix': '\x19Bitweb Signed Message:\n',
 						'bip32': {
@@ -494,7 +494,7 @@
 					'api': 'wss://electrum-testnet.bitwebcore.net:50004',
 					'ticker': 'TUGAR',
 					'decimals': 8,
-					'fee': 0.0001,
+					'fee': 0.001,
 					'network': {
 						'messagePrefix': '\x19Bitweb Signed Message:\n',
 						'bip32': {
@@ -510,41 +510,60 @@
 			}
 
 			// ─── ElectrumX WebSocket client ───────────────────────────────
+			// ElectrumX WebSocket protocol rules:
+			//   1. WebSocket messages are already framed — do NOT split by \n
+			//   2. Do NOT append \n to ws.send() — only for raw TCP/SSL sockets
+			//   3. server.version MUST be first message after connect
 			var electrum = (function() {
 				var ws = null
 				var pending = {}
 				var msgId = 0
 				var currentUrl = null
+				var connectingPromise = null
 
 				function connect(url) {
-					return new Promise(function(resolve, reject) {
+					if (connectingPromise) return connectingPromise
+					connectingPromise = new Promise(function(resolve, reject) {
 						currentUrl = url
-						ws = new WebSocket(url)
-						ws.onopen = function() { resolve() }
-						ws.onerror = function() { reject(new Error('WebSocket connection failed to ' + url)) }
-						ws.onclose = function() {
+						var newWs = new WebSocket(url)
+						newWs.onopen = function() {
+							ws = newWs
+							connectingPromise = null
+							// ElectrumX requires server.version as the very first message
+							newWs.send(JSON.stringify({
+								jsonrpc: '2.0',
+								id: 0,
+								method: 'server.version',
+								params: ['BitwebWallet/0.5', '1.4']
+							}))
+							resolve()
+						}
+						newWs.onerror = function() {
+							connectingPromise = null
+							reject(new Error('WebSocket connection failed to ' + url))
+						}
+						newWs.onclose = function() {
+							ws = null
+							connectingPromise = null
 							Object.keys(pending).forEach(function(id) {
 								pending[id].reject(new Error('Connection closed'))
 							})
 							pending = {}
-							ws = null
 						}
-						ws.onmessage = function(evt) {
+						newWs.onmessage = function(evt) {
 							try {
-								var lines = evt.data.split('\n')
-								lines.forEach(function(line) {
-									if (!line.trim()) return
-									var data = JSON.parse(line)
-									if (data.id !== undefined && pending[data.id]) {
-										var cb = pending[data.id]
-										delete pending[data.id]
-										if (data.error) cb.reject(new Error(data.error.message || JSON.stringify(data.error)))
-										else cb.resolve(data.result)
-									}
-								})
+								// WebSocket is already framed — parse directly, NO split
+								var data = JSON.parse(evt.data)
+								if (data.id && data.id !== 0 && pending[data.id]) {
+									var cb = pending[data.id]
+									delete pending[data.id]
+									if (data.error) cb.reject(new Error(data.error.message || JSON.stringify(data.error)))
+									else cb.resolve(data.result)
+								}
 							} catch(e) {}
 						}
 					})
+					return connectingPromise
 				}
 
 				function isConnected() {
@@ -563,7 +582,8 @@
 								}
 							}, 15000)
 							try {
-								ws.send(JSON.stringify({ jsonrpc: '2.0', id: id, method: method, params: params }) + '\n')
+								// NO \n — WebSocket frames messages automatically
+								ws.send(JSON.stringify({ jsonrpc: '2.0', id: id, method: method, params: params }))
 							} catch(e) {
 								delete pending[id]
 								reject(e)
@@ -580,14 +600,20 @@
 
 				function disconnect() {
 					if (ws) { ws.close(); ws = null }
+					connectingPromise = null
 				}
 
 				function testConnection(url) {
-					var testWs = new WebSocket(url)
 					return new Promise(function(resolve, reject) {
 						var done = false
+						var testWs = new WebSocket(url)
 						testWs.onopen = function() {
 							done = true
+							testWs.send(JSON.stringify({
+								jsonrpc: '2.0', id: 0,
+								method: 'server.version',
+								params: ['BitwebWallet/0.5', '1.4']
+							}))
 							testWs.close()
 							resolve()
 						}
@@ -942,18 +968,9 @@
 					})
 			}
 
-			// Estimate fee via ElectrumX (returns BTC/KB, convert to satoshis for ~250-byte tx)
+			// Fixed fee — no ElectrumX query needed
 			function estimateFee() {
-				return electrum.request('blockchain.estimatefee', [6])
-					.then(function(feeRate) {
-						if (feeRate < 0) return { error: 'estimation failed' }
-						// feeRate is BTC/KB; for ~250-byte tx: feeRate * 250/1000 BTC → satoshis
-						var feeSatoshis = Math.max(Math.ceil(feeRate * 250 * 1e5), 1000)
-						return { result: { feerate: feeSatoshis } }
-					})
-					.catch(function() {
-						return { error: 'estimation failed' }
-					})
+				return Promise.resolve({ result: { feerate: getConfig()['fee'] } })
 			}
 
 			// Get address balance via ElectrumX
@@ -1659,14 +1676,8 @@
 					initWallet()
 				})
 
-				// Set wallet recomended fee
-				estimateFee().then(function(data) {
-					if (data.error == undefined) {
-						globalData.rfee = amountFormat(data.result.feerate)
-					} else {
-						globalData.rfee = getConfig()['fee']
-					}
-				})
+				// Fixed fee — set directly from network config
+				globalData.rfee = getConfig()['fee']
 
 				$('#scan-modal').on('hide.bs.modal', function (e) {
 					stopStream()
