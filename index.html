@@ -222,6 +222,14 @@
 											<span class="ticker" tkey="loading"></span>
 										</b>
 									</span>
+									<!-- Immature coinbase balance row -->
+									<div id="immature-balance-row" class="d-none mt-1">
+										<span class="text-warning" style="font-size:12px">
+											<span class="fa fa-lock"></span>
+											<span>Immature (mining):</span>
+											<b class="immature-amount"></b>
+										</span>
+									</div>
 									<div class="float-md-right">
 										<a href="#" id="send-qr" class="text-dark pr-1">
 											<span tkey="scan-qr"></span>
@@ -251,6 +259,38 @@
 									<div class="input-group-append">
 										<button class="btn btn-outline-dark b-width" type="submit" id="send-tx" tkey="send"></button>
 									</div>
+								</div>
+
+								<!-- Coin Control (collapsible) -->
+								<div class="mt-2">
+									<a href="#" id="coin-control-toggle" class="text-muted small" style="text-decoration:none">
+										<span class="fa fa-sliders-h"></span>
+										<span id="coin-control-toggle-text">Coin Control</span>
+									</a>
+								</div>
+								<div id="coin-control-panel" class="d-none mt-2 border rounded p-2" style="font-size:12px">
+									<div class="d-flex justify-content-between align-items-center mb-2">
+										<div>
+											<input type="checkbox" id="coin-control-enable">
+											<label for="coin-control-enable" class="mb-0 ml-1">Manual UTXO selection</label>
+										</div>
+										<a href="#" id="coin-control-select-all" class="text-primary small">Select all mature</a>
+									</div>
+									<div id="coin-control-list" class="table-responsive" style="max-height:200px;overflow-y:auto">
+										<table class="table table-sm table-borderless mb-0" id="coin-control-table">
+											<thead class="thead-light">
+												<tr>
+													<th style="width:28px"></th>
+													<th>Amount</th>
+													<th>Confs</th>
+													<th>Type</th>
+													<th>Status</th>
+												</tr>
+											</thead>
+											<tbody id="coin-control-tbody"></tbody>
+										</table>
+									</div>
+									<div id="coin-control-selected-info" class="mt-1 text-muted"></div>
 								</div>
 							</div>
 
@@ -518,6 +558,15 @@
 						'pubKeyHash': 0x21,
 						'scriptHash': 0x1E,
 						'wif':     0x80
+					},
+					// Coinbase maturity config — parametrized for reuse in other projects
+					'maturity': {
+						'coinbase': 100,         // standard COINBASE_MATURITY
+						'extended': {
+							'enabled': true,     // set false to use standard maturity only
+							'start':   1177,     // EXT_MATURITY_START block height
+							'depth':   8000      // EXT_COINBASE_MATURITY blocks
+						}
 					}
 				}
 			}
@@ -528,16 +577,25 @@
 			}
 
 			var globalData = {
-				'balance':    0,
-				'height':     0,
-				'keys':       undefined,
-				'address':    undefined,
-				'scriptHex':  undefined,
-				'pubKeyHex':  undefined,
-				'rfee':       getConfig()['fee'],
-				'tx':         { 'amount': 0, 'outputs': [], 'fee': 0 },
-				'resetTx':    function() { this.tx = { 'amount': 0, 'outputs': [], 'fee': 0 } },
-				'clear':      function() { this.keys = {}; this.address = ''; this.scriptHex = undefined; this.pubKeyHex = undefined; this.balance = 0; this.height = 0; this.resetTx() }
+				'balance':         0,
+				'immatureBalance': 0,
+				'height':          0,
+				'keys':            undefined,
+				'address':         undefined,
+				'scriptHex':       undefined,
+				'pubKeyHex':       undefined,
+				'rfee':            getConfig()['fee'],
+				'utxos':           [],           // cached UTXO list with coinbase flag
+				'coinControl':     false,         // coin control mode on/off
+				'selectedUtxos':   null,          // Set of selected txid:index (coin control)
+				'tx':              { 'amount': 0, 'outputs': [], 'fee': 0 },
+				'resetTx':         function() { this.tx = { 'amount': 0, 'outputs': [], 'fee': 0 } },
+				'clear':           function() {
+					this.keys = {}; this.address = ''; this.scriptHex = undefined; this.pubKeyHex = undefined
+					this.balance = 0; this.immatureBalance = 0; this.height = 0
+					this.utxos = []; this.coinControl = false; this.selectedUtxos = null
+					this.resetTx()
+				}
 			}
 
 			var messages = initMessages()
@@ -831,6 +889,78 @@
 			}
 
 			// ================================================================
+			// Coinbase maturity logic (mirrors Bitweb consensus/consensus.h)
+			// ================================================================
+
+			// Returns required depth (confirmations) for a coinbase UTXO to be spendable.
+			// coinHeight = block height where the coinbase was mined
+			// Uses maturity config from current network (parametrized — disable extended
+			// for non-Bitweb networks by setting maturity.extended.enabled = false).
+			function getRequiredMaturity(coinHeight) {
+				var cfg = getConfig()['maturity']
+				if (!cfg) return 100
+				var m   = cfg.coinbase || 100
+				var ext = cfg.extended
+				if (ext && ext.enabled) {
+					var EXT_END = ext.start + ext.depth
+					if (coinHeight >= ext.start && coinHeight < EXT_END) {
+						// Extended rule: required = (EXT_END - coinHeight) + COINBASE_MATURITY
+						return (EXT_END - coinHeight) + m
+					}
+				}
+				return m
+			}
+
+			// Returns true if a UTXO is mature (safe to spend).
+			// utxo must have { coinbase: bool, height: int }
+			// currentHeight = current blockchain tip
+			function isUtxoMature(utxo, currentHeight) {
+				if (!utxo.coinbase) return true
+				if (utxo.height === 0) return false   // unconfirmed coinbase — never mature
+				var depth    = currentHeight - utxo.height + 1
+				var required = getRequiredMaturity(utxo.height)
+				return depth >= required
+			}
+
+			// Blocks remaining until UTXO matures (0 if already mature)
+			function blocksToMature(utxo, currentHeight) {
+				if (!utxo.coinbase || utxo.height === 0) return 0
+				var depth    = currentHeight - utxo.height + 1
+				var required = getRequiredMaturity(utxo.height)
+				return Math.max(0, required - depth)
+			}
+
+			// ================================================================
+			// UTXO localStorage cache
+			// Key: bte_utxo_{address}
+			// Stored: { utxos: [...], height: N, ts: timestamp }
+			// Invalidate when height changes or after 60s
+			// ================================================================
+			var UTXO_CACHE_TTL = 60000  // ms
+
+			function loadUtxoCache(address) {
+				try {
+					var raw = localStorage.getItem('bte_utxo_' + address)
+					if (!raw) return null
+					var c = JSON.parse(raw)
+					if (Date.now() - c.ts > UTXO_CACHE_TTL) return null
+					return c
+				} catch(e) { return null }
+			}
+
+			function saveUtxoCache(address, utxos, height) {
+				try {
+					localStorage.setItem('bte_utxo_' + address, JSON.stringify({
+						utxos: utxos, height: height, ts: Date.now()
+					}))
+				} catch(e) {}
+			}
+
+			function clearUtxoCache(address) {
+				try { localStorage.removeItem('bte_utxo_' + address) } catch(e) {}
+			}
+
+			// ================================================================
 			// Router
 			// ================================================================
 			function routePage() {
@@ -894,6 +1024,53 @@
 				var url = getBackend() + '/unspent/' + address + '?amount=' + amount
 				if (confirmedOnly) url += '&confirmed=true'
 				return Promise.resolve($.ajax({ 'url': url }))
+			}
+
+			// Fetch UTXOs, compute maturity, cache in localStorage + globalData.
+			// Calls renderCoinControl() and updates immature balance display.
+			// forceRefresh=true bypasses TTL cache.
+			function updateUtxos(forceRefresh) {
+				if (!globalData.address) return Promise.resolve()
+
+				var address = globalData.address
+				var height  = globalData.height
+
+				// Check cache unless forced
+				if (!forceRefresh) {
+					var cached = loadUtxoCache(address)
+					if (cached && cached.height === height && height > 0) {
+						globalData.utxos = cached.utxos
+						_applyUtxoData()
+						return Promise.resolve()
+					}
+				}
+
+				return fetch(getBackend() + '/unspent/' + address + '?confirmed=true')
+					.then(function(r) { return r.json() })
+					.then(function(data) {
+						if (!data || data.error !== null) return
+						var utxos = data.result || []
+						// Annotate each UTXO with mature flag and blocksLeft
+						utxos.forEach(function(u) {
+							u.mature     = isUtxoMature(u, height)
+							u.blocksLeft = blocksToMature(u, height)
+						})
+						globalData.utxos = utxos
+						saveUtxoCache(address, utxos, height)
+						_applyUtxoData()
+					})
+					.catch(function() {})
+			}
+
+			// Compute + display immature balance, re-render coin control if open
+			function _applyUtxoData() {
+				var immature = 0
+				globalData.utxos.forEach(function(u) {
+					if (!u.mature) immature += u.value
+				})
+				globalData.immatureBalance = immature
+				_renderImmatureBalance()
+				renderCoinControl()
 			}
 
 			// ================================================================
@@ -1110,6 +1287,8 @@
 					var infoData    = results[0]
 					var balanceData = results[1]
 
+					var prevHeight = globalData.height
+
 					// Update network height
 					if (infoData && infoData.result) {
 						globalData.height = infoData.result.blocks
@@ -1122,7 +1301,7 @@
 						globalData.balance = res.balance
 						balance = amountFormat(res.balance)
 
-						// If balance changed — refresh history
+						// If balance or height changed — refresh history + UTXOs
 						if (res.balance !== prevBal && globalData.address) updateHistory()
 					} else {
 						if (!silent) showMessage(messages.error['balance-load-failed'])
@@ -1130,12 +1309,29 @@
 
 					$('.wallet-balance .amount').text(balance)
 					$('.wallet-balance .ticker').text(getConfig()['ticker'])
+
+					// Refresh UTXOs when height changes or first load
+					var heightChanged = (globalData.height !== prevHeight)
+					if (heightChanged || globalData.utxos.length === 0) {
+						updateUtxos(heightChanged)
+					}
 				}).catch(function() {
 					if (!silent) {
 						showMessage(messages.error['balance-load-failed'])
 						$('.wallet-balance .ticker').text(getConfig()['ticker'])
 					}
 				})
+			}
+
+			function _renderImmatureBalance() {
+				var immature = globalData.immatureBalance
+				var $row = $('#immature-balance-row')
+				if (immature > 0) {
+					$row.removeClass('d-none')
+					$row.find('.immature-amount').text(amountFormat(immature) + ' ' + getConfig()['ticker'])
+				} else {
+					$row.addClass('d-none')
+				}
 			}
 
 			function setHomeTitle() {
@@ -1222,6 +1418,71 @@
 			}
 
 			// ================================================================
+			// Coin Control UI
+			// ================================================================
+			function renderCoinControl() {
+				var utxos  = globalData.utxos
+				var height = globalData.height
+				var tbody  = $('#coin-control-tbody')
+				tbody.empty()
+
+				if (utxos.length === 0) {
+					tbody.append('<tr><td colspan="5" class="text-muted text-center">No UTXOs</td></tr>')
+					_updateCoinControlInfo()
+					return
+				}
+
+				utxos.forEach(function(u, idx) {
+					var key      = u.txid + ':' + u.index
+					var checked  = !globalData.coinControl || (globalData.selectedUtxos && globalData.selectedUtxos.has(key))
+					var mature   = u.mature
+					var isCbase  = u.coinbase
+					var disabled = (!globalData.coinControl || !mature) ? 'disabled' : ''
+					var rowClass = (!mature) ? 'text-muted' : ''
+					var status   = ''
+					if (!mature) {
+						status = '<span class="text-warning" title="Matures in ' + u.blocksLeft + ' blocks">' +
+							'<span class="fa fa-lock"></span> ' + u.blocksLeft + ' blk</span>'
+					} else {
+						status = '<span class="text-success"><span class="fa fa-unlock"></span> mature</span>'
+					}
+					var typeLabel = isCbase
+						? '<span class="badge badge-secondary">coinbase</span>'
+						: '<span class="badge badge-light">regular</span>'
+					var shortTx   = u.txid.substr(0,6) + '…' + u.txid.substr(-4)
+					var amt       = amountFormat(u.value)
+
+					tbody.append(
+						'<tr class="' + rowClass + '" data-key="' + key + '">' +
+						'<td><input type="checkbox" class="cc-utxo-check" data-key="' + key + '"' +
+						(checked ? ' checked' : '') + (disabled ? ' disabled' : '') + (!mature ? ' title="Immature coinbase — cannot spend"' : '') + '></td>' +
+						'<td class="text-monospace">' + amt + '</td>' +
+						'<td>' + (height > 0 && u.height > 0 ? (height - u.height + 1) : '—') + '</td>' +
+						'<td>' + typeLabel + '</td>' +
+						'<td>' + status + '</td>' +
+						'</tr>'
+					)
+				})
+
+				_updateCoinControlInfo()
+			}
+
+			function _updateCoinControlInfo() {
+				if (!globalData.coinControl || !globalData.selectedUtxos) {
+					$('#coin-control-selected-info').text('')
+					return
+				}
+				var total = 0, count = 0
+				globalData.utxos.forEach(function(u) {
+					var key = u.txid + ':' + u.index
+					if (globalData.selectedUtxos.has(key)) { total += u.value; count++ }
+				})
+				$('#coin-control-selected-info').text(
+					count + ' UTXO selected — ' + amountFormat(total) + ' ' + getConfig()['ticker']
+				)
+			}
+
+			// ================================================================
 			// Send transaction — spend only confirmed UTXOs
 			// ================================================================
 			function showConfirmation(amount) {
@@ -1271,31 +1532,34 @@
 
 				$('#status-screen span').html(messages.tx['loading-utxo'])
 
-				// confirmed=true — skip unconfirmed UTXOs
-				getUnspent(address, amount, true).then(function(data) {
+				// Use cached UTXOs (already filtered to confirmed) + refresh if empty
+				var doSend = function(utxos) {
+					// Filter: exclude immature coinbase; if coin control enabled, use selection
+					var spendable
+					if (globalData.coinControl && globalData.selectedUtxos && globalData.selectedUtxos.size > 0) {
+						spendable = utxos.filter(function(u) {
+							return globalData.selectedUtxos.has(u.txid + ':' + u.index) && u.mature
+						})
+					} else {
+						// Default: skip immature coinbase automatically
+						spendable = utxos.filter(function(u) { return u.mature })
+					}
+
 					var value = 0
-					for (var i = 0; i < data.result.length; i++) {
-						var u      = data.result[i]
-						var txid   = u.txid
-						var index  = u.index
-						value += u.value
-
-						// Confirmations count
-						var confs = (u.height === 0 || globalData.height === 0)
-							? 0
-							: (globalData.height - u.height + 1)
-
+					for (var i = 0; i < spendable.length; i++) {
+						var u      = spendable[i]
 						var script = bitcoin.Buffer(u.script, 'hex')
 						var type   = getScriptType(script)
 
 						if (type == 'bech32') {
 							var p2wpkh = getP2WPKHScript(keys.publicKey)
-							txb.addInput(txid, index, null, p2wpkh.output)
+							txb.addInput(u.txid, u.index, null, p2wpkh.output)
 						} else {
-							txb.addInput(txid, index)
+							txb.addInput(u.txid, u.index)
 						}
-
 						scripts.push({ 'script': script, 'type': type, 'value': u.value })
+						value += u.value
+						if (value >= amount) break  // stop adding inputs once we have enough
 					}
 
 					if (value >= amount) {
@@ -1317,13 +1581,14 @@
 									break
 								default:
 									showSendError(messages.error['bad-utxo'])
-									break
+									return
 							}
 						}
 
 						var tx = txb.build()
 						transactionBroadcast(tx.toHex()).then(function(data) {
 							if (data.error == null) {
+								clearUtxoCache(address)  // invalidate UTXO cache after spend
 								$('#status-screen span').html(
 									'<a href="' + escHtml(blockExplorer.tx(data.result)) + '" target="_blank">' + escHtml(data.result) + '</a>'
 								)
@@ -1344,7 +1609,26 @@
 					} else {
 						showSendError(messages.error['not-enough-funds'])
 					}
-				})
+				}
+
+				// Use cached UTXOs if available and height hasn't changed; otherwise re-fetch
+				if (globalData.utxos.length > 0) {
+					doSend(globalData.utxos)
+				} else {
+					fetch(getBackend() + '/unspent/' + address + '?confirmed=true')
+					.then(function(r) { return r.json() })
+					.then(function(data) {
+						var utxos = (data && data.error === null) ? data.result : []
+						var h     = globalData.height
+						utxos.forEach(function(u) {
+							u.mature     = isUtxoMature(u, h)
+							u.blocksLeft = blocksToMature(u, h)
+						})
+						globalData.utxos = utxos
+						doSend(utxos)
+					})
+					.catch(function() { showSendError(messages.error['not-enough-utxo']) })
+				}
 			}
 
 			// ================================================================
@@ -1573,8 +1857,10 @@
 					})
 
 					total = parseFloat((total + txFee * 1).toFixed(getConfig()['decimals']))
+					// spendable = total balance minus immature coinbase
+					var spendable = amountFormat(globalData.balance - globalData.immatureBalance)
 					if (!error) {
-						if (total <= amountFormat(globalData.balance)) showConfirmation(total)
+						if (total <= spendable) showConfirmation(total)
 						else showSendError(messages.error['not-enough-funds'])
 					}
 				})
@@ -1655,6 +1941,50 @@
 				$('#send-reset').click(function(e) { resetTxForm(); e.preventDefault() })
 				$('#send-qr').click(function(e)    { showScanModal(); e.preventDefault() })
 				$('#footer-close').click(function(e) { closeWallet(); e.preventDefault() })
+
+				// Coin control toggle button
+				$('#coin-control-toggle').click(function(e) {
+					$('#coin-control-panel').toggleClass('d-none')
+					var open = !$('#coin-control-panel').hasClass('d-none')
+					$('#coin-control-toggle-text').text(open ? 'Coin Control ▲' : 'Coin Control')
+					if (open) renderCoinControl()
+					e.preventDefault()
+				})
+
+				// Enable/disable manual selection
+				$(document).on('change', '#coin-control-enable', function() {
+					globalData.coinControl = $(this).is(':checked')
+					if (globalData.coinControl) {
+						// Pre-select all mature UTXOs
+						globalData.selectedUtxos = new Set()
+						globalData.utxos.forEach(function(u) {
+							if (u.mature) globalData.selectedUtxos.add(u.txid + ':' + u.index)
+						})
+					} else {
+						globalData.selectedUtxos = null
+					}
+					renderCoinControl()
+				})
+
+				// Select all mature
+				$('#coin-control-select-all').click(function(e) {
+					if (!globalData.coinControl) return e.preventDefault()
+					globalData.selectedUtxos = new Set()
+					globalData.utxos.forEach(function(u) {
+						if (u.mature) globalData.selectedUtxos.add(u.txid + ':' + u.index)
+					})
+					renderCoinControl()
+					e.preventDefault()
+				})
+
+				// Individual UTXO checkbox
+				$(document).on('change', '.cc-utxo-check', function() {
+					if (!globalData.coinControl || !globalData.selectedUtxos) return
+					var key = $(this).data('key')
+					if ($(this).is(':checked')) globalData.selectedUtxos.add(key)
+					else globalData.selectedUtxos.delete(key)
+					_updateCoinControlInfo()
+				})
 
 				$('#footer-create').click(function() {
 					var keys    = bitcoin.ECPair.makeRandom({ 'network': getConfig()['network'] })
