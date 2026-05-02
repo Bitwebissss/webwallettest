@@ -381,7 +381,7 @@
 						<div id="wallet-backend">
 							<label tkey="wallet-backend"></label>
 							<div class="input-group pb-2">
-								<input class="form-control" type="text" placeholder="wss://host:port">
+								<input class="form-control" type="text" tkey="wallet-api">
 								<span class="input-group-append">
 									<button class="btn btn-outline-dark b-width" type="button" tkey="update"></button>
 								</span>
@@ -471,10 +471,10 @@
 					'uri': 'bitweb:',
 					'title': 'Bitweb Wallet',
 					'name': 'Main Network (BTE)',
-					'api': 'wss://electrum.bitwebcore.net:20003',
+					'api': 'https://api.bitwebcore.net',
 					'ticker': 'BTE',
 					'decimals': 8,
-					'fee': 0.001,
+					'fee': 0.0001,
 					'network': {
 						'messagePrefix': '\x19Bitweb Signed Message:\n',
 						'bip32': {
@@ -491,10 +491,10 @@
 					'uri': 'bitweb:',
 					'title': 'Bitweb Wallet',
 					'name': 'Test Network (TBTE)',
-					'api': 'wss://electrum-testnet.bitwebcore.net:50004',
+					'api': 'https://api-testnet.bitwebcore.net',
 					'ticker': 'TUGAR',
 					'decimals': 8,
-					'fee': 0.001,
+					'fee': 0.0001,
 					'network': {
 						'messagePrefix': '\x19Bitweb Signed Message:\n',
 						'bip32': {
@@ -507,136 +507,6 @@
 						'wif': 0xEF
 					}
 				}
-			}
-
-			// ─── ElectrumX WebSocket client ───────────────────────────────
-			// ElectrumX WebSocket protocol rules:
-			//   1. WebSocket messages are already framed — do NOT split by \n
-			//   2. Do NOT append \n to ws.send() — only for raw TCP/SSL sockets
-			//   3. server.version MUST be first message after connect
-			var electrum = (function() {
-				var ws = null
-				var pending = {}
-				var msgId = 0
-				var currentUrl = null
-				var connectingPromise = null
-
-				function connect(url) {
-					if (connectingPromise) return connectingPromise
-					connectingPromise = new Promise(function(resolve, reject) {
-						currentUrl = url
-						var newWs = new WebSocket(url)
-						newWs.onopen = function() {
-							ws = newWs
-							connectingPromise = null
-							// ElectrumX requires server.version as the very first message
-							newWs.send(JSON.stringify({
-								jsonrpc: '2.0',
-								id: 0,
-								method: 'server.version',
-								params: ['BitwebWallet/0.5', '1.4']
-							}))
-							resolve()
-						}
-						newWs.onerror = function() {
-							connectingPromise = null
-							reject(new Error('WebSocket connection failed to ' + url))
-						}
-						newWs.onclose = function() {
-							ws = null
-							connectingPromise = null
-							Object.keys(pending).forEach(function(id) {
-								pending[id].reject(new Error('Connection closed'))
-							})
-							pending = {}
-						}
-						newWs.onmessage = function(evt) {
-							try {
-								// WebSocket is already framed — parse directly, NO split
-								var data = JSON.parse(evt.data)
-								if (data.id && data.id !== 0 && pending[data.id]) {
-									var cb = pending[data.id]
-									delete pending[data.id]
-									if (data.error) cb.reject(new Error(data.error.message || JSON.stringify(data.error)))
-									else cb.resolve(data.result)
-								}
-							} catch(e) {}
-						}
-					})
-					return connectingPromise
-				}
-
-				function isConnected() {
-					return ws && ws.readyState === WebSocket.OPEN
-				}
-
-				function request(method, params) {
-					var id = ++msgId
-					return new Promise(function(resolve, reject) {
-						function doRequest() {
-							pending[id] = { resolve: resolve, reject: reject }
-							setTimeout(function() {
-								if (pending[id]) {
-									delete pending[id]
-									reject(new Error('Request timeout: ' + method))
-								}
-							}, 15000)
-							try {
-								// NO \n — WebSocket frames messages automatically
-								ws.send(JSON.stringify({ jsonrpc: '2.0', id: id, method: method, params: params }))
-							} catch(e) {
-								delete pending[id]
-								reject(e)
-							}
-						}
-
-						if (isConnected()) {
-							doRequest()
-						} else {
-							connect(currentUrl || getBackend()).then(doRequest).catch(reject)
-						}
-					})
-				}
-
-				function disconnect() {
-					if (ws) { ws.close(); ws = null }
-					connectingPromise = null
-				}
-
-				function testConnection(url) {
-					return new Promise(function(resolve, reject) {
-						var done = false
-						var testWs = new WebSocket(url)
-						testWs.onopen = function() {
-							done = true
-							testWs.send(JSON.stringify({
-								jsonrpc: '2.0', id: 0,
-								method: 'server.version',
-								params: ['BitwebWallet/0.5', '1.4']
-							}))
-							testWs.close()
-							resolve()
-						}
-						testWs.onerror = function() {
-							if (!done) { done = true; reject(new Error('Cannot connect')) }
-						}
-						setTimeout(function() {
-							if (!done) { done = true; testWs.close(); reject(new Error('Timeout')) }
-						}, 5000)
-					})
-				}
-
-				return { request: request, disconnect: disconnect, testConnection: testConnection, getUrl: function() { return currentUrl } }
-			})()
-
-			// ─── Script hash helper for ElectrumX ─────────────────────────
-			// ElectrumX expects SHA256(scriptPubKey) in little-endian hex
-			function addressToScriptHash(address) {
-				var network = getConfig()['network']
-				var script = bitcoin.address.toOutputScript(address, network)
-				var hash = bitcoin.crypto.sha256(script)
-				var reversed = bitcoin.Buffer.from(hash).reverse()
-				return reversed.toString('hex')
 			}
 
 			// Explorer links
@@ -684,7 +554,7 @@
 							return getText('address-type-changed') + ' <b>' + type + '</b>'
 						},
 						'backendSwitched': function (url) {
-							return getText('backend-switched') +  ' <b>' + url + '</b>'
+							returngetText('backend-switched') +  ' <b>' + url + '</b>'
 						},
 						'backendNotWorking': function (url) {
 							return '<b>' + url + '</b> ' + getText('backend-down')
@@ -792,7 +662,6 @@
 					setCookie('network', network, 60)
 					closeWallet()
 					displayNetworks()
-					electrum.disconnect()
 					switchBackend(networkConfigs[network]['api'])
 				}
 
@@ -839,16 +708,12 @@
 				return backend
 			}
 
-			// Switch wallet backend (ElectrumX WSS endpoint)
+			// Switch wallet backend
 			function switchBackend(url) {
-				if (!url.startsWith('wss://') && !url.startsWith('ws://')) {
-					showMessage('<b>' + url + '</b> — must start with wss:// or ws://')
-					$('#wallet-backend input').val(getBackend())
-					return
-				}
-				electrum.testConnection(url).then(function() {
+				Promise.resolve($.ajax({
+					'url': url + '/info',
+				})).then(function(data) {
 					setCookie('backend', url, 60)
-					electrum.disconnect()
 					showMessage(messages.settings.backendSwitched(url))
 				}).catch(function() {
 					showMessage(messages.settings.backendNotWorking(url))
@@ -957,72 +822,52 @@
 				document.title = title + ' | ' + getConfig()['title'];
 			}
 
-			// Broadcast tx via ElectrumX
+			// Broadcast tx
 			function transactionBroadcast(rawtx) {
-				return electrum.request('blockchain.transaction.broadcast', [rawtx])
-					.then(function(txid) {
-						return { result: txid }
-					})
-					.catch(function(err) {
-						return { error: { message: err.message || String(err) } }
-					})
+				return Promise.resolve($.ajax({
+					'method': 'POST',
+					'url': getBackend() + '/broadcast',
+					'data': {
+						'raw': rawtx
+					}
+				}))
 			}
 
-			// Fixed fee — no ElectrumX query needed
+			// Estimate fee
 			function estimateFee() {
-				return Promise.resolve({ result: { feerate: getConfig()['fee'] } })
+				return Promise.resolve($.ajax({
+					'url': getBackend() + '/fee',
+				})).then(function(data) {
+					return data
+				})
 			}
 
-			// Get address balance via ElectrumX
+			// Get address balance
 			function addressBalance(address) {
-				var scriptHash
-				try {
-					scriptHash = addressToScriptHash(address)
-				} catch(e) {
-					return Promise.resolve({ error: { message: 'Invalid address' } })
-				}
-				return electrum.request('blockchain.scripthash.get_balance', [scriptHash])
-					.then(function(result) {
-						// result = { confirmed: <sat>, unconfirmed: <sat> }
-						return { result: { balance: result.confirmed + result.unconfirmed } }
-					})
-					.catch(function(err) {
-						return { error: { message: err.message } }
-					})
+				return Promise.resolve($.ajax({
+					'url': getBackend() + '/balance/' + address,
+				})).then(function(data) {
+					return data
+				})
 			}
 
-			// Get address UTXOs via ElectrumX
-			// Returns normalised format compatible with sendTransaction()
+			// Get address UTXO
 			function getUnspent(address, amount) {
-				var scriptHash
-				try {
-					scriptHash = addressToScriptHash(address)
-				} catch(e) {
-					return Promise.resolve({ error: { message: 'Invalid address' } })
-				}
-				return electrum.request('blockchain.scripthash.listunspent', [scriptHash])
-					.then(function(utxos) {
-						// Build the scriptPubKey once from the address so getScriptType() works
-						var network = getConfig()['network']
-						var script = bitcoin.address.toOutputScript(address, network)
-						var scriptHex = script.toString('hex')
-						return {
-							result: utxos.map(function(u) {
-								return {
-									txid: u.tx_hash,
-									index: u.tx_pos,
-									value: u.value,   // satoshis
-									script: scriptHex
-								}
-							})
-						}
-					})
-					.catch(function(err) {
-						return { error: { message: err.message } }
-					})
+				return Promise.resolve($.ajax({
+					'url': getBackend() + '/unspent/' + address + '?amount=' + amount,
+				})).then(function(data) {
+					return data
+				})
 			}
 
-			// (transactionInfo removed – not used by this wallet UI)
+			// Get transaction info
+			function transactionInfo(hash) {
+				return Promise.resolve($.ajax({
+					'url': getBackend() + '/transaction/' + hash,
+				})).then(function(data) {
+					return data
+				})
+			}
 
 			// Convert satoshis to readable amount
 			function amountFormat(amount, invert = false) {
@@ -1052,16 +897,19 @@
 
 			// Check wallet balance
 			function walletBalance() {
+				var balance = '0.00'
 				$('.wallet-balance .amount').text('')
 				$('.wallet-balance .ticker').text(getText('loading'))
 
 				addressBalance(globalData.address).then(function(data) {
 					if (data['error'] == undefined) {
 						globalData.balance = data.result.balance
+						balance = amountFormat(globalData.balance)
+					} else {
+						showMessage(messages.errors['balance-load-failed'])
 					}
-					// on error: keep last known balance (0 for new wallet), no popup
 
-					$('.wallet-balance .amount').text(amountFormat(globalData.balance))
+					$('.wallet-balance .amount').text(balance)
 					$('.wallet-balance .ticker').text(getConfig()['ticker'])
 				})
 			}
@@ -1240,14 +1088,6 @@
 
 				$('#status-screen span').html(messages.tx['loading-utxo'])
 				getUnspent(address, amount).then(function(data) {
-					if (data.error) {
-						showMessage(messages.error['bad-utxo'])
-						$('#send-cancel').removeClass('disabled')
-						$('#send-confirm').removeClass('disabled')
-						$('#confirm-screen').removeClass('d-none')
-						$('#status-screen').addClass('d-none')
-						return
-					}
 					var value = 0
 					for (var i = 0, size = data.result.length; i < size; i++) {
 						var txid = data.result[i].txid
@@ -1676,8 +1516,14 @@
 					initWallet()
 				})
 
-				// Fixed fee — set directly from network config
-				globalData.rfee = getConfig()['fee']
+				// Set wallet recomended fee
+				estimateFee().then(function(data) {
+					if (data.error == undefined) {
+						globalData.rfee = amountFormat(data.result.feerate)
+					} else {
+						globalData.rfee = getConfig()['fee']
+					}
+				})
 
 				$('#scan-modal').on('hide.bs.modal', function (e) {
 					stopStream()
