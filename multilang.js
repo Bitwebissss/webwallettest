@@ -531,12 +531,7 @@ var walletLanguages = {
 		'pass-not-match': 'Ваши пароли не совпадают!',
 		'pass-too-short': 'Ваш пароль должен быть не меньше 10 символов!',
 		'bad-email': 'Похоже, Вы ввели не действительный электронный адрес!',
-		'small-fee': 'Вы должны указать комиссию не меньше, чем',
-		'scan-qr': 'Сканировать',
-		'scan-modal-title': 'Сканер QR-кода',
-		'webcam-message': 'Убедитесь, что веб-камера включена',
-		'webcam-loading': 'Загрузка камеры...',
-		'outputs-added': 'добавлен в получателей'
+		'small-fee': 'Вы должны указать комиссию не меньше, чем'
 	},
 	'kr': {
 		'lang-alias': '한국어',
@@ -611,12 +606,7 @@ var walletLanguages = {
 		'pass-not-match': '비밀번호가 일치하지 않습니다.',
 		'pass-too-short': '비밀번호는 10글자 이상 입력해주세요.',
 		'bad-email': '올바른 메일 주소가 아닙니다.',
-		'small-fee': '최소수수료',
-		'scan-qr': '스캔',
-		'scan-modal-title': 'QR 코드 스캐너',
-		'webcam-message': '웹캠이 활성화되어 있는지 확인하세요',
-		'webcam-loading': '카메라 로드 중...',
-		'outputs-added': '수신자에 추가됨'
+		'small-fee': '최소수수료'
 	},
 	'de': {
 		'lang-alias': 'Deutsch',
@@ -691,11 +681,6 @@ var walletLanguages = {
 		'pass-not-match': 'Die von Dir eingegebenen Passwörter stimmen nicht überein!',
 		'pass-too-short': 'Die Länge Deines Passworts muss mindestens 10 Zeichen betragen!',
 		'bad-email': 'Deine Email-Adresse scheint nicht gültig zu sein!',
-		'small-fee': 'sollte nicht weniger betragen als',
-		'scan-qr': 'Scannen',
-		'scan-modal-title': 'QR-Code Scanner',
-		'webcam-message': 'Bitte stelle sicher, dass deine Webcam aktiviert ist',
-		'webcam-loading': 'Kamera wird geladen...',
-		'outputs-added': 'zu Empfängern hinzugefügt'
+		'small-fee': 'sollte nicht weniger betragen als'
 	}
 }
