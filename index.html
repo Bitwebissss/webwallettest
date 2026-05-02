@@ -210,6 +210,14 @@
 										<span class="ticker" tkey="loading"></span>
 									</div>
 									<small class="wallet-unconfirmed text-warning d-none"></small>
+									<!-- Immature coinbase balance (shown only when > 0) -->
+									<div id="immature-balance-row-main" class="d-none mt-1">
+										<small class="text-warning">
+											<span class="fa fa-lock"></span>
+											Immature (mining): <b class="immature-amount"></b>
+											<span class="text-muted"> — cannot spend yet</span>
+										</small>
+									</div>
 								</div>
 							</div>
 
@@ -585,15 +593,18 @@
 				'scriptHex':       undefined,
 				'pubKeyHex':       undefined,
 				'rfee':            getConfig()['fee'],
-				'utxos':           [],           // cached UTXO list with coinbase flag
-				'coinControl':     false,         // coin control mode on/off
-				'selectedUtxos':   null,          // Set of selected txid:index (coin control)
+				'utxos':           [],
+				'coinControl':     false,
+				'selectedUtxos':   null,
 				'tx':              { 'amount': 0, 'outputs': [], 'fee': 0 },
+				// Track last rendered values — skip DOM update if nothing changed
+				'_lastRendered':   { balance: -1, immature: -1, utxoFingerprint: '' },
 				'resetTx':         function() { this.tx = { 'amount': 0, 'outputs': [], 'fee': 0 } },
 				'clear':           function() {
 					this.keys = {}; this.address = ''; this.scriptHex = undefined; this.pubKeyHex = undefined
 					this.balance = 0; this.immatureBalance = 0; this.height = 0
 					this.utxos = []; this.coinControl = false; this.selectedUtxos = null
+					this._lastRendered = { balance: -1, immature: -1, utxoFingerprint: '' }
 					this.resetTx()
 				}
 			}
@@ -1062,15 +1073,26 @@
 					.catch(function() {})
 			}
 
-			// Compute + display immature balance, re-render coin control if open
+			// Compute + display immature balance, re-render coin control only if UTXOs changed
 			function _applyUtxoData() {
 				var immature = 0
 				globalData.utxos.forEach(function(u) {
 					if (!u.mature) immature += u.value
 				})
 				globalData.immatureBalance = immature
-				_renderImmatureBalance()
-				renderCoinControl()
+
+				// Fingerprint = sorted txid:index:mature list — skip coin control re-render if identical
+				var fp = globalData.utxos.map(function(u) {
+					return u.txid + ':' + u.index + ':' + (u.mature ? 1 : 0)
+				}).join('|')
+
+				var fpChanged = fp !== globalData._lastRendered.utxoFingerprint
+				if (fpChanged) {
+					globalData._lastRendered.utxoFingerprint = fp
+					renderCoinControl()
+				}
+
+				_renderBalanceDisplay()
 			}
 
 			// ================================================================
@@ -1278,6 +1300,9 @@
 				if (!silent) {
 					$('.wallet-balance .amount').text('')
 					$('.wallet-balance .ticker').text(getText('loading'))
+					// Reset last rendered so next call forces DOM update
+					globalData._lastRendered.balance  = -1
+					globalData._lastRendered.immature = -1
 				}
 
 				Promise.all([
@@ -1287,31 +1312,28 @@
 					var infoData    = results[0]
 					var balanceData = results[1]
 
-					var prevHeight = globalData.height
+					var prevHeight  = globalData.height
+					var prevBalance = globalData.balance
 
-					// Update network height
 					if (infoData && infoData.result) {
 						globalData.height = infoData.result.blocks
 					}
 
-					var balance = '0.00'
 					if (balanceData && balanceData.error == null) {
-						var res        = balanceData.result
-						var prevBal    = globalData.balance
-						globalData.balance = res.balance
-						balance = amountFormat(res.balance)
+						globalData.balance = balanceData.result.balance
 
-						// If balance or height changed — refresh history + UTXOs
-						if (res.balance !== prevBal && globalData.address) updateHistory()
+						// Balance changed → refresh history
+						if (globalData.balance !== prevBalance && globalData.address) updateHistory()
 					} else {
 						if (!silent) showMessage(messages.error['balance-load-failed'])
 					}
 
-					$('.wallet-balance .amount').text(balance)
-					$('.wallet-balance .ticker').text(getConfig()['ticker'])
+					// Render balance (available = balance - immature, already computed)
+					_renderBalanceDisplay()
 
-					// Refresh UTXOs when height changes or first load
-					var heightChanged = (globalData.height !== prevHeight)
+					// Refresh UTXOs when height changed or first load — they recompute immature
+					// which triggers _renderBalanceDisplay again with correct immature value
+					var heightChanged = globalData.height !== prevHeight
 					if (heightChanged || globalData.utxos.length === 0) {
 						updateUtxos(heightChanged)
 					}
@@ -1323,15 +1345,38 @@
 				})
 			}
 
-			function _renderImmatureBalance() {
+			// Render available + immature balances.
+			// Skips DOM update entirely if nothing changed since last render.
+			function _renderBalanceDisplay() {
+				var total    = globalData.balance
 				var immature = globalData.immatureBalance
-				var $row = $('#immature-balance-row')
-				if (immature > 0) {
-					$row.removeClass('d-none')
-					$row.find('.immature-amount').text(amountFormat(immature) + ' ' + getConfig()['ticker'])
-				} else {
-					$row.addClass('d-none')
-				}
+				var avail    = Math.max(0, total - immature)
+
+				// Skip if nothing changed
+				var lr = globalData._lastRendered
+				if (lr.balance === total && lr.immature === immature) return
+				lr.balance = total
+				lr.immature = immature
+
+				var ticker = getConfig()['ticker']
+
+				// Main balance shows AVAILABLE (spendable) amount
+				$('.wallet-balance .amount').text(amountFormat(avail))
+				$('.wallet-balance .ticker').text(ticker)
+
+				// Immature row — both tabs — visible only when > 0
+				var immatureText = immature > 0
+					? amountFormat(immature) + ' ' + ticker
+					: ''
+
+				$('#immature-balance-row-main, #immature-balance-row').each(function() {
+					if (immature > 0) {
+						$(this).find('.immature-amount').text(immatureText)
+						$(this).removeClass('d-none')
+					} else {
+						$(this).addClass('d-none')
+					}
+				})
 			}
 
 			function setHomeTitle() {
