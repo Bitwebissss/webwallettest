@@ -5,6 +5,7 @@
 		<meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
 		<meta http-equiv="X-UA-Compatible" content="IE=edge">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/css/bootstrap.min.css">
 		<link rel="stylesheet" href="/css/wizardry.min.css">
 		<link rel="stylesheet" href="/css/entypo.css">
@@ -412,6 +413,7 @@
 						</button>
 					</div>
 					<div class="modal-body">
+						<div id="send-modal-error" class="alert alert-danger d-none" role="alert"></div>
 						<div id="confirm-screen">
 							<span tkey="send-warning"></span> <strong id="confirm-amount"></strong>. <span tkey="send-warning-reverse"></span>
 						</div>
@@ -475,7 +477,7 @@
 
 		<footer class="mb-3">
 			<div class="container text-center">
-				Made with <span class="entypo heart text-danger"></span> by <a target="_blank" href="https://github.com/bitweb-project/web-wallet">Volbil</a>
+				<span class="fab fa-github "></span> <a target="_blank" href="https://github.com/bitweb-project/web-wallet">Bitweb</a>
 			</div>
 		</footer>
 
@@ -526,14 +528,16 @@
 			}
 
 			var globalData = {
-				'balance':  0,
-				'height':   0,
-				'keys':     undefined,
-				'address':  undefined,
-				'rfee':     getConfig()['fee'],
-				'tx':       { 'amount': 0, 'outputs': [], 'fee': 0 },
-				'resetTx':  function() { this.tx = { 'amount': 0, 'outputs': [], 'fee': 0 } },
-				'clear':    function() { this.keys = {}; this.address = ''; this.balance = 0; this.height = 0; this.resetTx() }
+				'balance':    0,
+				'height':     0,
+				'keys':       undefined,
+				'address':    undefined,
+				'scriptHex':  undefined,
+				'pubKeyHex':  undefined,
+				'rfee':       getConfig()['fee'],
+				'tx':         { 'amount': 0, 'outputs': [], 'fee': 0 },
+				'resetTx':    function() { this.tx = { 'amount': 0, 'outputs': [], 'fee': 0 } },
+				'clear':      function() { this.keys = {}; this.address = ''; this.scriptHex = undefined; this.pubKeyHex = undefined; this.balance = 0; this.height = 0; this.resetTx() }
 			}
 
 			var messages = initMessages()
@@ -907,17 +911,29 @@
 				setTimeout(function() { $('#error-message').addClass('d-none') }, 3400)
 			}
 
+			// Show error inside the send modal (opens modal if not already open)
+			function showSendError(message) {
+				$('#send-modal-error').html(message).removeClass('d-none')
+				$('#confirm-screen').addClass('d-none')
+				$('#status-screen').addClass('d-none')
+				$('#send-cancel').removeClass('disabled d-none')
+				$('#send-confirm').addClass('d-none')
+				$('#send-close-footer').addClass('d-none disabled')
+				if (!$('#send-modal').hasClass('show')) {
+					$('#send-title').text(messages.title['sure'] || 'Send')
+					$('#send-modal').modal('show')
+				}
+			}
+
 			function showQrAddress(text) {
 				$('#qr-code-addres').empty()
 				$('#qr-code-addres').qrcode(text)
 			}
 
 			// ================================================================
-			// Transaction history
+			// Transaction history  (last 10 fetched client-side, direction computed from vout)
 			// ================================================================
-			function getHistory(address) {
-				return Promise.resolve($.ajax({ url: getBackend() + '/history/' + address }))
-			}
+			var HISTORY_LIMIT = 10
 
 			function loadHistory() {
 				var key = 'bte_history_' + globalData.address
@@ -925,56 +941,167 @@
 			}
 
 			function saveHistory(txs) {
-				localStorage.setItem('bte_history_' + globalData.address, JSON.stringify(txs))
+				try { localStorage.setItem('bte_history_' + globalData.address, JSON.stringify(txs)) } catch(e) {}
+			}
+
+			// Annotate a tx using full verbose tx data (vin + vout)
+			// Determines direction by looking for our pubkey in vin inputs:
+			//   - bech32 (P2WPKH)    : txinwitness[1] = compressed pubkey
+			//   - segwit (P2SH-P2WPKH): txinwitness[1] = compressed pubkey (same witness structure)
+			//   - legacy (P2PKH)     : scriptSig.hex ends with "21" + pubkey (no witness)
+			function annotateTx(txMeta, txDetail) {
+				var vin  = txDetail.vin  || []
+				var vout = txDetail.vout || []
+				var myPub = (globalData.pubKeyHex || '').toLowerCase()
+
+				var weAreSender = vin.some(function(input) {
+					// bech32 and segwit: pubkey is txinwitness[1]
+					var wit = input.txinwitness || []
+					if (wit[1] && wit[1].toLowerCase() === myPub) return true
+
+					// legacy P2PKH: scriptSig ends with OP_PUSHDATA(33) + pubkey = "21" + pubkey_hex
+					var sig = (input.scriptSig && input.scriptSig.hex) ? input.scriptSig.hex.toLowerCase() : ''
+					if (sig.length >= 68 && sig.slice(-68) === '21' + myPub) return true
+
+					return false
+				})
+
+				// Sum vout: received = to us, sentToOthers = to other addresses
+				var received = 0, sentToOthers = 0
+				vout.forEach(function(o) {
+					var sat = (o.value_sat != null) ? o.value_sat : Math.round((o.value || 0) * 1e8)
+					if (o.scriptPubKey && o.scriptPubKey.hex === globalData.scriptHex) {
+						received += sat
+					} else {
+						sentToOthers += sat
+					}
+				})
+
+				// direction + display amount
+				// Note: fee = inputs_total - all_vout_total; it's not in any vout so it's
+				// not included in sentToOthers. Display shows "sent X to recipient (+ fee)".
+				var direction, amount
+				if (weAreSender) {
+					direction = 'out'
+					// If all outputs came back to us (self-send), show received
+					amount = sentToOthers > 0 ? sentToOthers : received
+				} else {
+					direction = 'in'
+					amount = received
+				}
+
+				return {
+					tx_hash:   txMeta.tx_hash,
+					height:    txMeta.height,
+					direction: direction,
+					amount:    amount
+				}
 			}
 
 			function updateHistory() {
-				if (!globalData.address) return
-				getHistory(globalData.address).then(function(data) {
-					if (!data || data.error !== null) return
-					var txs = data.result || []
-					saveHistory(txs)
-					renderHistory(txs)
-				}).catch(function() {})
+				if (!globalData.address || !globalData.scriptHex) return
+
+				$('#history-list').html('<div class="text-muted text-center py-3 small">Loading…</div>')
+
+				// 1. Fetch full history list (lightweight — just hashes + heights)
+				fetch(getBackend() + '/history/' + globalData.address)
+				.then(function(r) { return r.json() })
+				.then(function(data) {
+					if (!data || data.error !== null) {
+						$('#history-list').html('<div class="text-danger text-center py-3 small">Failed to load history</div>')
+						return
+					}
+					var all    = data.result || []
+					var total  = all.length
+					// Take last HISTORY_LIMIT, reversed so newest first
+					var recent = all.slice(-HISTORY_LIMIT).reverse()
+
+					if (recent.length === 0) { renderHistory([], total); return }
+
+					// 2. Fetch verbose details for each tx in parallel
+					var fetches = recent.map(function(txMeta) {
+						return fetch(getBackend() + '/tx/' + txMeta.tx_hash)
+						.then(function(r) { return r.json() })
+						.then(function(d) {
+							var txDetail = (d.error === null && d.result) ? d.result : {}
+							return annotateTx(txMeta, txDetail)
+						})
+						.catch(function() {
+							// If /tx fetch fails, show row without amount
+							return { tx_hash: txMeta.tx_hash, height: txMeta.height, direction: 'unknown', amount: null }
+						})
+					})
+
+					Promise.all(fetches).then(function(annotated) {
+						saveHistory(annotated)
+						renderHistory(annotated, total)
+					})
+				})
+				.catch(function() {
+					$('#history-list').html('<div class="text-danger text-center py-3 small">Network error</div>')
+				})
 			}
 
-			function renderHistory(txs) {
+			function renderHistory(txs, total) {
 				if (!txs || txs.length === 0) {
-					$('#history-list').html('<div class="text-muted text-center py-3 small">No transactions yet</div>')
+					$('#history-list').html('<div class="text-muted text-center py-3 small" tkey="no-transactions">No transactions yet</div>')
 					return
 				}
-				var list = txs.slice().reverse()
+
 				var html = ''
-				list.forEach(function(tx) {
-					var confirmed = tx.height !== 0
-					var confs = confirmed
+				txs.forEach(function(tx) {
+					var confirmed  = tx.height !== 0
+					var confs      = confirmed
 						? (globalData.height > 0 ? (globalData.height - tx.height + 1) + ' conf' : 'confirmed')
 						: 'pending'
-					var badge = confirmed
-						? '<span class="badge badge-success">' + confs + '</span>'
-						: '<span class="badge badge-warning">pending</span>'
-					var blockStr = tx.height === 0 ? 'mempool' : 'block #' + tx.height
-					var txUrl    = blockExplorer.tx(tx.tx_hash)
-					var shortHash = tx.tx_hash.substr(0, 14) + '…' + tx.tx_hash.substr(-8)
-					html += '<div class="history-item d-flex justify-content-between align-items-center border-bottom">' +
-						'<div style="min-width:0">' +
-						'<div class="text-monospace" style="font-size:11px;overflow:hidden;text-overflow:ellipsis">' +
-						'<a href="' + txUrl + '" target="_blank">' + shortHash + '</a>' +
+					var confBadge  = confirmed
+						? '<span class="badge badge-success ml-1">' + confs + '</span>'
+						: '<span class="badge badge-warning ml-1">pending</span>'
+
+					// Amount + direction label (left side, before txid)
+					var dir    = tx.direction || 'unknown'
+					var amt    = (tx.amount != null) ? amountFormat(tx.amount) : '?'
+					var ticker = getConfig()['ticker']
+
+					var dirLabel = ''
+					if (dir === 'in') {
+						dirLabel = '<span class="font-weight-bold text-success" style="min-width:110px;display:inline-block">&#x2193; +' + amt + ' ' + ticker + '</span>'
+					} else if (dir === 'out') {
+						dirLabel = '<span class="font-weight-bold text-danger" style="min-width:110px;display:inline-block">&#x2191; -' + amt + ' ' + ticker + '</span>'
+					} else {
+						dirLabel = '<span class="text-muted" style="min-width:110px;display:inline-block">— ? ' + ticker + '</span>'
+					}
+
+					var txUrl     = blockExplorer.tx(tx.tx_hash)
+					var shortHash = tx.tx_hash.substr(0, 10) + '…' + tx.tx_hash.substr(-6)
+
+					html += '<div class="history-item d-flex align-items-center border-bottom" style="gap:6px">' +
+						dirLabel +
+						'<div class="text-monospace text-truncate flex-grow-1" style="font-size:11px">' +
+							'<a href="' + txUrl + '" target="_blank">' + shortHash + '</a>' +
 						'</div>' +
-						'<small class="text-muted">' + blockStr + '</small>' +
-						'</div>' +
-						'<div class="ml-2 flex-shrink-0">' + badge + '</div>' +
-						'</div>'
+						'<div class="flex-shrink-0">' + confBadge + '</div>' +
+					'</div>'
 				})
+
+				// "See more" link when history is longer than HISTORY_LIMIT
+				if (total && total > HISTORY_LIMIT) {
+					var explorerUrl = blockExplorer.address(globalData.address)
+					html += '<div class="text-center py-2"><small><a href="' + explorerUrl + '" target="_blank">View all ' + total + ' transactions on explorer &#x2197;</a></small></div>'
+				}
+
 				$('#history-list').html(html)
 			}
 
 			// ================================================================
 			// Wallet balance — with confirmations and network height
-			// ================================================================
-			function walletBalance() {
-				$('.wallet-balance .amount').text('')
-				$('.wallet-balance .ticker').text(getText('loading'))
+			// silent=true: update in background without clearing displayed value (auto-refresh)
+			// silent=false (default): show Loading state (first open / manual refresh)
+			function walletBalance(silent) {
+				if (!silent) {
+					$('.wallet-balance .amount').text('')
+					$('.wallet-balance .ticker').text(getText('loading'))
+				}
 
 				Promise.all([
 					$.ajax({ url: getBackend() + '/info' }),
@@ -998,14 +1125,16 @@
 						// If balance changed — refresh history
 						if (res.balance !== prevBal && globalData.address) updateHistory()
 					} else {
-						showMessage(messages.error['balance-load-failed'])
+						if (!silent) showMessage(messages.error['balance-load-failed'])
 					}
 
 					$('.wallet-balance .amount').text(balance)
 					$('.wallet-balance .ticker').text(getConfig()['ticker'])
 				}).catch(function() {
-					showMessage(messages.error['balance-load-failed'])
-					$('.wallet-balance .ticker').text(getConfig()['ticker'])
+					if (!silent) {
+						showMessage(messages.error['balance-load-failed'])
+						$('.wallet-balance .ticker').text(getConfig()['ticker'])
+					}
 				})
 			}
 
@@ -1017,7 +1146,7 @@
 			function checkBalanceLoop() {
 				clearTimeout(walletTimer)
 				walletTimer = setTimeout(function() {
-					if ($('.wallet-balance .ticker').text() != getText('loading')) walletBalance()
+					if ($('.wallet-balance .ticker').text() != getText('loading')) walletBalance(true)
 					checkBalanceLoop()
 				}, 20000)
 			}
@@ -1025,10 +1154,25 @@
 			// ================================================================
 			// Open wallet
 			// ================================================================
+			// Compute scriptPubKey hex for this address type — used to match vout in tx history
+			function getScriptHex(keys) {
+				var network = getConfig()['network']
+				var type    = getAddressType()
+				if (type === 'bech32') {
+					return getP2WPKHScript(keys.publicKey).output.toString('hex')
+				} else if (type === 'segwit') {
+					return getP2SHScript(getP2WPKHScript(keys.publicKey)).output.toString('hex')
+				} else {
+					return bitcoin.payments.p2pkh({ pubkey: keys.publicKey, network: network }).output.toString('hex')
+				}
+			}
+
 			// identity, password — only when opening via credentials form, null otherwise
 			function openWallet(keys, identity, password) {
-				globalData.address = getAddress(keys)
-				var pubkey = keys.publicKey.toString('hex')
+				globalData.address   = getAddress(keys)
+				globalData.scriptHex = getScriptHex(keys)
+				globalData.pubKeyHex = keys.publicKey.toString('hex')
+				var pubkey = globalData.pubKeyHex
 				var wif    = keys.toWIF()
 				var redeem = '0014' + getP2WPKHScript(keys.publicKey).hash.toString('hex')
 
@@ -1082,6 +1226,7 @@
 			// ================================================================
 			function showConfirmation(amount) {
 				$('#confirm-amount').text(amount + ' ' + getConfig()['ticker'])
+				$('#send-modal-error').addClass('d-none').html('')
 				$('#send-modal').modal('toggle')
 				$('#send-title').text(messages.title['sure'])
 				$('#send-cancel').removeClass('disabled d-none')
@@ -1171,7 +1316,7 @@
 									txb.sign(i, keys)
 									break
 								default:
-									showMessage(messages.error['bad-utxo'])
+									showSendError(messages.error['bad-utxo'])
 									break
 							}
 						}
@@ -1197,7 +1342,7 @@
 						$('#send-confirm').addClass('d-none')
 						$('#send-close-footer').removeClass('d-none disabled')
 					} else {
-						showMessage(messages.error['not-enough-funds'])
+						showSendError(messages.error['not-enough-funds'])
 					}
 				})
 			}
@@ -1414,23 +1559,23 @@
 					var total = 0
 
 					if (isNaN(txFee) || txFee <= 0) {
-						showMessage(messages.error['not-valid-fee']); error = true
+						showSendError(messages.error['not-valid-fee']); error = true
 					} else if (txFee < getConfig()['fee']) {
-						showMessage(messages.error['small-fee']); error = true
+						showSendError(messages.error['small-fee']); error = true
 					}
 
 					$.each($('#send-outputs .send-outputs-item'), function(key, item) {
 						var address = $('[name="send-address"]', item).val().trim()
 						var amount  = $('[name="send-ammount"]', item).val()
-						if (isNaN(amount) || amount <= 0) { showMessage(messages.error['not-valid-amount']); error = true }
-						if (!validateAddress(address))    { showMessage(messages.error['not-valid-address']); error = true }
+						if (isNaN(amount) || amount <= 0) { showSendError(messages.error['not-valid-amount']); error = true }
+						if (!validateAddress(address))    { showSendError(messages.error['not-valid-address']); error = true }
 						total += amount * 1
 					})
 
 					total = parseFloat((total + txFee * 1).toFixed(getConfig()['decimals']))
 					if (!error) {
 						if (total <= amountFormat(globalData.balance)) showConfirmation(total)
-						else showMessage(messages.error['not-enough-funds'])
+						else showSendError(messages.error['not-enough-funds'])
 					}
 				})
 
