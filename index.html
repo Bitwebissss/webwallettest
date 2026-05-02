@@ -117,18 +117,18 @@
 				<div id="pin-login-block" class="d-none">
 					<div class="card mb-3 pin-login-card">
 						<div class="card-body">
-							<p class="pin-login-title"><span class="entypo lock"></span> Saved wallet found</p>
+							<p class="pin-login-title"><span class="entypo lock"></span> <span tkey="pin-login-title">Saved wallet found</span></p>
 							<div class="input-group mb-2">
-								<input id="pin-login-input" type="password" class="form-control" placeholder="Enter PIN to open" maxlength="16" autocomplete="current-password">
+								<input id="pin-login-input" type="password" class="form-control" tkey="pin-login-placeholder" placeholder="Enter PIN to open" maxlength="16" autocomplete="current-password">
 								<div class="input-group-append">
-									<button id="pin-login-btn" class="btn btn-primary b-width">Open</button>
+									<button id="pin-login-btn" class="btn btn-primary b-width" tkey="pin-login-btn">Open</button>
 								</div>
 							</div>
-							<div id="pin-login-error" class="text-danger small mb-2 d-none">Wrong PIN, try again.</div>
+							<div id="pin-login-error" class="text-danger small mb-2 d-none" tkey="pin-login-error">Wrong PIN, try again.</div>
 							<div class="text-center">
-								<a href="#" id="pin-login-manual" class="text-muted small">Enter credentials manually</a>
+								<a href="#" id="pin-login-manual" class="text-muted small" tkey="pin-login-manual">Enter credentials manually</a>
 								<span class="text-muted small mx-2">·</span>
-								<a href="#" id="pin-login-forget" class="text-muted small">Forget saved wallet</a>
+								<a href="#" id="pin-login-forget" class="text-muted small" tkey="pin-login-forget">Forget saved wallet</a>
 							</div>
 						</div>
 					</div>
@@ -174,8 +174,8 @@
 								<span tkey="generate-question"></span> <span tkey="generate-it"></span>
 							</div>
 							<div id="saved-wallet-hint" class="saved-wallet-hint d-none">
-								Saved wallet found. <a href="#" id="open-saved-wallet">Open with PIN</a> or
-								<a href="#" id="forget-saved-wallet">forget it</a>.
+								<span tkey="saved-wallet-hint-prefix">Saved wallet found.</span> <a href="#" id="open-saved-wallet" tkey="saved-wallet-open">Open with PIN</a> <span tkey="saved-wallet-or">or</span>
+								<a href="#" id="forget-saved-wallet" tkey="saved-wallet-forget">forget it</a>.
 							</div>
 						</div>
 					</div>
@@ -386,9 +386,9 @@
 							</div>
 						</div>
 						<div id="forget-wallet-section" class="d-none">
-							<label>Saved wallet</label>
+							<label tkey="saved-wallet-label">Saved wallet</label>
 							<div class="input-group">
-								<button id="settings-forget-wallet" class="btn btn-outline-danger">
+								<button id="settings-forget-wallet" class="btn btn-outline-danger" tkey="settings-forget-wallet">
 									Forget saved wallet
 								</button>
 							</div>
@@ -452,16 +452,16 @@
 			<div class="modal-dialog modal-sm" role="document">
 				<div class="modal-content">
 					<div class="modal-header">
-						<h5 id="pin-modal-title" class="modal-title">Wallet PIN</h5>
+						<h5 id="pin-modal-title" class="modal-title" tkey="pin-title-default">Wallet PIN</h5>
 					</div>
 					<div class="modal-body">
 						<p id="pin-modal-desc" class="text-muted small"></p>
-						<input id="pin-input" type="password" class="form-control" placeholder="PIN (min 4 digits)" maxlength="16">
-						<div id="pin-error" class="text-danger small mt-1 d-none">Wrong PIN, try again.</div>
+						<input id="pin-input" type="password" class="form-control" tkey="pin-input-placeholder" placeholder="PIN (min 4 digits)" maxlength="16">
+						<div id="pin-error" class="text-danger small mt-1 d-none" tkey="pin-login-error">Wrong PIN, try again.</div>
 					</div>
 					<div class="modal-footer">
-						<button id="pin-cancel" type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-						<button id="pin-confirm" type="button" class="btn btn-primary">OK</button>
+						<button id="pin-cancel" type="button" class="btn btn-secondary" data-dismiss="modal" tkey="cancel">Cancel</button>
+						<button id="pin-confirm" type="button" class="btn btn-primary" tkey="ok">OK</button>
 					</div>
 				</div>
 			</div>
@@ -997,19 +997,6 @@
 
 						// If balance changed — refresh history
 						if (res.balance !== prevBal && globalData.address) updateHistory()
-
-						// Show unconfirmed balance
-						var unconf = res.unconfirmed || 0
-						if (unconf !== 0) {
-							var absVal  = amountFormat(Math.abs(unconf))
-							var ticker  = getConfig()['ticker']
-							var label   = unconf > 0
-								? ('+' + absVal + ' ' + ticker + ' incoming, pending')
-								: (absVal + ' ' + ticker + ' sending, pending')
-							$('.wallet-unconfirmed').text(label).removeClass('d-none')
-						} else {
-							$('.wallet-unconfirmed').addClass('d-none')
-						}
 					} else {
 						showMessage(messages.error['balance-load-failed'])
 					}
@@ -1067,8 +1054,8 @@
 				if (identity && !hasSavedWallet()) {
 					setTimeout(function() {
 						askPin(
-							'Save wallet',
-							'Enter a PIN to save your wallet. Next time you will only need the PIN to open it.'
+							getText('pin-save-title'),
+							getText('pin-save-desc')
 						).then(function(pin) {
 							if (pin && pin.length >= 4) {
 								saveCredentials(identity, password, pin).then(function() {
@@ -1347,14 +1334,14 @@
 				function doPinLogin() {
 					var pin = $('#pin-login-input').val()
 					if (!pin || pin.length < 4) {
-						$('#pin-login-error').text('PIN must be at least 4 characters.').removeClass('d-none')
+						$('#pin-login-error').text(getText('pin-login-error')).removeClass('d-none')
 						return
 					}
-					$('#pin-login-btn').prop('disabled', true).text('Opening…')
+					$('#pin-login-btn').prop('disabled', true).text(getText('loading'))
 					loadCredentials(pin).then(function(creds) {
-						$('#pin-login-btn').prop('disabled', false).text('Open')
+						$('#pin-login-btn').prop('disabled', false).text(getText('pin-login-btn'))
 						if (!creds) {
-							$('#pin-login-error').text('Wrong PIN, try again.').removeClass('d-none')
+							$('#pin-login-error').text(getText('pin-login-error')).removeClass('d-none')
 							$('#pin-login-input').val('').focus()
 							return
 						}
@@ -1365,8 +1352,8 @@
 							forgetSavedWallet()
 						}
 					}).catch(function() {
-						$('#pin-login-btn').prop('disabled', false).text('Open')
-						$('#pin-login-error').text('Wrong PIN, try again.').removeClass('d-none')
+						$('#pin-login-btn').prop('disabled', false).text(getText('pin-login-btn'))
+						$('#pin-login-error').text(getText('pin-login-error')).removeClass('d-none')
 					})
 				}
 
