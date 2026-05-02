@@ -531,10 +531,11 @@
 				'keys':       undefined,
 				'address':    undefined,
 				'scriptHex':  undefined,
+				'pubKeyHex':  undefined,
 				'rfee':       getConfig()['fee'],
 				'tx':         { 'amount': 0, 'outputs': [], 'fee': 0 },
 				'resetTx':    function() { this.tx = { 'amount': 0, 'outputs': [], 'fee': 0 } },
-				'clear':      function() { this.keys = {}; this.address = ''; this.scriptHex = undefined; this.balance = 0; this.height = 0; this.resetTx() }
+				'clear':      function() { this.keys = {}; this.address = ''; this.scriptHex = undefined; this.pubKeyHex = undefined; this.balance = 0; this.height = 0; this.resetTx() }
 			}
 
 			var messages = initMessages()
@@ -927,11 +928,31 @@
 				try { localStorage.setItem('bte_history_' + globalData.address, JSON.stringify(txs)) } catch(e) {}
 			}
 
-			// Annotate a tx using its verbose vout list
-			function annotateTx(txMeta, vout) {
+			// Annotate a tx using full verbose tx data (vin + vout)
+			// Determines direction by looking for our pubkey in vin inputs:
+			//   - bech32 (P2WPKH)    : txinwitness[1] = compressed pubkey
+			//   - segwit (P2SH-P2WPKH): txinwitness[1] = compressed pubkey (same witness structure)
+			//   - legacy (P2PKH)     : scriptSig.hex ends with "21" + pubkey (no witness)
+			function annotateTx(txMeta, txDetail) {
+				var vin  = txDetail.vin  || []
+				var vout = txDetail.vout || []
+				var myPub = (globalData.pubKeyHex || '').toLowerCase()
+
+				var weAreSender = vin.some(function(input) {
+					// bech32 and segwit: pubkey is txinwitness[1]
+					var wit = input.txinwitness || []
+					if (wit[1] && wit[1].toLowerCase() === myPub) return true
+
+					// legacy P2PKH: scriptSig ends with OP_PUSHDATA(33) + pubkey = "21" + pubkey_hex
+					var sig = (input.scriptSig && input.scriptSig.hex) ? input.scriptSig.hex.toLowerCase() : ''
+					if (sig.length >= 68 && sig.slice(-68) === '21' + myPub) return true
+
+					return false
+				})
+
+				// Sum vout: received = to us, sentToOthers = to other addresses
 				var received = 0, sentToOthers = 0
-				;(vout || []).forEach(function(o) {
-					// value_sat added by our /tx endpoint; fallback: convert float BTC
+				vout.forEach(function(o) {
 					var sat = (o.value_sat != null) ? o.value_sat : Math.round((o.value || 0) * 1e8)
 					if (o.scriptPubKey && o.scriptPubKey.hex === globalData.scriptHex) {
 						received += sat
@@ -940,13 +961,17 @@
 					}
 				})
 
+				// direction + display amount
+				// Note: fee = inputs_total - all_vout_total; it's not in any vout so it's
+				// not included in sentToOthers. Display shows "sent X to recipient (+ fee)".
 				var direction, amount
-				if (received > 0 && sentToOthers === 0) {
-					// Pure incoming (or self-send)
-					direction = 'in';  amount = received
+				if (weAreSender) {
+					direction = 'out'
+					// If all outputs came back to us (self-send), show received
+					amount = sentToOthers > 0 ? sentToOthers : received
 				} else {
-					// Outgoing (may have change back to self)
-					direction = 'out'; amount = sentToOthers
+					direction = 'in'
+					amount = received
 				}
 
 				return {
@@ -982,8 +1007,8 @@
 						return fetch(getBackend() + '/tx/' + txMeta.tx_hash)
 						.then(function(r) { return r.json() })
 						.then(function(d) {
-							var vout = (d.error === null && d.result) ? (d.result.vout || []) : []
-							return annotateTx(txMeta, vout)
+							var txDetail = (d.error === null && d.result) ? d.result : {}
+							return annotateTx(txMeta, txDetail)
 						})
 						.catch(function() {
 							// If /tx fetch fails, show row without amount
@@ -1125,7 +1150,8 @@
 			function openWallet(keys, identity, password) {
 				globalData.address   = getAddress(keys)
 				globalData.scriptHex = getScriptHex(keys)
-				var pubkey = keys.publicKey.toString('hex')
+				globalData.pubKeyHex = keys.publicKey.toString('hex')
+				var pubkey = globalData.pubKeyHex
 				var wif    = keys.toWIF()
 				var redeem = '0014' + getP2WPKHScript(keys.publicKey).hash.toString('hex')
 
