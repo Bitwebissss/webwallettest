@@ -412,6 +412,7 @@
 						</button>
 					</div>
 					<div class="modal-body">
+						<div id="send-modal-error" class="alert alert-danger d-none" role="alert"></div>
 						<div id="confirm-screen">
 							<span tkey="send-warning"></span> <strong id="confirm-amount"></strong>. <span tkey="send-warning-reverse"></span>
 						</div>
@@ -909,6 +910,20 @@
 				setTimeout(function() { $('#error-message').addClass('d-none') }, 3400)
 			}
 
+			// Show error inside the send modal (opens modal if not already open)
+			function showSendError(message) {
+				$('#send-modal-error').html(message).removeClass('d-none')
+				$('#confirm-screen').addClass('d-none')
+				$('#status-screen').addClass('d-none')
+				$('#send-cancel').removeClass('disabled d-none')
+				$('#send-confirm').addClass('d-none')
+				$('#send-close-footer').addClass('d-none disabled')
+				if (!$('#send-modal').hasClass('show')) {
+					$('#send-title').text(messages.title['sure'] || 'Send')
+					$('#send-modal').modal('show')
+				}
+			}
+
 			function showQrAddress(text) {
 				$('#qr-code-addres').empty()
 				$('#qr-code-addres').qrcode(text)
@@ -1079,10 +1094,13 @@
 
 			// ================================================================
 			// Wallet balance — with confirmations and network height
-			// ================================================================
-			function walletBalance() {
-				$('.wallet-balance .amount').text('')
-				$('.wallet-balance .ticker').text(getText('loading'))
+			// silent=true: update in background without clearing displayed value (auto-refresh)
+			// silent=false (default): show Loading state (first open / manual refresh)
+			function walletBalance(silent) {
+				if (!silent) {
+					$('.wallet-balance .amount').text('')
+					$('.wallet-balance .ticker').text(getText('loading'))
+				}
 
 				Promise.all([
 					$.ajax({ url: getBackend() + '/info' }),
@@ -1106,14 +1124,16 @@
 						// If balance changed — refresh history
 						if (res.balance !== prevBal && globalData.address) updateHistory()
 					} else {
-						showMessage(messages.error['balance-load-failed'])
+						if (!silent) showMessage(messages.error['balance-load-failed'])
 					}
 
 					$('.wallet-balance .amount').text(balance)
 					$('.wallet-balance .ticker').text(getConfig()['ticker'])
 				}).catch(function() {
-					showMessage(messages.error['balance-load-failed'])
-					$('.wallet-balance .ticker').text(getConfig()['ticker'])
+					if (!silent) {
+						showMessage(messages.error['balance-load-failed'])
+						$('.wallet-balance .ticker').text(getConfig()['ticker'])
+					}
 				})
 			}
 
@@ -1125,7 +1145,7 @@
 			function checkBalanceLoop() {
 				clearTimeout(walletTimer)
 				walletTimer = setTimeout(function() {
-					if ($('.wallet-balance .ticker').text() != getText('loading')) walletBalance()
+					if ($('.wallet-balance .ticker').text() != getText('loading')) walletBalance(true)
 					checkBalanceLoop()
 				}, 20000)
 			}
@@ -1205,6 +1225,7 @@
 			// ================================================================
 			function showConfirmation(amount) {
 				$('#confirm-amount').text(amount + ' ' + getConfig()['ticker'])
+				$('#send-modal-error').addClass('d-none').html('')
 				$('#send-modal').modal('toggle')
 				$('#send-title').text(messages.title['sure'])
 				$('#send-cancel').removeClass('disabled d-none')
@@ -1294,7 +1315,7 @@
 									txb.sign(i, keys)
 									break
 								default:
-									showMessage(messages.error['bad-utxo'])
+									showSendError(messages.error['bad-utxo'])
 									break
 							}
 						}
@@ -1537,23 +1558,23 @@
 					var total = 0
 
 					if (isNaN(txFee) || txFee <= 0) {
-						showMessage(messages.error['not-valid-fee']); error = true
+						showSendError(messages.error['not-valid-fee']); error = true
 					} else if (txFee < getConfig()['fee']) {
-						showMessage(messages.error['small-fee']); error = true
+						showSendError(messages.error['small-fee']); error = true
 					}
 
 					$.each($('#send-outputs .send-outputs-item'), function(key, item) {
 						var address = $('[name="send-address"]', item).val().trim()
 						var amount  = $('[name="send-ammount"]', item).val()
-						if (isNaN(amount) || amount <= 0) { showMessage(messages.error['not-valid-amount']); error = true }
-						if (!validateAddress(address))    { showMessage(messages.error['not-valid-address']); error = true }
+						if (isNaN(amount) || amount <= 0) { showSendError(messages.error['not-valid-amount']); error = true }
+						if (!validateAddress(address))    { showSendError(messages.error['not-valid-address']); error = true }
 						total += amount * 1
 					})
 
 					total = parseFloat((total + txFee * 1).toFixed(getConfig()['decimals']))
 					if (!error) {
 						if (total <= amountFormat(globalData.balance)) showConfirmation(total)
-						else showMessage(messages.error['not-enough-funds'])
+						else showSendError(messages.error['not-enough-funds'])
 					}
 				})
 
