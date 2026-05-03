@@ -841,19 +841,43 @@
 			// ================================================================
 			// PIN modal (async modal instead of prompt)
 			// ================================================================
-			var _pinResolve = null
+			var _pinResolve   = null
+			var _pinValidator = null  // function(pin) -> error string or null
 
-			function askPin(title, desc) {
+			function askPin(title, desc, validator, mandatory) {
 				return new Promise(function(resolve) {
-					_pinResolve = resolve
+					_pinResolve   = resolve
+					_pinValidator = validator || null
 					$('#pin-modal-title').text(title)
 					$('#pin-modal-desc').text(desc)
 					$('#pin-input').val('')
 					$('#pin-error').addClass('d-none')
+					if (mandatory) {
+						$('#pin-cancel').addClass('d-none')
+					} else {
+						$('#pin-cancel').removeClass('d-none')
+					}
 					$('#pin-modal').modal({ backdrop: 'static', keyboard: false })
 					$('#pin-modal').modal('show')
 					setTimeout(function() { $('#pin-input').focus() }, 400)
 				})
+			}
+
+			// Two-step mandatory PIN setup: enter then confirm. Returns confirmed PIN.
+			async function askPinSetup() {
+				var pin = await askPin(
+					'Create wallet PIN',
+					'Choose a PIN (min 6 characters). You will need it every time you open the wallet.',
+					function(p) { return (!p || p.length < 6) ? 'PIN must be at least 6 characters.' : null },
+					true
+				)
+				var confirmed = await askPin(
+					'Confirm PIN',
+					'Enter your PIN again to confirm.',
+					function(p) { return (p !== pin) ? 'PINs do not match. Try again.' : null },
+					true
+				)
+				return confirmed
 			}
 
 			// ================================================================
@@ -1613,12 +1637,8 @@
 			}
 
 			// identity, password params removed — pass offerPin=true to trigger PIN save dialog
-			function openWallet(keys, offerPin) {
-				globalData.address   = getAddress(keys)
-				globalData.scriptHex = getScriptHex(keys)
-				globalData.pubKeyHex = bitcoin.Buffer.from(keys.publicKey).toString('hex')
-				globalData.allScriptHexes = getAllScriptHexes(keys)
-				globalData.allAddresses   = getAllAddresses(keys)
+			// Show wallet UI and start balance polling. Called only AFTER PIN is collected.
+			function _showWalletUI(keys) {
 				var pubkey = globalData.pubKeyHex
 				var redeem = '0014' + bitcoin.Buffer.from(getP2WPKHScript(keys.publicKey).hash).toString('hex')
 
@@ -1637,31 +1657,30 @@
 				$('#send-fee').attr('placeholder', getText('fee') + ' (' + getText('recommended') + ' ' + globalData.rfee + ' ' + getConfig()['ticker'] + ')')
 				showQrAddress(getConfig()['uri'] + globalData.address)
 
-				// Load cached history from localStorage
 				renderHistory(loadHistory())
-
 				walletBalance()
 				checkBalanceLoop()
 				setHomeTitle()
+				_resetAutoLock()
+			}
 
-				// Offer to save only if caller requested it and wallet not already saved
+			// Open wallet: if offerPin && no saved wallet -> collect PIN first, then show UI.
+			async function openWallet(keys, offerPin) {
+				globalData.address   = getAddress(keys)
+				globalData.scriptHex = getScriptHex(keys)
+				globalData.pubKeyHex = bitcoin.Buffer.from(keys.publicKey).toString('hex')
+				globalData.allScriptHexes = getAllScriptHexes(keys)
+				globalData.allAddresses   = getAllAddresses(keys)
+
 				if (offerPin && !hasSavedWallet()) {
+					// PIN setup is mandatory — collect BEFORE showing wallet UI
+					var pin = await askPinSetup()
 					var wifToSave = keys.toWIF()
-					setTimeout(function() {
-						askPin(
-							getText('pin-save-title'),
-							getText('pin-save-desc')
-						).then(function(pin) {
-							if (pin && pin.length >= 6) {
-								saveWif(wifToSave, pin).then(function() {
-									showMessage(getText('wallet-saved'))
-									updateSavedWalletUI()
-								})
-							}
-						})
-					}, 800)
+					await saveWif(wifToSave, pin)
+					showMessage(getText('wallet-saved'))
+					updateSavedWalletUI()
 				}
-				_resetAutoLock()  // start/reset inactivity timer
+				_showWalletUI(keys)
 			}
 
 			function closeWallet() {
@@ -2058,17 +2077,28 @@
 				routePage()
 				updateSavedWalletUI()
 
-				// PIN modal — confirm button
+				// PIN modal — confirm button (validates before closing)
 				$('#pin-confirm').click(function() {
 					var pin = $('#pin-input').val()
 					if (_pinResolve) {
+						if (_pinValidator) {
+							var err = _pinValidator(pin)
+							if (err) {
+								$('#pin-error').text(err).removeClass('d-none')
+								$('#pin-input').focus()
+								return
+							}
+						}
+						$('#pin-error').addClass('d-none')
 						$('#pin-modal').modal('hide')
-						_pinResolve(pin)
-						_pinResolve = null
+						var resolve = _pinResolve
+						_pinResolve   = null
+						_pinValidator = null
+						resolve(pin)
 					}
 				})
 				$('#pin-cancel').click(function() {
-					if (_pinResolve) { _pinResolve(null); _pinResolve = null }
+					if (_pinResolve) { _pinResolve(null); _pinResolve = null; _pinValidator = null }
 				})
 				$('#pin-input').on('keydown', function(e) {
 					if (e.key === 'Enter') $('#pin-confirm').click()
@@ -2078,7 +2108,11 @@
 				function doPinLogin() {
 					var pin = $('#pin-login-input').val()
 					if (!pin) {
-						$('#pin-login-error').text(getText('pin-login-error')).removeClass('d-none')
+						$('#pin-login-error').text('Enter your PIN.').removeClass('d-none')
+						return
+					}
+					if (pin.length < 6) {
+						$('#pin-login-error').text('PIN must be at least 6 characters.').removeClass('d-none')
 						return
 					}
 					$('#pin-login-btn').prop('disabled', true).text(getText('loading'))
