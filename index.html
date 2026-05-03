@@ -11,7 +11,6 @@
 		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/css/bootstrap.min.css"
 		      integrity="sha512-tDXPcamuZsWWd6OsKFyH6nAqh/MjZ/5Yk88T5o+aMfygqNFPan1pLyPFAndRzmOWHKT+jSDzWpJv8krj6x1LMA==" crossorigin="anonymous">
 		<link rel="stylesheet" href="css/wizardry.min.css">
-		<link rel="stylesheet" href="css/entypo.css">
 
 		<link rel="icon" type="image/png" href="images/logo.png">
 		<!-- Google Fonts: SRI impossible — server returns different CSS per browser/OS.
@@ -31,8 +30,6 @@
 		<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"
 		        integrity="sha512-oGXgZXbDc7hvUdHPZCP6d3SAk4cQnjp+jmnqUjgDw87vHMCFESVifMfBm+Gg4Mev6XPZ8nKwI4Rzm0gLZPCUIw==" crossorigin="anonymous"></script>
 		<script src="multilang.js"></script>
-
-		<!-- bitcoin-bundle: deterministic build — sha512 matches BUILD.md exactly -->
 		<script src="js/bitcoin-bundle-v7.min.js"
 		        integrity="sha512-mUri5zVIyWAlxMgapxp3iWXDVt4zLH0Lq2hnKtE0NsD132msKfOxM3ktH7qV5rTwocurwpvTfuaseKiXSDIctA==" crossorigin="anonymous"></script>
 
@@ -645,13 +642,14 @@
 				)
 			}
 
-			// Save credentials encrypted by PIN
-			async function saveCredentials(identity, password, pin) {
+			// Save WIF key encrypted by PIN.
+			// Stores the private key directly — no need to re-derive from identity+password every open.
+			async function saveWif(wif, pin) {
 				var enc     = new TextEncoder()
 				var salt    = crypto.getRandomValues(new Uint8Array(16))
 				var iv      = crypto.getRandomValues(new Uint8Array(12))
 				var key     = await deriveKey(pin, salt)
-				var payload = JSON.stringify({ type: 'credentials', identity: identity, password: password })
+				var payload = JSON.stringify({ type: 'wif', wif: wif })
 				var ct      = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, enc.encode(payload))
 				localStorage.setItem(STORAGE_KEY, JSON.stringify({
 					salt: Array.from(salt),
@@ -678,25 +676,36 @@
 				}
 			}
 
-			// Reconstruct key from credentials and open wallet
+			// Reconstruct key from saved blob and open wallet (no PIN save re-offer)
+			// Handles both new format {type:'wif'} and legacy {type:'credentials'}
 			function openFromCredentials(creds) {
-				if (!creds || creds.type !== 'credentials') return false
-				var identity = creds.identity
-				var pass     = creds.password
-				var s = identity
-				s += '|' + pass + '|'
-				s += s.length + '|!@' + ((pass.length * 7) + identity.length) * 7
-				var regchars   = (pass.match(/[a-z]+/g)) ? pass.match(/[a-z]+/g).length   : 1
-				var regupchars = (pass.match(/[A-Z]+/g)) ? pass.match(/[A-Z]+/g).length   : 1
-				var regnums    = (pass.match(/[0-9]+/g)) ? pass.match(/[0-9]+/g).length   : 1
-				s += ((regnums + regchars) + regupchars) * pass.length + '3571'
-				s += (s + '' + s)
-				for (var i = 0; i <= 51; i++) s = sha256.update(s).hex()
-				globalData.keys = bitcoin.ECPair.fromPrivateKey(
-					bitcoin.Buffer.from(s, 'hex'),
-					{ 'network': getConfig()['network'] }
-				)
-				openWallet(globalData.keys, null, null)
+				if (!creds) return false
+				try {
+					if (creds.type === 'wif') {
+						// New format: WIF stored directly — fast path, no re-derivation
+						globalData.keys = bitcoin.ECPair.fromWIF(creds.wif, getConfig()['network'])
+					} else if (creds.type === 'credentials') {
+						// Legacy format: re-derive key from identity+password hash chain
+						var identity = creds.identity
+						var pass     = creds.password
+						var s = identity
+						s += '|' + pass + '|'
+						s += s.length + '|!@' + ((pass.length * 7) + identity.length) * 7
+						var regchars   = (pass.match(/[a-z]+/g)) ? pass.match(/[a-z]+/g).length   : 1
+						var regupchars = (pass.match(/[A-Z]+/g)) ? pass.match(/[A-Z]+/g).length   : 1
+						var regnums    = (pass.match(/[0-9]+/g)) ? pass.match(/[0-9]+/g).length   : 1
+						s += ((regnums + regchars) + regupchars) * pass.length + '3571'
+						s += (s + '' + s)
+						for (var i = 0; i <= 51; i++) s = sha256.update(s).hex()
+						globalData.keys = bitcoin.ECPair.fromPrivateKey(
+							bitcoin.Buffer.from(s, 'hex'),
+							{ 'network': getConfig()['network'] }
+						)
+					} else {
+						return false
+					}
+				} catch(e) { return false }
+				openWallet(globalData.keys, false)  // don't offer PIN save — already saved
 				return true
 			}
 
@@ -891,32 +900,49 @@
 			}
 
 			// ================================================================
-			// Cookie helpers
+			// Settings storage — localStorage (replaces cookies for all settings)
+			// Keys: bte_cfg_{name}  — isolated from wallet data keys (bte_wallet_*, bte_utxo_*, bte_history_*)
 			// ================================================================
-			function setCookie(name, value, days) {
-				var expires = ''
-				if (days) {
-					var date = new Date()
-					date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000))
-					expires = '; expires=' + date.toGMTString()
-				}
-				document.cookie = encodeURIComponent(name) + '=' + encodeURIComponent(value) + expires + '; path=/'
+			var CFG_PREFIX = 'bte_cfg_'
+
+			// Validate backend URL before storing:
+			//   - must be absolute http(s) URL
+			//   - no embedded credentials (user:pass@host)
+			//   - rejects javascript:, data:, blob:, etc.
+			//   - http allowed only for localhost (dev)
+			function isValidBackendUrl(url) {
+				try {
+					var u = new URL(url)
+					if (u.protocol !== 'https:' &&
+						!(u.protocol === 'http:' && (u.hostname === 'localhost' || u.hostname === '127.0.0.1'))) return false
+					if (u.username || u.password) return false
+					return true
+				} catch(e) { return false }
 			}
 
+			function _cfgSet(key, value) {
+				try { localStorage.setItem(CFG_PREFIX + key, String(value)) } catch(e) {}
+			}
+			function _cfgGet(key) {
+				try { return localStorage.getItem(CFG_PREFIX + key) } catch(e) { return null }
+			}
+			function _cfgDel(key) {
+				try { localStorage.removeItem(CFG_PREFIX + key) } catch(e) {}
+			}
+
+			// Public API — same signatures as the old cookie helpers so nothing else needs to change
+			function setCookie(name, value, _days) {
+				if (name === 'backend' && !isValidBackendUrl(value)) return  // reject invalid backend URLs
+				_cfgSet(name, value)
+			}
 			function readCookie(name) {
-				var nameEQ = encodeURIComponent(name) + '='
-				var ca = document.cookie.split(';')
-				for (var i = 0; i < ca.length; i++) {
-					var c = ca[i]
-					while (c.charAt(0) === ' ') c = c.substring(1)
-					if (c.indexOf(nameEQ) === 0) return decodeURIComponent(c.substring(nameEQ.length))
-				}
-				return null
+				return _cfgGet(name)
+			}
+			function deleteCookie(name) {
+				_cfgDel(name)
 			}
 
-			function deleteCookie(name) {
-				document.cookie = encodeURIComponent(name) + '=; expires=Thu, 01 Jan 1970 00:00:01 GMT; path=/'
-			}
+
 
 			// ================================================================
 			// Copy to clipboard — works on HTTPS mobile + desktop
@@ -1512,8 +1538,8 @@
 				return set
 			}
 
-			// identity, password — only when opening via credentials form, null otherwise
-			function openWallet(keys, identity, password) {
+			// identity, password params removed — pass offerPin=true to trigger PIN save dialog
+			function openWallet(keys, offerPin) {
 				globalData.address   = getAddress(keys)
 				globalData.scriptHex = getScriptHex(keys)
 				globalData.pubKeyHex = bitcoin.Buffer.from(keys.publicKey).toString('hex')
@@ -1541,15 +1567,16 @@
 				checkBalanceLoop()
 				setHomeTitle()
 
-				// Offer to save only if credentials provided and not yet saved
-				if (identity && !hasSavedWallet()) {
+				// Offer to save only if caller requested it and wallet not already saved
+				if (offerPin && !hasSavedWallet()) {
+					var wifToSave = keys.toWIF()
 					setTimeout(function() {
 						askPin(
 							getText('pin-save-title'),
 							getText('pin-save-desc')
 						).then(function(pin) {
 							if (pin && pin.length >= 4) {
-								saveCredentials(identity, password, pin).then(function() {
+								saveWif(wifToSave, pin).then(function() {
 									showMessage(getText('wallet-saved'))
 									updateSavedWalletUI()
 								})
@@ -1923,7 +1950,7 @@
 			}
 
 			function initWallet() {
-				if (globalData.keys != undefined) openWallet(globalData.keys)
+				if (globalData.keys != undefined) openWallet(globalData.keys, false)
 			}
 
 			// ================================================================
@@ -2066,11 +2093,11 @@
 					if ([51, 52].includes(wif.length)) {
 						try {
 							globalData.keys = bitcoin.ECPair.fromWIF(wif, getConfig()['network'])
+							$('#passphrase').val('')
+							openWallet(globalData.keys, true)  // offer PIN save — same as regular form
 						} catch(err) {
 							showMessage(messages.error['bad-priv-key'])
 						}
-						$('#passphrase').val('')
-						initWallet()
 					} else {
 						showMessage(messages.error['bad-priv-key'])
 					}
@@ -2101,8 +2128,7 @@
 									bitcoin.Buffer.from(s, 'hex'),
 									{ 'network': getConfig()['network'] }
 								)
-								// Pass identity+pass — openWallet will offer to save via PIN
-								openWallet(globalData.keys, identity.toLowerCase(), pass)
+								openWallet(globalData.keys, true)  // offerPin=true
 							} else { showMessage(messages.error['pass-not-match']) }
 						} else { showMessage(messages.error['pass-too-short']) }
 					} else { showMessage(getText('identity-too-short')) }
@@ -2244,7 +2270,19 @@
 				$('#wallet-language-select select').on('change', function() {
 					setCookie('language', $('#wallet-language-select select').val(), 60)
 					initLang()
-					initWallet()
+					// Re-render dynamic content that uses getText but is NOT covered by [tkey] scan:
+					//   - Coin control panel rows (use getText for status labels)
+					//   - Wallet history rows (use getText for direction/badge labels)
+					//   - send-fee placeholder (set in openWallet, re-applied via openWallet below)
+					//   - messages object (already updated inside initLang via initMessages())
+					if (globalData.keys) {
+						// openWallet re-applies all getText-based placeholders and titles
+						openWallet(globalData.keys, false)
+						// Re-render coin control if panel is visible
+						if (!$('#coin-control-panel').hasClass('d-none')) renderCoinControl()
+						// Re-render history (uses getText for conf labels, direction labels)
+						updateHistory()
+					}
 				})
 
 				estimateFee().then(function(data) {
