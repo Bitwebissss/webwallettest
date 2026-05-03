@@ -94,7 +94,6 @@
 							<a href="#" class="nav-link router-link mr-md-2" data-route="homepage" tkey="home"></a>
 						</li>
 						<li class="nav-item">
-							<a href="#/create" class="nav-link router-link mr-md-2" data-route="create" tkey="create"></a>
 						</li>
 						<li class="nav-item">
 							<a href="#/broadcast" class="nav-link router-link mr-md-2" data-route="broadcast" tkey="broadcast"></a>
@@ -352,42 +351,6 @@
 		</div>
 
 		<!-- Generate address -->
-		<div id="create" class="router-page">
-			<div class="container">
-				<div class="card mb-3">
-					<div class="card-header">
-						<b tkey="create-wallet"></b>
-					</div>
-					<div class="card-body">
-						<div id="create-keys">
-							<div id="create-keys-address">
-								<label tkey="address"></label>
-								<div class="input-group pb-2">
-									<input class="form-control" readonly type="text">
-								</div>
-							</div>
-							<div id="create-keys-pubkey">
-								<label tkey="public-key"></label>
-								<div class="input-group pb-2">
-									<input class="form-control" readonly type="text">
-								</div>
-							</div>
-							<div id="create-keys-privkey">
-								<label tkey="private-key"></label>
-								<div class="d-flex align-items-center pb-2" style="gap:4px">
-									<canvas id="create-privkey-canvas" class="form-control p-1" style="height:38px;cursor:default;flex:1 1 auto" height="38"></canvas>
-									<button id="create-privkey-copy-btn" class="btn btn-outline-secondary flex-shrink-0 d-none" type="button" title="Copy"><span class="fa fa-copy"></span></button>
-									<button id="toggle-create-privkey" class="btn btn-outline-dark flex-shrink-0 b-width" type="button" tkey="show"></button>
-								</div>
-							</div>
-						</div>
-					</div>
-					<div class="card-footer">
-						<button id="footer-create" type="button" class="btn btn-primary btn-block footer-item" tkey="create"></button>
-					</div>
-				</div>
-			</div>
-		</div>
 
 		<!-- Broadcast transaction -->
 		<div id="broadcast" class="router-page">
@@ -594,9 +557,6 @@
 			// ================================================================
 			// Canvas private key display — WIF never goes into input.value
 			// ================================================================
-			// Holds the WIF for the Create page only — cleared on navigation away
-			var _createWif = null
-
 			// Draw masked dots on a canvas (initial/hidden state)
 			function _privkeyMask(canvasId) {
 				var canvas = document.getElementById(canvasId)
@@ -678,6 +638,7 @@
 			}
 
 			var globalData = {
+				'status':          'locked',
 				'balance':         0,
 				'immatureBalance': 0,
 				'height':          0,
@@ -694,7 +655,7 @@
 				'_lastRendered':   { balance: -1, immature: -1, utxoFingerprint: '' },
 				'resetTx':         function() { this.tx = { 'amount': 0, 'outputs': [], 'fee': 0 } },
 				'clear':           function() {
-					this.keys = {}; this.address = ''; this.scriptHex = undefined; this.pubKeyHex = undefined
+					this.status = 'locked'; this.keys = {}; this.address = ''; this.scriptHex = undefined; this.pubKeyHex = undefined
 					this.allScriptHexes = null; this.allAddresses = null
 					this.balance = 0; this.immatureBalance = 0; this.height = 0
 					this.utxos = []; this.coinControl = false; this.selectedUtxos = null
@@ -709,6 +670,7 @@
 			// Encrypted storage (WebCrypto AES-GCM + PBKDF2)
 			// ================================================================
 			var STORAGE_KEY = 'bte_wallet_v2'
+			var EXIST_KEY   = 'bte_wallet_exist'  // static flag: wallet has ever been saved
 
 			// ================================================================
 			// Auto-lock: closes wallet after 20 min of inactivity.
@@ -762,6 +724,7 @@
 					iv:   Array.from(iv),
 					data: Array.from(new Uint8Array(ct))
 				}))
+				localStorage.setItem(EXIST_KEY, '1')
 			}
 
 			// Load credentials by PIN — returns {type, identity, password} or null
@@ -820,7 +783,18 @@
 			}
 
 			function forgetSavedWallet() {
-				localStorage.removeItem(STORAGE_KEY)
+				// Wipe ALL wallet data: encrypted blob, exist flag, history, utxo cache
+				try {
+					Object.keys(localStorage).forEach(function(k) {
+						if (
+							k === STORAGE_KEY ||
+							k === EXIST_KEY   ||
+							k.indexOf('bte_history_') === 0 ||
+							k.indexOf('bte_utxo_')    === 0 ||
+							k.indexOf('bte_wallet_')  === 0
+						) localStorage.removeItem(k)
+					})
+				} catch(e) {}
 				updateSavedWalletUI()
 			}
 
@@ -1145,16 +1119,6 @@
 				if (urlParams[0] == '#') {
 					var pageName    = urlParams[1] != '' ? urlParams[1] : 'homepage'
 					var templateName = '#' + pageName
-					// Leaving Create page — wipe generated key from canvas and memory
-					if ($('#create').is(':visible') && pageName !== 'create') {
-						_privkeyClear('create-privkey-canvas')
-						_privkeyMask('create-privkey-canvas')
-						$('#create-privkey-copy-btn').addClass('d-none')
-						$('#toggle-create-privkey').text(getText('show'))
-						$('#create-keys-address input').val('')
-						$('#create-keys-pubkey input').val('')
-						_createWif = null
-					}
 					$('.router-link').removeClass('active')
 					$('.router-link[data-route=' + pageName + ']').addClass('active')
 					if ($('.router-page:visible').attr('id') != urlParams[1]) {
@@ -1163,8 +1127,7 @@
 					}
 					switch(pageName) {
 						case 'homepage':  setHomeTitle(); break
-						case 'create':    setTitle(getText('create-wallet')); break
-						case 'broadcast': setTitle(getText('broadcast-transaction')); break
+							case 'broadcast': setTitle(getText('broadcast-transaction')); break
 						case 'settings':  setTitle(getText('wallet-settings')); break
 						case 'network':
 							var network = urlParams[2]
@@ -1396,7 +1359,7 @@
 			}
 
 			function updateHistory() {
-				if (!globalData.address || !globalData.scriptHex) return
+				if (globalData.status !== 'unlocked') return
 
 				$('#history-list').html('<div class="text-muted text-center py-3 small">' + escHtml(getText('history-loading')) + '</div>')
 
@@ -1499,6 +1462,7 @@
 			// silent=true: update in background without clearing displayed value (auto-refresh)
 			// silent=false (default): show Loading state (first open / manual refresh)
 			function walletBalance(silent) {
+				if (globalData.status !== 'unlocked') return
 				if (!silent) {
 					$('.wallet-balance .amount').text('')
 					$('.wallet-balance .ticker').text(getText('loading'))
@@ -1589,6 +1553,7 @@
 			function checkBalanceLoop() {
 				clearTimeout(walletTimer)
 				walletTimer = setTimeout(function() {
+					if (globalData.status !== 'unlocked') return  // wallet locked or closed — stop loop
 					if ($('.wallet-balance .ticker').text() != getText('loading')) walletBalance(true)
 					checkBalanceLoop()
 				}, 20000)
@@ -1668,6 +1633,7 @@
 
 			// Open wallet: if offerPin && no saved wallet -> collect PIN first, then show UI.
 			async function openWallet(keys, offerPin) {
+				globalData.status    = 'unlocked'
 				globalData.address   = getAddress(keys)
 				globalData.scriptHex = getScriptHex(keys)
 				globalData.pubKeyHex = bitcoin.Buffer.from(keys.publicKey).toString('hex')
@@ -2092,14 +2058,17 @@
 							}
 						}
 						$('#pin-error').addClass('d-none')
+						var pinValue = pin
+						$('#pin-input').val('')
 						$('#pin-modal').modal('hide')
 						var resolve = _pinResolve
 						_pinResolve   = null
 						_pinValidator = null
-						resolve(pin)
+						resolve(pinValue)
 					}
 				})
 				$('#pin-cancel').click(function() {
+					$('#pin-input').val('')
 					if (_pinResolve) { _pinResolve(null); _pinResolve = null; _pinValidator = null }
 				})
 				$('#pin-input').on('keydown', function(e) {
@@ -2292,26 +2261,6 @@
 					}
 				})
 
-				// ── Create page: toggle reveal/hide via canvas ──
-				$('#toggle-create-privkey').click(function() {
-					if ($(this).text() == getText('show')) {
-						if (_createWif) {
-							_privkeyReveal('create-privkey-canvas', _createWif)
-							$('#create-privkey-copy-btn').removeClass('d-none')
-							$(this).text(getText('hide'))
-						}
-					} else {
-						_privkeyClear('create-privkey-canvas')
-						_privkeyMask('create-privkey-canvas')
-						$('#create-privkey-copy-btn').addClass('d-none')
-						$(this).text(getText('show'))
-					}
-				})
-
-				$('#create-privkey-copy-btn').click(function() {
-					if (_createWif) copyToClipboard(_createWif, $(this))
-				})
-
 				$('#add-output').click(function(e) {
 					$('#send-outputs').append(
 						'<div class="send-additional-output send-outputs-item input-group mb-2">' +
@@ -2370,22 +2319,6 @@
 					if ($(this).is(':checked')) globalData.selectedUtxos.add(key)
 					else globalData.selectedUtxos.delete(key)
 					_updateCoinControlInfo()
-				})
-
-				$('#footer-create').click(function() {
-					var keys    = bitcoin.ECPair.makeRandom({ 'network': getConfig()['network'] })
-					var address = getAddress(keys)
-					if (address != undefined) {
-						// Store WIF in module var — displayed via canvas only, never in input.value
-						_createWif = keys.toWIF()
-						$('#create-keys-address input').val(address)
-						$('#create-keys-pubkey input').val(bitcoin.Buffer.from(keys.publicKey).toString('hex'))
-						// Reset canvas to masked state — user must click Show to reveal
-						_privkeyClear('create-privkey-canvas')
-						_privkeyMask('create-privkey-canvas')
-						$('#create-privkey-copy-btn').addClass('d-none')
-						$('#toggle-create-privkey').text(getText('show'))
-					}
 				})
 
 				$('#footer-broadcast').click(function() {
