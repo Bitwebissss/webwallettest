@@ -866,15 +866,15 @@
 			// Two-step mandatory PIN setup: enter then confirm. Returns confirmed PIN.
 			async function askPinSetup() {
 				var pin = await askPin(
-					'Create wallet PIN',
-					'Choose a PIN (min 6 characters). You will need it every time you open the wallet.',
-					function(p) { return (!p || p.length < 6) ? 'PIN must be at least 6 characters.' : null },
+					getText('pin-create-title'),
+					getText('pin-create-desc'),
+					function(p) { return (!p || p.length < 6) ? getText('pin-too-short') : null },
 					true
 				)
 				var confirmed = await askPin(
-					'Confirm PIN',
-					'Enter your PIN again to confirm.',
-					function(p) { return (p !== pin) ? 'PINs do not match. Try again.' : null },
+					getText('pin-confirm-title'),
+					getText('pin-confirm-desc'),
+					function(p) { return (p !== pin) ? getText('pin-mismatch') : null },
 					true
 				)
 				return confirmed
@@ -1315,6 +1315,7 @@
 			}
 
 			function saveHistory(txs) {
+				if (!globalData.address) return
 				try { localStorage.setItem('bte_history_' + globalData.address, JSON.stringify(txs)) } catch(e) {}
 			}
 
@@ -1429,6 +1430,7 @@
 					})
 
 					Promise.all(fetches).then(function(annotated) {
+						if (!globalData.address) return
 						saveHistory(annotated)
 						renderHistory(annotated, total)
 					})
@@ -2108,11 +2110,7 @@
 				function doPinLogin() {
 					var pin = $('#pin-login-input').val()
 					if (!pin) {
-						$('#pin-login-error').text('Enter your PIN.').removeClass('d-none')
-						return
-					}
-					if (pin.length < 6) {
-						$('#pin-login-error').text('PIN must be at least 6 characters.').removeClass('d-none')
+						$('#pin-login-error').text(getText('pin-login-error')).removeClass('d-none')
 						return
 					}
 					$('#pin-login-btn').prop('disabled', true).text(getText('loading'))
