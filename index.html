@@ -13,12 +13,12 @@
 		<link rel="icon" type="image/png" href="/images/logo.png">
 		<link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro&display=swap" rel="stylesheet">
 		
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sha256/0.9.0/sha256.min.js"></script>
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js"></script>
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/js/bootstrap.min.js"></script>
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.qrcode/1.0/jquery.qrcode.min.js"></script>
-		<script src="https://cdn.jsdelivr.net/gh/cozmo/jsQR@master/dist/jsQR.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 		<script src="multilang.js"></script>
 
 		<script>
@@ -206,7 +206,7 @@
 									<div id="qr-code-addres" class="qr-code"></div>
 									<div class="d-inline-flex align-items-center justify-content-center" style="gap:5px;max-width:100%">
 										<div id="wallet-address" class="break-word" style="font-size:13px;word-break:break-all"></div>
-										<button id="copy-address-btn" class="btn btn-sm btn-outline-secondary flex-shrink-0" title="Copy address" style="padding:1px 7px;font-size:12px;line-height:1.6">
+										<button id="copy-address-btn" class="btn btn-sm btn-outline-secondary flex-shrink-0" data-tkey-title="copy-address" title="Copy address" style="padding:1px 7px;font-size:12px;line-height:1.6">
 											<span class="fa fa-copy" id="copy-address-icon"></span>
 										</button>
 									</div>
@@ -219,8 +219,8 @@
 									<div id="immature-balance-row-main" class="d-none mt-1">
 										<small class="text-warning">
 											<span class="fa fa-lock"></span>
-											Immature (mining): <b class="immature-amount"></b>
-											<span class="text-muted"> — cannot spend yet</span>
+											<span tkey="immature-mining">Immature (mining):</span> <b class="immature-amount"></b>
+											<span class="text-muted"> — <span tkey="immature-cannot-spend">cannot spend yet</span></span>
 										</small>
 									</div>
 								</div>
@@ -239,7 +239,7 @@
 									<div id="immature-balance-row" class="d-none mt-1">
 										<span class="text-warning" style="font-size:12px">
 											<span class="fa fa-lock"></span>
-											<span>Immature (mining):</span>
+											<span tkey="immature-mining">Immature (mining):</span>
 											<b class="immature-amount"></b>
 										</span>
 									</div>
@@ -278,26 +278,26 @@
 								<div class="mt-2">
 									<a href="#" id="coin-control-toggle" class="text-muted small" style="text-decoration:none">
 										<span class="fa fa-sliders-h"></span>
-										<span id="coin-control-toggle-text">Coin Control</span>
+										<span id="coin-control-toggle-text" tkey="coin-control">Coin Control</span>
 									</a>
 								</div>
 								<div id="coin-control-panel" class="d-none mt-2 border rounded p-2" style="font-size:12px">
 									<div class="d-flex justify-content-between align-items-center mb-2">
 										<div>
 											<input type="checkbox" id="coin-control-enable">
-											<label for="coin-control-enable" class="mb-0 ml-1">Manual UTXO selection</label>
+											<label for="coin-control-enable" class="mb-0 ml-1" tkey="coin-control-manual">Manual UTXO selection</label>
 										</div>
-										<a href="#" id="coin-control-select-all" class="text-primary small">Select all mature</a>
+										<a href="#" id="coin-control-select-all" class="text-primary small" tkey="coin-control-select-all">Select all mature</a>
 									</div>
 									<div id="coin-control-list" class="table-responsive" style="max-height:200px;overflow-y:auto">
 										<table class="table table-sm table-borderless mb-0" id="coin-control-table">
 											<thead class="thead-light">
 												<tr>
 													<th style="width:28px"></th>
-													<th>Amount</th>
-													<th>Confs</th>
-													<th>Type</th>
-													<th>Status</th>
+													<th tkey="amount">Amount</th>
+													<th tkey="coin-control-confs">Confs</th>
+													<th tkey="coin-control-type">Type</th>
+													<th tkey="coin-control-status">Status</th>
 												</tr>
 											</thead>
 											<tbody id="coin-control-tbody"></tbody>
@@ -327,7 +327,7 @@
 										</div>
 									</div>
 									<div id="wallet-keys-script">
-										<label>Redeem Script <i>(SegWit)</i></label>
+										<label tkey="redeem-script">Redeem Script <i>(SegWit)</i></label>
 										<div class="input-group pb-2">
 											<input class="form-control" readonly type="text">
 										</div>
@@ -336,7 +336,7 @@
 							</div>
 							<div class="tab-item d-none" data-tab="wallet-history">
 								<div id="history-list">
-									<div class="text-muted text-center py-3 small">Loading history…</div>
+									<div class="text-muted text-center py-3 small" tkey="history-loading">Loading history…</div>
 								</div>
 							</div>
 						</div>
@@ -530,7 +530,7 @@
 
 		<footer class="mb-3">
 			<div class="container text-center">
-				<span class="fab fa-github "></span> <a target="_blank" href="https://github.com/bitweb-project/web-wallet">Bitweb</a>
+				<span class="fab fa-github "></span> <a target="_blank" rel="noopener noreferrer" href="https://github.com/bitweb-project/web-wallet">Bitweb</a>
 			</div>
 		</footer>
 
@@ -796,6 +796,10 @@
 						$(this).html(getText($(this).attr('tkey')))
 					}
 				})
+				// Translate title attributes separately (avoids replacing innerHTML)
+				$('[data-tkey-title]').each(function() {
+					$(this).attr('title', getText($(this).attr('data-tkey-title')))
+				})
 				messages = initMessages()
 				setTitle(getText('wallet-settings'))
 				return language
@@ -901,7 +905,7 @@
 			}
 
 			function deleteCookie(name) {
-				document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:01 GMT;'
+				document.cookie = encodeURIComponent(name) + '=; expires=Thu, 01 Jan 1970 00:00:01 GMT; path=/'
 			}
 
 			// ================================================================
@@ -1237,14 +1241,14 @@
 			function updateHistory() {
 				if (!globalData.address || !globalData.scriptHex) return
 
-				$('#history-list').html('<div class="text-muted text-center py-3 small">Loading…</div>')
+				$('#history-list').html('<div class="text-muted text-center py-3 small">' + escHtml(getText('history-loading')) + '</div>')
 
 				// 1. Fetch full history list (lightweight — just hashes + heights)
 				fetch(getBackend() + '/history/' + globalData.address)
 				.then(function(r) { return r.json() })
 				.then(function(data) {
 					if (!data || data.error !== null) {
-						$('#history-list').html('<div class="text-danger text-center py-3 small">Failed to load history</div>')
+						$('#history-list').html('<div class="text-danger text-center py-3 small">' + escHtml(getText('history-failed')) + '</div>')
 						return
 					}
 					var all    = data.result || []
@@ -1274,13 +1278,13 @@
 					})
 				})
 				.catch(function() {
-					$('#history-list').html('<div class="text-danger text-center py-3 small">Network error</div>')
+					$('#history-list').html('<div class="text-danger text-center py-3 small">' + escHtml(getText('history-network-error')) + '</div>')
 				})
 			}
 
 			function renderHistory(txs, total) {
 				if (!txs || txs.length === 0) {
-					$('#history-list').html('<div class="text-muted text-center py-3 small" tkey="no-transactions">No transactions yet</div>')
+					$('#history-list').html('<div class="text-muted text-center py-3 small">' + escHtml(getText('no-transactions')) + '</div>')
 					return
 				}
 
@@ -1288,11 +1292,11 @@
 				txs.forEach(function(tx) {
 					var confirmed  = tx.height !== 0
 					var confs      = confirmed
-						? (globalData.height > 0 ? (globalData.height - tx.height + 1) + ' conf' : 'confirmed')
-						: 'pending'
+						? (globalData.height > 0 ? (globalData.height - tx.height + 1) + ' ' + getText('history-conf') : getText('history-confirmed'))
+						: getText('history-pending')
 					var confBadge  = confirmed
-						? '<span class="badge badge-success ml-1">' + confs + '</span>'
-						: '<span class="badge badge-warning ml-1">pending</span>'
+						? '<span class="badge badge-success ml-1">' + escHtml(confs) + '</span>'
+						: '<span class="badge badge-warning ml-1">' + escHtml(getText('history-pending')) + '</span>'
 
 					// Amount + direction label (left side, before txid)
 					var dir    = tx.direction || 'unknown'
@@ -1301,20 +1305,21 @@
 
 					var dirLabel = ''
 					if (dir === 'in') {
-						dirLabel = '<span class="font-weight-bold text-success" style="min-width:110px;display:inline-block">&#x2193; +' + amt + ' ' + ticker + '</span>'
+						dirLabel = '<span class="font-weight-bold text-success" style="min-width:110px;display:inline-block">&#x2193; +' + escHtml(String(amt)) + ' ' + escHtml(ticker) + '</span>'
 					} else if (dir === 'out') {
-						dirLabel = '<span class="font-weight-bold text-danger" style="min-width:110px;display:inline-block">&#x2191; -' + amt + ' ' + ticker + '</span>'
+						dirLabel = '<span class="font-weight-bold text-danger" style="min-width:110px;display:inline-block">&#x2191; -' + escHtml(String(amt)) + ' ' + escHtml(ticker) + '</span>'
 					} else {
-						dirLabel = '<span class="text-muted" style="min-width:110px;display:inline-block">— ? ' + ticker + '</span>'
+						dirLabel = '<span class="text-muted" style="min-width:110px;display:inline-block">— ? ' + escHtml(ticker) + '</span>'
 					}
 
-					var txUrl     = blockExplorer.tx(tx.tx_hash)
-					var shortHash = tx.tx_hash.substr(0, 10) + '…' + tx.tx_hash.substr(-6)
+					var safeHash  = escHtml(tx.tx_hash || '')
+					var txUrl     = escHtml(blockExplorer.tx(tx.tx_hash || ''))
+					var shortHash = safeHash.substr(0, 10) + '…' + safeHash.substr(-6)
 
 					html += '<div class="history-item d-flex align-items-center border-bottom" style="gap:6px">' +
 						dirLabel +
 						'<div class="text-monospace text-truncate flex-grow-1" style="font-size:11px">' +
-							'<a href="' + txUrl + '" target="_blank">' + shortHash + '</a>' +
+							'<a href="' + txUrl + '" target="_blank" rel="noopener noreferrer">' + shortHash + '</a>' +
 						'</div>' +
 						'<div class="flex-shrink-0">' + confBadge + '</div>' +
 					'</div>'
@@ -1322,8 +1327,8 @@
 
 				// "See more" link when history is longer than HISTORY_LIMIT
 				if (total && total > HISTORY_LIMIT) {
-					var explorerUrl = blockExplorer.address(globalData.address)
-					html += '<div class="text-center py-2"><small><a href="' + explorerUrl + '" target="_blank">View all ' + total + ' transactions on explorer &#x2197;</a></small></div>'
+					var explorerUrl = escHtml(blockExplorer.address(globalData.address))
+					html += '<div class="text-center py-2"><small><a href="' + explorerUrl + '" target="_blank" rel="noopener noreferrer">' + escHtml(getText('history-view-all')) + ' ' + total + ' ' + escHtml(getText('history-on-explorer')) + ' &#x2197;</a></small></div>'
 				}
 
 				$('#history-list').html(html)
@@ -1481,7 +1486,7 @@
 						).then(function(pin) {
 							if (pin && pin.length >= 4) {
 								saveCredentials(identity, password, pin).then(function() {
-									showMessage('Wallet saved. Next time just enter your PIN.')
+									showMessage(getText('wallet-saved'))
 									updateSavedWalletUI()
 								})
 							}
@@ -1509,37 +1514,37 @@
 				tbody.empty()
 
 				if (utxos.length === 0) {
-					tbody.append('<tr><td colspan="5" class="text-muted text-center">No UTXOs</td></tr>')
+					tbody.append('<tr><td colspan="5" class="text-muted text-center">' + escHtml(getText('coin-control-no-utxo')) + '</td></tr>')
 					_updateCoinControlInfo()
 					return
 				}
 
 				utxos.forEach(function(u, idx) {
-					var key      = u.txid + ':' + u.index
-					var checked  = !globalData.coinControl || (globalData.selectedUtxos && globalData.selectedUtxos.has(key))
+					var key      = escHtml(u.txid + ':' + u.index)
+					var checked  = !globalData.coinControl || (globalData.selectedUtxos && globalData.selectedUtxos.has(u.txid + ':' + u.index))
 					var mature   = u.mature
 					var isCbase  = u.coinbase
 					var disabled = (!globalData.coinControl || !mature) ? 'disabled' : ''
 					var rowClass = (!mature) ? 'text-muted' : ''
 					var status   = ''
 					if (!mature) {
-						status = '<span class="text-warning" title="Matures in ' + u.blocksLeft + ' blocks">' +
-							'<span class="fa fa-lock"></span> ' + u.blocksLeft + ' blk</span>'
+						status = '<span class="text-warning" title="' + escHtml(getText('coin-control-matures-in')) + ' ' + escHtml(String(u.blocksLeft)) + ' ' + escHtml(getText('coin-control-blocks')) + '">' +
+							'<span class="fa fa-lock"></span> ' + escHtml(String(u.blocksLeft)) + ' blk</span>'
 					} else {
-						status = '<span class="text-success"><span class="fa fa-unlock"></span> mature</span>'
+						status = '<span class="text-success"><span class="fa fa-unlock"></span> ' + escHtml(getText('coin-control-mature')) + '</span>'
 					}
 					var typeLabel = isCbase
-						? '<span class="badge badge-secondary">coinbase</span>'
-						: '<span class="badge badge-light">regular</span>'
-					var shortTx   = u.txid.substr(0,6) + '…' + u.txid.substr(-4)
+						? '<span class="badge badge-secondary">' + escHtml(getText('coin-control-coinbase')) + '</span>'
+						: '<span class="badge badge-light">' + escHtml(getText('coin-control-regular')) + '</span>'
+					var shortTx   = escHtml(u.txid.substr(0,6)) + '…' + escHtml(u.txid.substr(-4))
 					var amt       = amountFormat(u.value)
 
 					tbody.append(
 						'<tr class="' + rowClass + '" data-key="' + key + '">' +
 						'<td><input type="checkbox" class="cc-utxo-check" data-key="' + key + '"' +
-						(checked ? ' checked' : '') + (disabled ? ' disabled' : '') + (!mature ? ' title="Immature coinbase — cannot spend"' : '') + '></td>' +
-						'<td class="text-monospace">' + amt + '</td>' +
-						'<td>' + (height > 0 && u.height > 0 ? (height - u.height + 1) : '—') + '</td>' +
+						(checked ? ' checked' : '') + (disabled ? ' disabled' : '') + (!mature ? ' title="' + escHtml(getText('coin-control-immature-title')) + '"' : '') + '></td>' +
+						'<td class="text-monospace">' + escHtml(String(amt)) + '</td>' +
+						'<td>' + (height > 0 && u.height > 0 ? escHtml(String(height - u.height + 1)) : '—') + '</td>' +
 						'<td>' + typeLabel + '</td>' +
 						'<td>' + status + '</td>' +
 						'</tr>'
@@ -1560,7 +1565,7 @@
 					if (globalData.selectedUtxos.has(key)) { total += u.value; count++ }
 				})
 				$('#coin-control-selected-info').text(
-					count + ' UTXO selected — ' + amountFormat(total) + ' ' + getConfig()['ticker']
+					count + ' ' + getText('coin-control-selected') + ' — ' + amountFormat(total) + ' ' + getConfig()['ticker']
 				)
 			}
 
@@ -1672,7 +1677,7 @@
 							if (data.error == null) {
 								clearUtxoCache(address)  // invalidate UTXO cache after spend
 								$('#status-screen span').html(
-									'<a href="' + escHtml(blockExplorer.tx(data.result)) + '" target="_blank">' + escHtml(data.result) + '</a>'
+									'<a href="' + escHtml(blockExplorer.tx(data.result)) + '" target="_blank" rel="noopener noreferrer">' + escHtml(data.result) + '</a>'
 								)
 								$('#send-title').text(messages.title['success'])
 							} else {
@@ -1859,7 +1864,7 @@
 						$('#pin-login-error').addClass('d-none')
 						$('#pin-login-input').val('')
 						if (!openFromCredentials(creds)) {
-							showMessage('Saved wallet is corrupted. Please re-open manually.')
+							showMessage(getText('wallet-corrupted'))
 							forgetSavedWallet()
 						}
 					}).catch(function() {
@@ -1880,7 +1885,7 @@
 				$('#pin-login-forget').click(function(e) {
 					e.preventDefault()
 					forgetSavedWallet()
-					showMessage('Saved wallet deleted.')
+					showMessage(getText('wallet-deleted'))
 				})
 
 				// Open saved wallet (link in footer hint)
@@ -1893,13 +1898,13 @@
 				$('#forget-saved-wallet').click(function(e) {
 					e.preventDefault()
 					forgetSavedWallet()
-					showMessage('Saved wallet deleted.')
+					showMessage(getText('wallet-deleted'))
 				})
 
 				// Forget saved wallet (in settings)
 				$('#settings-forget-wallet').click(function() {
 					forgetSavedWallet()
-					showMessage('Saved wallet deleted.')
+					showMessage(getText('wallet-deleted'))
 				})
 
 				// Tabs
@@ -1992,7 +1997,7 @@
 								openWallet(globalData.keys, identity.toLowerCase(), pass)
 							} else { showMessage(messages.error['pass-not-match']) }
 						} else { showMessage(messages.error['pass-too-short']) }
-					} else { showMessage('Identity must be at least 3 characters.') }
+					} else { showMessage(getText('identity-too-short')) }
 					e.preventDefault()
 				})
 
@@ -2028,7 +2033,7 @@
 				$('#coin-control-toggle').click(function(e) {
 					$('#coin-control-panel').toggleClass('d-none')
 					var open = !$('#coin-control-panel').hasClass('d-none')
-					$('#coin-control-toggle-text').text(open ? 'Coin Control ▲' : 'Coin Control')
+					$('#coin-control-toggle-text').text(open ? getText('coin-control') + ' ▲' : getText('coin-control'))
 					if (open) renderCoinControl()
 					e.preventDefault()
 				})
@@ -2082,7 +2087,7 @@
 					var rawtx = $('#transaction-broadcast-raw')
 					transactionBroadcast(rawtx.val()).then(function(data) {
 						if (data.error == null) {
-							showMessage(messages.tx['success'] + '<a href="' + escHtml(blockExplorer.tx(data.result)) + '" target="_blank">' + escHtml(data.result) + '</a>')
+							showMessage(messages.tx['success'] + '<a href="' + escHtml(blockExplorer.tx(data.result)) + '" target="_blank" rel="noopener noreferrer">' + escHtml(data.result) + '</a>')
 						} else {
 							showMessage(messages.error['broadcast-failed'])
 						}
