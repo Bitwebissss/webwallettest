@@ -584,12 +584,6 @@
 				_cfgDel(name)
 			}
 
-			// Clean up any stale keys written before CFG_PREFIX was defined (e.g. 'undefinedlanguage')
-			;(function _cleanStaleKeys() {
-				var stale = ['undefinedlanguage', 'undefinednetwork', 'undefinedbackend', 'undefinedtype']
-				stale.forEach(function(k) { try { localStorage.removeItem(k) } catch(e) {} })
-			})()
-
 			// ================================================================
 			// Utility: HTML entity escaping (XSS prevention)
 			// ================================================================
