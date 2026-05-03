@@ -604,7 +604,7 @@
 				'resetTx':         function() { this.tx = { 'amount': 0, 'outputs': [], 'fee': 0 } },
 				'clear':           function() {
 					this.keys = {}; this.address = ''; this.scriptHex = undefined; this.pubKeyHex = undefined
-					this.allScriptHexes = null
+					this.allScriptHexes = null; this.allAddresses = null
 					this.balance = 0; this.immatureBalance = 0; this.height = 0
 					this.utxos = []; this.coinControl = false; this.selectedUtxos = null
 					this._lastRendered = { balance: -1, immature: -1, utxoFingerprint: '' }
@@ -1209,11 +1209,27 @@
 				vout.forEach(function(o) {
 					var sat = (o.value_sat != null) ? o.value_sat : Math.round((o.value || 0) * 1e8)
 					var hex = (o.scriptPubKey && o.scriptPubKey.hex) ? o.scriptPubKey.hex.toLowerCase() : ''
-					// Match against ALL our scriptPubKeys (bech32 + segwit + legacy) —
-					// one key produces three addresses; change may go to any of them.
-					var isOurs = globalData.allScriptHexes
-						? globalData.allScriptHexes.has(hex)
-						: (hex === (globalData.scriptHex || '').toLowerCase())
+					// Primary: match by scriptPubKey hex against all our known scripts
+					var isOurs = hex
+						? (globalData.allScriptHexes
+							? globalData.allScriptHexes.has(hex)
+							: (hex === (globalData.scriptHex || '').toLowerCase()))
+						: false
+					// Fallback: match by address string — catches cases where ElectrumX
+					// returns a different scriptPubKey structure or hex doesn't match
+					if (!isOurs) {
+						var outAddr = ''
+						if (o.scriptPubKey) {
+							outAddr = o.scriptPubKey.address
+								|| (o.scriptPubKey.addresses && o.scriptPubKey.addresses[0])
+								|| ''
+						}
+						if (outAddr) {
+							isOurs = globalData.allAddresses
+								? globalData.allAddresses.has(outAddr)
+								: (outAddr === (globalData.address || ''))
+						}
+					}
 					if (isOurs) {
 						received += sat
 					} else {
@@ -1224,14 +1240,14 @@
 				// direction + display amount
 				// Note: fee = inputs_total - all_vout_total; it's not in any vout so it's
 				// not included in sentToOthers. Display shows "sent X to recipient (+ fee)".
-				var direction, amount
+				var direction, amount, isSelfSend
 				if (weAreSender) {
-					direction = 'out'
-					// If all outputs came back to us (self-send), show received
-					amount = sentToOthers > 0 ? sentToOthers : received
+					isSelfSend = (sentToOthers === 0)
+					direction  = isSelfSend ? 'self' : 'out'
+					amount     = isSelfSend ? received : sentToOthers
 				} else {
 					direction = 'in'
-					amount = received
+					amount    = received
 				}
 
 				return {
@@ -1312,6 +1328,8 @@
 						dirLabel = '<span class="font-weight-bold text-success" style="min-width:110px;display:inline-block">&#x2193; +' + escHtml(String(amt)) + ' ' + escHtml(ticker) + '</span>'
 					} else if (dir === 'out') {
 						dirLabel = '<span class="font-weight-bold text-danger" style="min-width:110px;display:inline-block">&#x2191; -' + escHtml(String(amt)) + ' ' + escHtml(ticker) + '</span>'
+					} else if (dir === 'self') {
+						dirLabel = '<span class="font-weight-bold text-info" style="min-width:110px;display:inline-block">&#x21C5; ' + escHtml(String(amt)) + ' ' + escHtml(ticker) + '</span>'
 					} else {
 						dirLabel = '<span class="text-muted" style="min-width:110px;display:inline-block">— ? ' + escHtml(ticker) + '</span>'
 					}
@@ -1468,12 +1486,27 @@
 				return set
 			}
 
+			// Build a Set of ALL address strings for this key (bech32 + segwit + legacy).
+			// Used as a reliable fallback when scriptPubKey.hex matching fails.
+			function getAllAddresses(keys) {
+				var network = getConfig()['network']
+				var set = new Set()
+				try { set.add(bitcoin.payments.p2wpkh({ pubkey: keys.publicKey, network: network }).address) } catch(e) {}
+				try {
+					var redeem = bitcoin.payments.p2wpkh({ pubkey: keys.publicKey, network: network })
+					set.add(bitcoin.payments.p2sh({ redeem: redeem, network: network }).address)
+				} catch(e) {}
+				try { set.add(bitcoin.payments.p2pkh({ pubkey: keys.publicKey, network: network }).address) } catch(e) {}
+				return set
+			}
+
 			// identity, password — only when opening via credentials form, null otherwise
 			function openWallet(keys, identity, password) {
 				globalData.address   = getAddress(keys)
 				globalData.scriptHex = getScriptHex(keys)
 				globalData.pubKeyHex = keys.publicKey.toString('hex')
 				globalData.allScriptHexes = getAllScriptHexes(keys)
+				globalData.allAddresses   = getAllAddresses(keys)
 				var pubkey = globalData.pubKeyHex
 				var wif    = keys.toWIF()
 				var redeem = '0014' + getP2WPKHScript(keys.publicKey).hash.toString('hex')
