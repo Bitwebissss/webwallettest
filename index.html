@@ -50,7 +50,6 @@
 			.qr-code canvas { max-width: 100%; }
 			.wallet-balance { font-size: 23px; }
 			.wallet-balance .text-monospace { font-size: 20px; }
-			[class*="entypo"]:before { font-family: 'EntypoRegular', sans-serif; font-size: 16px; }
 			@media (max-width: 991.98px) {
 				.navbar-expand-lg>.container, .navbar-expand-lg>.container-fluid {
 					padding-right: 15px;
@@ -115,7 +114,7 @@
 				<div id="pin-login-block" class="d-none">
 					<div class="card mb-3 pin-login-card">
 						<div class="card-body">
-							<p class="pin-login-title"><span class="entypo lock"></span> <span tkey="pin-login-title">Saved wallet found</span></p>
+							<p class="pin-login-title"><span class="fa fa-lock"></span> <span tkey="pin-login-title">Saved wallet found</span></p>
 							<div class="input-group mb-2">
 								<input id="pin-login-input" type="password" class="form-control" tkey="pin-login-placeholder" placeholder="Enter PIN to open" maxlength="16" autocomplete="current-password">
 								<div class="input-group-append">
@@ -243,11 +242,11 @@
 									<div class="float-md-right">
 										<a href="#" id="send-qr" class="text-dark pr-1">
 											<span tkey="scan-qr"></span>
-											<span class="entypo camera"></span>
+											<span class="fa fa-camera"></span>
 										</a>
 										<a href="#" id="send-reset" class="text-dark">
 											<span tkey="reset"></span>
-											<span class="entypo cycle"></span>
+											<span class="fa fa-sync"></span>
 										</a>
 									</div>
 								</div>
@@ -258,7 +257,7 @@
 										<input name="send-ammount" class="form-control" type="text" value="" tkey="amount">
 										<div class="input-group-append">
 											<button id="add-output" class="btn btn-outline-dark">
-												<span class="entypo plus"></span>
+												<span class="fa fa-plus"></span>
 											</button>
 										</div>
 									</div>
@@ -2114,7 +2113,7 @@
 						'<div class="send-additional-output send-outputs-item input-group mb-2">' +
 						'<input name="send-address" class="form-control" placeholder="' + getText('enter-address') + '" type="text">' +
 						'<input name="send-ammount" class="form-control" placeholder="' + getText('amount') + '" type="text">' +
-						'<div class="input-group-append"><button class="btn btn-outline-danger remove-additional-output" type="submit"><span class="entypo minus"></span></button></div>' +
+						'<div class="input-group-append"><button class="btn btn-outline-danger remove-additional-output" type="submit"><span class="fa fa-minus"></span></button></div>' +
 						'</div>'
 					)
 					$('.remove-additional-output').click(function(e) { $(this).closest('.send-additional-output').remove(); e.preventDefault() })
