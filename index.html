@@ -1463,11 +1463,11 @@
 				var network = getConfig()['network']
 				var type    = getAddressType()
 				if (type === 'bech32') {
-					return getP2WPKHScript(keys.publicKey).output.toString('hex')
+					return bitcoin.Buffer.from(getP2WPKHScript(keys.publicKey).output).toString('hex')
 				} else if (type === 'segwit') {
-					return getP2SHScript(getP2WPKHScript(keys.publicKey)).output.toString('hex')
+					return bitcoin.Buffer.from(getP2SHScript(getP2WPKHScript(keys.publicKey)).output).toString('hex')
 				} else {
-					return bitcoin.payments.p2pkh({ pubkey: keys.publicKey, network: network }).output.toString('hex')
+					return bitcoin.Buffer.from(bitcoin.payments.p2pkh({ pubkey: keys.publicKey, network: network }).output).toString('hex')
 				}
 			}
 
@@ -1477,11 +1477,11 @@
 				var network = getConfig()['network']
 				var set = new Set()
 				// P2WPKH (bech32)
-				set.add(getP2WPKHScript(keys.publicKey).output.toString('hex').toLowerCase())
+				set.add(bitcoin.Buffer.from(getP2WPKHScript(keys.publicKey).output).toString('hex').toLowerCase())
 				// P2SH-P2WPKH (segwit)
-				set.add(getP2SHScript(getP2WPKHScript(keys.publicKey)).output.toString('hex').toLowerCase())
+				set.add(bitcoin.Buffer.from(getP2SHScript(getP2WPKHScript(keys.publicKey)).output).toString('hex').toLowerCase())
 				// P2PKH (legacy)
-				set.add(bitcoin.payments.p2pkh({ pubkey: keys.publicKey, network: network }).output.toString('hex').toLowerCase())
+				set.add(bitcoin.Buffer.from(bitcoin.payments.p2pkh({ pubkey: keys.publicKey, network: network }).output).toString('hex').toLowerCase())
 				return set
 			}
 
@@ -1503,12 +1503,12 @@
 			function openWallet(keys, identity, password) {
 				globalData.address   = getAddress(keys)
 				globalData.scriptHex = getScriptHex(keys)
-				globalData.pubKeyHex = keys.publicKey.toString('hex')
+				globalData.pubKeyHex = bitcoin.Buffer.from(keys.publicKey).toString('hex')
 				globalData.allScriptHexes = getAllScriptHexes(keys)
 				globalData.allAddresses   = getAllAddresses(keys)
 				var pubkey = globalData.pubKeyHex
 				var wif    = keys.toWIF()
-				var redeem = '0014' + getP2WPKHScript(keys.publicKey).hash.toString('hex')
+				var redeem = '0014' + bitcoin.Buffer.from(getP2WPKHScript(keys.publicKey).hash).toString('hex')
 
 				$('#wallet-keys-pubkey input').val(pubkey)
 				$('#wallet-keys-privkey input').val(wif)
@@ -2173,7 +2173,7 @@
 					var address = getAddress(keys)
 					if (address != undefined) {
 						$('#create-keys-address input').val(address)
-						$('#create-keys-pubkey input').val(keys.publicKey.toString('hex'))
+						$('#create-keys-pubkey input').val(bitcoin.Buffer.from(keys.publicKey).toString('hex'))
 						$('#create-keys-privkey input').val(keys.toWIF())
 					}
 				})
@@ -2217,7 +2217,7 @@
 					showQrAddress(getConfig()['uri'] + globalData.address);
 					$('#wallet-keys-pubkey input').val(globalData.pubKeyHex);
 					$('#wallet-keys-privkey input').val(globalData.keys.toWIF());
-					$('#wallet-keys-script input').val('0014' + getP2WPKHScript(globalData.keys.publicKey).hash.toString('hex'));
+					$('#wallet-keys-script input').val('0014' + bitcoin.Buffer.from(getP2WPKHScript(globalData.keys.publicKey).hash).toString('hex'));
 					
 					// Fetch UTXOs and balance for the new address – Coin Control now shows only those UTXOs
 					walletBalance();
