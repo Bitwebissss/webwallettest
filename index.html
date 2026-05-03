@@ -2192,10 +2192,38 @@
 				})
 
 				$('#address-type-select select').on('change', function() {
-					switchAddressType($(this).val())
-					showMessage(messages.settings.typeSwitched($(this).val()))
-					initWallet()
-				})
+					var newType = $(this).val();
+					switchAddressType(newType);
+					showMessage(messages.settings.typeSwitched(newType));
+					
+					if (!globalData.keys) return;
+					
+					// Discard UTXOs and cache for the old address
+					if (globalData.address) clearUtxoCache(globalData.address);
+					globalData.utxos = [];
+					globalData.coinControl = false;
+					globalData.selectedUtxos = null;
+					globalData.immatureBalance = 0;
+					globalData._lastRendered = { balance: -1, immature: -1, utxoFingerprint: '' };
+					globalData._lastUpdateAddress = null;
+					
+					// Compute new address and scripts for the selected type
+					globalData.address   = getAddress(globalData.keys);
+					globalData.scriptHex = getScriptHex(globalData.keys);
+					globalData.allScriptHexes = getAllScriptHexes(globalData.keys);
+					globalData.allAddresses   = getAllAddresses(globalData.keys);
+					
+					// Update the UI
+					$('#wallet-address').text(globalData.address);
+					showQrAddress(getConfig()['uri'] + globalData.address);
+					$('#wallet-keys-pubkey input').val(globalData.pubKeyHex);
+					$('#wallet-keys-privkey input').val(globalData.keys.toWIF());
+					$('#wallet-keys-script input').val('0014' + getP2WPKHScript(globalData.keys.publicKey).hash.toString('hex'));
+					
+					// Fetch UTXOs and balance for the new address – Coin Control now shows only those UTXOs
+					walletBalance();
+					setHomeTitle();
+				});
 
 				$('#wallet-backend button').click(function() {
 					switchBackend($('#wallet-backend input').val())
