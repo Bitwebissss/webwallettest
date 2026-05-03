@@ -2077,7 +2077,7 @@
 				// PIN login block — main open button
 				function doPinLogin() {
 					var pin = $('#pin-login-input').val()
-					if (!pin || pin.length < 6) {
+					if (!pin) {
 						$('#pin-login-error').text(getText('pin-login-error')).removeClass('d-none')
 						return
 					}
