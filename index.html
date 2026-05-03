@@ -604,6 +604,7 @@
 				'resetTx':         function() { this.tx = { 'amount': 0, 'outputs': [], 'fee': 0 } },
 				'clear':           function() {
 					this.keys = {}; this.address = ''; this.scriptHex = undefined; this.pubKeyHex = undefined
+					this.allScriptHexes = null
 					this.balance = 0; this.immatureBalance = 0; this.height = 0
 					this.utxos = []; this.coinControl = false; this.selectedUtxos = null
 					this._lastRendered = { balance: -1, immature: -1, utxoFingerprint: '' }
@@ -1203,11 +1204,17 @@
 					return false
 				})
 
-				// Sum vout: received = to us, sentToOthers = to other addresses
+				// Sum vout: received = to us (any of our addresses), sentToOthers = to other addresses
 				var received = 0, sentToOthers = 0
 				vout.forEach(function(o) {
 					var sat = (o.value_sat != null) ? o.value_sat : Math.round((o.value || 0) * 1e8)
-					if (o.scriptPubKey && o.scriptPubKey.hex === globalData.scriptHex) {
+					var hex = (o.scriptPubKey && o.scriptPubKey.hex) ? o.scriptPubKey.hex.toLowerCase() : ''
+					// Match against ALL our scriptPubKeys (bech32 + segwit + legacy) —
+					// one key produces three addresses; change may go to any of them.
+					var isOurs = globalData.allScriptHexes
+						? globalData.allScriptHexes.has(hex)
+						: (hex === (globalData.scriptHex || '').toLowerCase())
+					if (isOurs) {
 						received += sat
 					} else {
 						sentToOthers += sat
@@ -1447,11 +1454,26 @@
 				}
 			}
 
+			// Build a Set of ALL scriptPubKey hex strings for this key (bech32 + segwit + legacy).
+			// One key produces three addresses — history may contain change outputs to any of them.
+			function getAllScriptHexes(keys) {
+				var network = getConfig()['network']
+				var set = new Set()
+				// P2WPKH (bech32)
+				set.add(getP2WPKHScript(keys.publicKey).output.toString('hex').toLowerCase())
+				// P2SH-P2WPKH (segwit)
+				set.add(getP2SHScript(getP2WPKHScript(keys.publicKey)).output.toString('hex').toLowerCase())
+				// P2PKH (legacy)
+				set.add(bitcoin.payments.p2pkh({ pubkey: keys.publicKey, network: network }).output.toString('hex').toLowerCase())
+				return set
+			}
+
 			// identity, password — only when opening via credentials form, null otherwise
 			function openWallet(keys, identity, password) {
 				globalData.address   = getAddress(keys)
 				globalData.scriptHex = getScriptHex(keys)
 				globalData.pubKeyHex = keys.publicKey.toString('hex')
+				globalData.allScriptHexes = getAllScriptHexes(keys)
 				var pubkey = globalData.pubKeyHex
 				var wif    = keys.toWIF()
 				var redeem = '0014' + getP2WPKHScript(keys.publicKey).hash.toString('hex')
