@@ -517,7 +517,7 @@
 					</div>
 					<div class="modal-body">
 						<p id="pin-modal-desc" class="text-muted small"></p>
-						<input id="pin-input" type="password" class="form-control" tkey="pin-input-placeholder" placeholder="PIN (min 4 digits)" maxlength="16">
+						<input id="pin-input" type="password" class="form-control" tkey="pin-input-placeholder" placeholder="PIN (min 6 digits)" maxlength="32">
 						<div id="pin-error" class="text-danger small mt-1 d-none" tkey="pin-login-error">Wrong PIN, try again.</div>
 					</div>
 					<div class="modal-footer">
@@ -1571,11 +1571,11 @@
 				globalData.allScriptHexes = getAllScriptHexes(keys)
 				globalData.allAddresses   = getAllAddresses(keys)
 				var pubkey = globalData.pubKeyHex
-				var wif    = keys.toWIF()
 				var redeem = '0014' + bitcoin.Buffer.from(getP2WPKHScript(keys.publicKey).hash).toString('hex')
 
 				$('#wallet-keys-pubkey input').val(pubkey)
-				$('#wallet-keys-privkey input').val(wif)
+				$('#wallet-keys-privkey input').val('').attr('type', 'password')
+				$('#wallet-keys-privkey .toggle-priv-key').text(getText('show'))
 				$('#wallet-keys-script input').val(redeem)
 
 				$('#wallet-address').text(globalData.address)
@@ -1600,7 +1600,7 @@
 							getText('pin-save-title'),
 							getText('pin-save-desc')
 						).then(function(pin) {
-							if (pin && pin.length >= 4) {
+							if (pin && pin.length >= 6) {
 								saveWif(wifToSave, pin).then(function() {
 									showMessage(getText('wallet-saved'))
 									updateSavedWalletUI()
@@ -2024,7 +2024,7 @@
 				// PIN login block — main open button
 				function doPinLogin() {
 					var pin = $('#pin-login-input').val()
-					if (!pin || pin.length < 4) {
+					if (!pin || pin.length < 6) {
 						$('#pin-login-error').text(getText('pin-login-error')).removeClass('d-none')
 						return
 					}
@@ -2086,6 +2086,11 @@
 				$('.tab-link').click(function(e) {
 					var tabFamily = $(this).data('tab-family')
 					var tabName   = $(this).data('tab-name')
+					// If leaving the Keys tab — wipe WIF from DOM immediately
+					if (tabFamily === 'wallet-block' && tabName !== 'wallet-keys') {
+						$('#wallet-keys-privkey input').val('').attr('type', 'password')
+						$('#wallet-keys-privkey .toggle-priv-key').text(getText('show'))
+					}
 					$('#' + tabFamily + ' .tab-item').addClass('d-none')
 					$('#' + tabFamily + ' .card-header .card-header-tabs .nav-link').removeClass('active')
 					$('#' + tabFamily + ' [data-tab=' + tabName + ']').removeClass('d-none')
@@ -2179,11 +2184,24 @@
 				$('#send-confirm').click(function(e) { sendTransaction(); e.preventDefault() })
 
 				$('.toggle-priv-key').click(function() {
-					var inp = $(this).parent().parent().find('.keys-privkey')
+					var inp      = $(this).parent().parent().find('.keys-privkey')
+					var isWallet = $(this).closest('#wallet-keys-privkey').length > 0
 					if ($(this).text() == getText('show')) {
-						inp.attr('type', 'text'); $(this).text(getText('hide'))
+						if (isWallet) {
+							// Load WIF only now — never stored in DOM until user explicitly asks
+							if (globalData.keys && globalData.keys.privateKey) {
+								inp.val(globalData.keys.toWIF())
+							}
+						}
+						inp.attr('type', 'text')
+						$(this).text(getText('hide'))
 					} else {
-						inp.attr('type', 'password'); $(this).text(getText('show'))
+						if (isWallet) {
+							// Wipe from DOM immediately on hide
+							inp.val('')
+						}
+						inp.attr('type', 'password')
+						$(this).text(getText('show'))
 					}
 				})
 
@@ -2295,7 +2313,9 @@
 					$('#wallet-address').text(globalData.address);
 					showQrAddress(getConfig()['uri'] + globalData.address);
 					$('#wallet-keys-pubkey input').val(globalData.pubKeyHex);
-					$('#wallet-keys-privkey input').val(globalData.keys.toWIF());
+					// WIF not pre-populated — user must click Show to reveal
+					$('#wallet-keys-privkey input').val('').attr('type', 'password');
+					$('#wallet-keys-privkey .toggle-priv-key').text(getText('show'));
 					$('#wallet-keys-script input').val('0014' + bitcoin.Buffer.from(getP2WPKHScript(globalData.keys.publicKey).hash).toString('hex'));
 					
 					// Fetch UTXOs and balance for the new address – Coin Control now shows only those UTXOs
