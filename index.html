@@ -323,13 +323,10 @@
 									</div>
 									<div id="wallet-keys-privkey">
 										<label tkey="private-key"></label>
-										<div class="input-group pb-2">
-											<div class="input-group">
-												<input class="form-control keys-privkey privkey" readonly data-original-title="" title="" type="password">
-												<span class="input-group-append">
-													<button class="btn btn-outline-dark b-width toggle-priv-key" type="button" tkey="show"></button>
-												</span>
-											</div>
+										<div class="d-flex align-items-center pb-2" style="gap:4px">
+											<canvas id="wallet-privkey-canvas" class="form-control p-1" style="height:38px;cursor:default;flex:1 1 auto" height="38"></canvas>
+											<button id="wallet-privkey-copy-btn" class="btn btn-outline-secondary flex-shrink-0 d-none" type="button" title="Copy"><span class="fa fa-copy"></span></button>
+											<button id="toggle-wallet-privkey" class="btn btn-outline-dark flex-shrink-0 b-width" type="button" tkey="show"></button>
 										</div>
 									</div>
 									<div id="wallet-keys-script">
@@ -377,13 +374,10 @@
 							</div>
 							<div id="create-keys-privkey">
 								<label tkey="private-key"></label>
-								<div class="input-group pb-2">
-									<div class="input-group">
-										<input class="form-control keys-privkey privkey" readonly data-original-title="" title="" type="password">
-										<span class="input-group-append">
-											<button class="btn btn-outline-dark b-width toggle-priv-key" type="button" tkey="show"></button>
-										</span>
-									</div>
+								<div class="d-flex align-items-center pb-2" style="gap:4px">
+									<canvas id="create-privkey-canvas" class="form-control p-1" style="height:38px;cursor:default;flex:1 1 auto" height="38"></canvas>
+									<button id="create-privkey-copy-btn" class="btn btn-outline-secondary flex-shrink-0 d-none" type="button" title="Copy"><span class="fa fa-copy"></span></button>
+									<button id="toggle-create-privkey" class="btn btn-outline-dark flex-shrink-0 b-width" type="button" tkey="show"></button>
 								</div>
 							</div>
 						</div>
@@ -595,6 +589,51 @@
 					.replace(/>/g, '&gt;')
 					.replace(/"/g, '&quot;')
 					.replace(/'/g, '&#039;')
+			}
+
+			// ================================================================
+			// Canvas private key display — WIF never goes into input.value
+			// ================================================================
+			// Holds the WIF for the Create page only — cleared on navigation away
+			var _createWif = null
+
+			// Draw masked dots on a canvas (initial/hidden state)
+			function _privkeyMask(canvasId) {
+				var canvas = document.getElementById(canvasId)
+				if (!canvas) return
+				var w = canvas.parentElement ? canvas.parentElement.offsetWidth - 120 : 300
+				if (w < 100) w = 300
+				canvas.width = w
+				var ctx = canvas.getContext('2d')
+				ctx.clearRect(0, 0, canvas.width, canvas.height)
+				ctx.fillStyle = '#aaa'
+				ctx.font = '20px sans-serif'
+				ctx.textBaseline = 'middle'
+				ctx.fillText('● ● ● ● ● ● ● ● ● ● ● ●', 8, canvas.height / 2)
+			}
+
+			// Draw actual WIF text on canvas (revealed state)
+			function _privkeyReveal(canvasId, wif) {
+				var canvas = document.getElementById(canvasId)
+				if (!canvas) return
+				var w = canvas.parentElement ? canvas.parentElement.offsetWidth - 120 : 300
+				if (w < 100) w = 300
+				canvas.width = w
+				var ctx = canvas.getContext('2d')
+				ctx.clearRect(0, 0, canvas.width, canvas.height)
+				ctx.fillStyle = '#212529'
+				ctx.font = '12px monospace'
+				ctx.textBaseline = 'middle'
+				ctx.fillText(wif, 4, canvas.height / 2)
+			}
+
+			// Wipe canvas completely (on close / navigation away)
+			function _privkeyClear(canvasId) {
+				var canvas = document.getElementById(canvasId)
+				if (!canvas) return
+				var ctx = canvas.getContext('2d')
+				ctx.clearRect(0, 0, canvas.width, canvas.height)
+				canvas.width = 1  // forces GPU buffer release
 			}
 
 			// ================================================================
@@ -1082,6 +1121,16 @@
 				if (urlParams[0] == '#') {
 					var pageName    = urlParams[1] != '' ? urlParams[1] : 'homepage'
 					var templateName = '#' + pageName
+					// Leaving Create page — wipe generated key from canvas and memory
+					if ($('#create').is(':visible') && pageName !== 'create') {
+						_privkeyClear('create-privkey-canvas')
+						_privkeyMask('create-privkey-canvas')
+						$('#create-privkey-copy-btn').addClass('d-none')
+						$('#toggle-create-privkey').text(getText('show'))
+						$('#create-keys-address input').val('')
+						$('#create-keys-pubkey input').val('')
+						_createWif = null
+					}
 					$('.router-link').removeClass('active')
 					$('.router-link[data-route=' + pageName + ']').addClass('active')
 					if ($('.router-page:visible').attr('id') != urlParams[1]) {
@@ -1574,8 +1623,11 @@
 				var redeem = '0014' + bitcoin.Buffer.from(getP2WPKHScript(keys.publicKey).hash).toString('hex')
 
 				$('#wallet-keys-pubkey input').val(pubkey)
-				$('#wallet-keys-privkey input').val('').attr('type', 'password')
-				$('#wallet-keys-privkey .toggle-priv-key').text(getText('show'))
+				// Private key: canvas masked, never in input.value
+				_privkeyClear('wallet-privkey-canvas')
+				_privkeyMask('wallet-privkey-canvas')
+				$('#wallet-privkey-copy-btn').addClass('d-none')
+				$('#toggle-wallet-privkey').text(getText('show'))
 				$('#wallet-keys-script input').val(redeem)
 
 				$('#wallet-address').text(globalData.address)
@@ -1615,10 +1667,11 @@
 			function closeWallet() {
 				_stopAutoLock()
 				clearTimeout(walletTimer)
-				// Explicitly wipe sensitive values from DOM before hiding.
-				// globalData.clear() clears the JS object but NOT DOM input values —
-				// without this, '#wallet-keys-privkey input'.val() still returns WIF after close.
-				$('#wallet-keys-privkey input').val('')
+				// Wipe private key canvas — forces GPU buffer release
+				_privkeyClear('wallet-privkey-canvas')
+				_privkeyMask('wallet-privkey-canvas')
+				$('#wallet-privkey-copy-btn').addClass('d-none')
+				$('#toggle-wallet-privkey').text(getText('show'))
 				$('#wallet-keys-pubkey input').val('')
 				$('#wallet-keys-script input').val('')
 				$('#wallet-address').text('')
@@ -2086,10 +2139,12 @@
 				$('.tab-link').click(function(e) {
 					var tabFamily = $(this).data('tab-family')
 					var tabName   = $(this).data('tab-name')
-					// If leaving the Keys tab — wipe WIF from DOM immediately
+					// Leaving Keys tab — wipe canvas immediately
 					if (tabFamily === 'wallet-block' && tabName !== 'wallet-keys') {
-						$('#wallet-keys-privkey input').val('').attr('type', 'password')
-						$('#wallet-keys-privkey .toggle-priv-key').text(getText('show'))
+						_privkeyClear('wallet-privkey-canvas')
+						_privkeyMask('wallet-privkey-canvas')
+						$('#wallet-privkey-copy-btn').addClass('d-none')
+						$('#toggle-wallet-privkey').text(getText('show'))
 					}
 					$('#' + tabFamily + ' .tab-item').addClass('d-none')
 					$('#' + tabFamily + ' .card-header .card-header-tabs .nav-link').removeClass('active')
@@ -2183,26 +2238,46 @@
 				$('.wallet-balance').click(function(e) { walletBalance(); e.preventDefault() })
 				$('#send-confirm').click(function(e) { sendTransaction(); e.preventDefault() })
 
-				$('.toggle-priv-key').click(function() {
-					var inp      = $(this).parent().parent().find('.keys-privkey')
-					var isWallet = $(this).closest('#wallet-keys-privkey').length > 0
+				// ── Wallet keys tab: toggle reveal/hide via canvas ──
+				$('#toggle-wallet-privkey').click(function() {
 					if ($(this).text() == getText('show')) {
-						if (isWallet) {
-							// Load WIF only now — never stored in DOM until user explicitly asks
-							if (globalData.keys && globalData.keys.privateKey) {
-								inp.val(globalData.keys.toWIF())
-							}
+						if (globalData.keys && globalData.keys.privateKey) {
+							_privkeyReveal('wallet-privkey-canvas', globalData.keys.toWIF())
+							$('#wallet-privkey-copy-btn').removeClass('d-none')
+							$(this).text(getText('hide'))
 						}
-						inp.attr('type', 'text')
-						$(this).text(getText('hide'))
 					} else {
-						if (isWallet) {
-							// Wipe from DOM immediately on hide
-							inp.val('')
-						}
-						inp.attr('type', 'password')
+						_privkeyClear('wallet-privkey-canvas')
+						_privkeyMask('wallet-privkey-canvas')
+						$('#wallet-privkey-copy-btn').addClass('d-none')
 						$(this).text(getText('show'))
 					}
+				})
+
+				$('#wallet-privkey-copy-btn').click(function() {
+					if (globalData.keys && globalData.keys.privateKey) {
+						copyToClipboard(globalData.keys.toWIF(), $(this))
+					}
+				})
+
+				// ── Create page: toggle reveal/hide via canvas ──
+				$('#toggle-create-privkey').click(function() {
+					if ($(this).text() == getText('show')) {
+						if (_createWif) {
+							_privkeyReveal('create-privkey-canvas', _createWif)
+							$('#create-privkey-copy-btn').removeClass('d-none')
+							$(this).text(getText('hide'))
+						}
+					} else {
+						_privkeyClear('create-privkey-canvas')
+						_privkeyMask('create-privkey-canvas')
+						$('#create-privkey-copy-btn').addClass('d-none')
+						$(this).text(getText('show'))
+					}
+				})
+
+				$('#create-privkey-copy-btn').click(function() {
+					if (_createWif) copyToClipboard(_createWif, $(this))
 				})
 
 				$('#add-output').click(function(e) {
@@ -2269,9 +2344,15 @@
 					var keys    = bitcoin.ECPair.makeRandom({ 'network': getConfig()['network'] })
 					var address = getAddress(keys)
 					if (address != undefined) {
+						// Store WIF in module var — displayed via canvas only, never in input.value
+						_createWif = keys.toWIF()
 						$('#create-keys-address input').val(address)
 						$('#create-keys-pubkey input').val(bitcoin.Buffer.from(keys.publicKey).toString('hex'))
-						$('#create-keys-privkey input').val(keys.toWIF())
+						// Reset canvas to masked state — user must click Show to reveal
+						_privkeyClear('create-privkey-canvas')
+						_privkeyMask('create-privkey-canvas')
+						$('#create-privkey-copy-btn').addClass('d-none')
+						$('#toggle-create-privkey').text(getText('show'))
 					}
 				})
 
@@ -2313,9 +2394,11 @@
 					$('#wallet-address').text(globalData.address);
 					showQrAddress(getConfig()['uri'] + globalData.address);
 					$('#wallet-keys-pubkey input').val(globalData.pubKeyHex);
-					// WIF not pre-populated — user must click Show to reveal
-					$('#wallet-keys-privkey input').val('').attr('type', 'password');
-					$('#wallet-keys-privkey .toggle-priv-key').text(getText('show'));
+					// Reset privkey canvas to masked — user must click Show again
+					_privkeyClear('wallet-privkey-canvas');
+					_privkeyMask('wallet-privkey-canvas');
+					$('#wallet-privkey-copy-btn').addClass('d-none');
+					$('#toggle-wallet-privkey').text(getText('show'));
 					$('#wallet-keys-script input').val('0014' + bitcoin.Buffer.from(getP2WPKHScript(globalData.keys.publicKey).hash).toString('hex'));
 					
 					// Fetch UTXOs and balance for the new address – Coin Control now shows only those UTXOs
