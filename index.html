@@ -808,7 +808,7 @@
 			var _pinResolve   = null
 			var _pinValidator = null  // function(pin) -> error string or null
 
-			function askPin(title, desc, validator, mandatory, cancelLabel) {
+			function askPin(title, desc, validator, mandatory) {
 				return new Promise(function(resolve) {
 					_pinResolve   = resolve
 					_pinValidator = validator || null
@@ -819,7 +819,7 @@
 					if (mandatory) {
 						$('#pin-cancel').addClass('d-none')
 					} else {
-						$('#pin-cancel').removeClass('d-none').text(cancelLabel || getText('cancel'))
+						$('#pin-cancel').removeClass('d-none')
 					}
 					$('#pin-modal').modal({ backdrop: 'static', keyboard: false })
 					$('#pin-modal').modal('show')
@@ -828,28 +828,23 @@
 			}
 
 			// Two-step mandatory PIN setup: enter then confirm. Returns confirmed PIN.
+			// Two-step PIN setup. Returns confirmed PIN string, or null if user cancelled.
 			async function askPinSetup() {
-				while (true) {
-					// Step 1: enter new PIN — Cancel aborts entirely
-					var pin = await askPin(
-						getText('pin-create-title'),
-						getText('pin-create-desc'),
-						function(p) { return (!p || p.length < 6) ? getText('pin-too-short') : null },
-						false
-					)
-					if (pin === null) return null  // user cancelled — do not save
+				var pin = await askPin(
+					getText('pin-create-title'),
+					getText('pin-create-desc'),
+					function(p) { return (!p || p.length < 6) ? getText('pin-too-short') : null },
+					false
+				)
+				if (pin === null) return null
 
-					// Step 2: confirm PIN — “Back” returns to step 1
-					var confirmed = await askPin(
-						getText('pin-confirm-title'),
-						getText('pin-confirm-desc'),
-						function(p) { return (p !== pin) ? getText('pin-mismatch') : null },
-						false,
-						getText('back') || '← Back'
-					)
-					if (confirmed !== null) return confirmed  // PINs match — done
-					// confirmed === null: Back on step 2 → restart from step 1
-				}
+				var confirmed = await askPin(
+					getText('pin-confirm-title'),
+					getText('pin-confirm-desc'),
+					function(p) { return (p !== pin) ? getText('pin-mismatch') : null },
+					false
+				)
+				return confirmed  // null = cancelled, string = confirmed PIN
 			}
 
 			// ================================================================
