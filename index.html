@@ -808,7 +808,7 @@
 			var _pinResolve   = null
 			var _pinValidator = null  // function(pin) -> error string or null
 
-			function askPin(title, desc, validator, mandatory) {
+			function askPin(title, desc, validator, mandatory, cancelLabel) {
 				return new Promise(function(resolve) {
 					_pinResolve   = resolve
 					_pinValidator = validator || null
@@ -819,7 +819,7 @@
 					if (mandatory) {
 						$('#pin-cancel').addClass('d-none')
 					} else {
-						$('#pin-cancel').removeClass('d-none')
+						$('#pin-cancel').removeClass('d-none').text(cancelLabel || getText('cancel'))
 					}
 					$('#pin-modal').modal({ backdrop: 'static', keyboard: false })
 					$('#pin-modal').modal('show')
@@ -829,19 +829,27 @@
 
 			// Two-step mandatory PIN setup: enter then confirm. Returns confirmed PIN.
 			async function askPinSetup() {
-				var pin = await askPin(
-					getText('pin-create-title'),
-					getText('pin-create-desc'),
-					function(p) { return (!p || p.length < 6) ? getText('pin-too-short') : null },
-					true
-				)
-				var confirmed = await askPin(
-					getText('pin-confirm-title'),
-					getText('pin-confirm-desc'),
-					function(p) { return (p !== pin) ? getText('pin-mismatch') : null },
-					true
-				)
-				return confirmed
+				while (true) {
+					// Step 1: enter new PIN — Cancel aborts entirely
+					var pin = await askPin(
+						getText('pin-create-title'),
+						getText('pin-create-desc'),
+						function(p) { return (!p || p.length < 6) ? getText('pin-too-short') : null },
+						false
+					)
+					if (pin === null) return null  // user cancelled — do not save
+
+					// Step 2: confirm PIN — “Back” returns to step 1
+					var confirmed = await askPin(
+						getText('pin-confirm-title'),
+						getText('pin-confirm-desc'),
+						function(p) { return (p !== pin) ? getText('pin-mismatch') : null },
+						false,
+						getText('back') || '← Back'
+					)
+					if (confirmed !== null) return confirmed  // PINs match — done
+					// confirmed === null: Back on step 2 → restart from step 1
+				}
 			}
 
 			// ================================================================
@@ -1546,7 +1554,7 @@
 					if (globalData.status !== 'unlocked') return  // wallet locked or closed — stop loop
 					if ($('.wallet-balance .ticker').text() != getText('loading')) walletBalance(true)
 					checkBalanceLoop()
-				}, 20000)
+				}, 40000)
 			}
 
 			// ================================================================
@@ -1623,21 +1631,26 @@
 
 			// Open wallet: if offerPin && no saved wallet -> collect PIN first, then show UI.
 			async function openWallet(keys, offerPin) {
-				globalData.status    = 'unlocked'
-				globalData.address   = getAddress(keys)
-				globalData.scriptHex = getScriptHex(keys)
-				globalData.pubKeyHex = bitcoin.Buffer.from(keys.publicKey).toString('hex')
-				globalData.allScriptHexes = getAllScriptHexes(keys)
-				globalData.allAddresses   = getAllAddresses(keys)
-
 				if (offerPin && !hasSavedWallet()) {
-					// PIN setup is mandatory — collect BEFORE showing wallet UI
 					var pin = await askPinSetup()
-					var wifToSave = keys.toWIF()
-					await saveWif(wifToSave, pin)
+					if (pin === null) {
+						// User cancelled — wipe key from memory, stay on open form
+						globalData.keys = undefined
+						return
+					}
+					await saveWif(keys.toWIF(), pin)
 					showMessage(getText('wallet-saved'))
 					updateSavedWalletUI()
 				}
+
+				// Only set runtime state after PIN is confirmed (or not required)
+				globalData.status         = 'unlocked'
+				globalData.address        = getAddress(keys)
+				globalData.scriptHex      = getScriptHex(keys)
+				globalData.pubKeyHex      = bitcoin.Buffer.from(keys.publicKey).toString('hex')
+				globalData.allScriptHexes = getAllScriptHexes(keys)
+				globalData.allAddresses   = getAllAddresses(keys)
+
 				_showWalletUI(keys)
 			}
 
