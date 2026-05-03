@@ -542,6 +542,55 @@
 
 		<script>
 			// ================================================================
+			// Settings storage — localStorage (replaces cookies for all settings)
+			// Keys: bte_cfg_{name}  — isolated from wallet data keys (bte_wallet_*, bte_utxo_*, bte_history_*)
+			// ================================================================
+			var CFG_PREFIX = 'bte_cfg_'
+
+			// Validate backend URL before storing:
+			//   - must be absolute http(s) URL
+			//   - no embedded credentials (user:pass@host)
+			//   - rejects javascript:, data:, blob:, etc.
+			//   - http allowed only for localhost (dev)
+			function isValidBackendUrl(url) {
+				try {
+					var u = new URL(url)
+					if (u.protocol !== 'https:' &&
+						!(u.protocol === 'http:' && (u.hostname === 'localhost' || u.hostname === '127.0.0.1'))) return false
+					if (u.username || u.password) return false
+					return true
+				} catch(e) { return false }
+			}
+
+			function _cfgSet(key, value) {
+				try { localStorage.setItem(CFG_PREFIX + key, String(value)) } catch(e) {}
+			}
+			function _cfgGet(key) {
+				try { return localStorage.getItem(CFG_PREFIX + key) } catch(e) { return null }
+			}
+			function _cfgDel(key) {
+				try { localStorage.removeItem(CFG_PREFIX + key) } catch(e) {}
+			}
+
+			// Public API — same signatures as the old cookie helpers so nothing else needs to change
+			function setCookie(name, value, _days) {
+				if (name === 'backend' && !isValidBackendUrl(value)) return  // reject invalid backend URLs
+				_cfgSet(name, value)
+			}
+			function readCookie(name) {
+				return _cfgGet(name)
+			}
+			function deleteCookie(name) {
+				_cfgDel(name)
+			}
+
+			// Clean up any stale keys written before CFG_PREFIX was defined (e.g. 'undefinedlanguage')
+			;(function _cleanStaleKeys() {
+				var stale = ['undefinedlanguage', 'undefinednetwork', 'undefinedbackend', 'undefinedtype']
+				stale.forEach(function(k) { try { localStorage.removeItem(k) } catch(e) {} })
+			})()
+
+			// ================================================================
 			// Utility: HTML entity escaping (XSS prevention)
 			// ================================================================
 			function escHtml(s) {
@@ -627,6 +676,30 @@
 			// Encrypted storage (WebCrypto AES-GCM + PBKDF2)
 			// ================================================================
 			var STORAGE_KEY = 'bte_wallet_v2'
+
+			// ================================================================
+			// Auto-lock: closes wallet after 20 min of inactivity.
+			// Uses the same closeWallet() path — if wallet is saved in localStorage,
+			// PIN login appears automatically (hasSavedWallet() is still true).
+			// ================================================================
+			var AUTO_LOCK_MS   = 20 * 60 * 1000   // 20 minutes
+			var _autoLockTimer = null
+
+			function _resetAutoLock() {
+				// Only tick when wallet is open (ECPair has privateKey buffer)
+				if (!globalData.keys || !globalData.keys.privateKey) return
+				clearTimeout(_autoLockTimer)
+				_autoLockTimer = setTimeout(function() {
+					closeWallet()
+					var msg = (typeof getText === 'function') ? getText('auto-locked') : ''
+					showMessage(msg || 'Wallet locked after inactivity')
+				}, AUTO_LOCK_MS)
+			}
+
+			function _stopAutoLock() {
+				clearTimeout(_autoLockTimer)
+				_autoLockTimer = null
+			}
 
 			async function deriveKey(pin, salt) {
 				var enc = new TextEncoder()
@@ -899,48 +972,6 @@
 				})
 			}
 
-			// ================================================================
-			// Settings storage — localStorage (replaces cookies for all settings)
-			// Keys: bte_cfg_{name}  — isolated from wallet data keys (bte_wallet_*, bte_utxo_*, bte_history_*)
-			// ================================================================
-			var CFG_PREFIX = 'bte_cfg_'
-
-			// Validate backend URL before storing:
-			//   - must be absolute http(s) URL
-			//   - no embedded credentials (user:pass@host)
-			//   - rejects javascript:, data:, blob:, etc.
-			//   - http allowed only for localhost (dev)
-			function isValidBackendUrl(url) {
-				try {
-					var u = new URL(url)
-					if (u.protocol !== 'https:' &&
-						!(u.protocol === 'http:' && (u.hostname === 'localhost' || u.hostname === '127.0.0.1'))) return false
-					if (u.username || u.password) return false
-					return true
-				} catch(e) { return false }
-			}
-
-			function _cfgSet(key, value) {
-				try { localStorage.setItem(CFG_PREFIX + key, String(value)) } catch(e) {}
-			}
-			function _cfgGet(key) {
-				try { return localStorage.getItem(CFG_PREFIX + key) } catch(e) { return null }
-			}
-			function _cfgDel(key) {
-				try { localStorage.removeItem(CFG_PREFIX + key) } catch(e) {}
-			}
-
-			// Public API — same signatures as the old cookie helpers so nothing else needs to change
-			function setCookie(name, value, _days) {
-				if (name === 'backend' && !isValidBackendUrl(value)) return  // reject invalid backend URLs
-				_cfgSet(name, value)
-			}
-			function readCookie(name) {
-				return _cfgGet(name)
-			}
-			function deleteCookie(name) {
-				_cfgDel(name)
-			}
 
 
 
@@ -1584,10 +1615,20 @@
 						})
 					}, 800)
 				}
+				_resetAutoLock()  // start/reset inactivity timer
 			}
 
 			function closeWallet() {
+				_stopAutoLock()
 				clearTimeout(walletTimer)
+				// Explicitly wipe sensitive values from DOM before hiding.
+				// globalData.clear() clears the JS object but NOT DOM input values —
+				// without this, '#wallet-keys-privkey input'.val() still returns WIF after close.
+				$('#wallet-keys-privkey input').val('')
+				$('#wallet-keys-pubkey input').val('')
+				$('#wallet-keys-script input').val('')
+				$('#wallet-address').text('')
+				$('#qr-code-addres').empty()
 				$('#wallet-block').addClass('d-none')
 				$('.wallet-unconfirmed').addClass('d-none')
 				globalData.clear()
@@ -1958,6 +1999,11 @@
 			// ================================================================
 			$(document).ready(function() {
 				initLang()
+
+				// Reset auto-lock timer on any user interaction (only effective when wallet is open)
+				;['click', 'keydown', 'touchstart', 'mousemove'].forEach(function(evt) {
+					document.addEventListener(evt, function() { _resetAutoLock() }, { passive: true, capture: false })
+				})
 				$('#wallet-version').text(walletVersion)
 				$('#wallet-backend input').val(getBackend())
 				$('#address-type-select select').val(getAddressType())
