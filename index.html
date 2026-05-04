@@ -2804,43 +2804,71 @@ function getAddressType() {
 				// _hideSeedReveal is defined in outer scope — accessible here too.
 
 				$('#btn-show-seed').click(async function() {
-					var raw = localStorage.getItem(STORAGE_KEY)
-					if (!raw) return
-					// Reuse the askPin (confirm) modal flow — re-enter PIN to decrypt
-					var pin = await new Promise(function(resolve) {
+					if (!localStorage.getItem(STORAGE_KEY)) return
+
+					// Re-enter PIN to decrypt — plaintext mnemonic never leaves this scope
+					var seedData = await new Promise(function(resolve) {
 						$('#pin-modal-title').text('Enter PIN to view seed phrase')
 						$('#pin-modal-desc').text('Your seed phrase will be shown briefly.')
 						$('#pin-input').val('')
 						$('#pin-error').addClass('d-none')
 						var modal = new bootstrap.Modal(document.getElementById('pin-modal'), { keyboard: false })
 						modal.show()
-						$('#pin-confirm').off('click').on('click', async function() {
+
+						function onConfirm() {
 							var p = $('#pin-input').val()
-							var creds = await loadCredentials(p)
-							if (!creds || creds.type !== 'bip39') {
-								$('#pin-error').removeClass('d-none')
-								return
-							}
-							modal.hide()
-							resolve({ mnemonic: creds.mnemonic, passphrase: creds.passphrase })
-						})
-						$('#pin-cancel').off('click').on('click', function() {
+							loadCredentials(p).then(function(creds) {
+								if (!creds || creds.type !== 'bip39') {
+									$('#pin-error').removeClass('d-none')
+									creds = null  // wipe immediately on failure
+									return
+								}
+								// Extract only what's needed, wipe full creds immediately
+								var result = { mnemonic: creds.mnemonic, passphrase: creds.passphrase }
+								creds.mnemonic = ''
+								creds.passphrase = ''
+								creds = null
+								modal.hide()
+								// Detach listener before resolve so closure is released
+								$('#pin-confirm').off('click', onConfirm)
+								resolve(result)
+							})
+						}
+
+						function onCancel() {
+							$('#pin-confirm').off('click', onConfirm)
+							$('#pin-cancel').off('click', onCancel)
 							modal.hide()
 							resolve(null)
-						})
-					})
-					if (!pin) return
+						}
 
-					// Render seed grid
-					seedRenderGrid(pin.mnemonic.split(' '), '#wallet-seed-grid')
-					if (pin.passphrase) {
-						$('#wallet-seed-passphrase-val').text(pin.passphrase)
+						$('#pin-confirm').off('click').on('click', onConfirm)
+						$('#pin-cancel').off('click').on('click', onCancel)
+					})
+
+					if (!seedData) return
+
+					// Render grid then immediately wipe seedData strings
+					var words = seedData.mnemonic.split(' ')
+					var hasPassphrase = !!seedData.passphrase
+					var passphraseVal = seedData.passphrase
+					seedData.mnemonic = ''   // wipe before rendering
+					seedData.passphrase = ''
+					seedData = null
+
+					seedRenderGrid(words, '#wallet-seed-grid')
+					words.fill('')  // wipe word array
+					words = null
+
+					if (hasPassphrase) {
+						$('#wallet-seed-passphrase-val').text(passphraseVal)
 						$('#wallet-seed-passphrase-row').removeClass('d-none')
+						passphraseVal = ''
 					}
 					$('#wallet-seed-hidden').addClass('d-none')
 					$('#wallet-seed-revealed').removeClass('d-none')
 
-					// Auto-hide after 60 seconds
+					// Auto-hide after 60 seconds — also clears DOM words
 					setTimeout(_hideSeedReveal, 60000)
 				})
 
