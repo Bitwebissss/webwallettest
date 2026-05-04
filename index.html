@@ -22,18 +22,23 @@
 		<!-- Bootstrap 5.3.8 bundle (includes Popper.js — standalone Popper removed) -->
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/js/bootstrap.bundle.min.js"
 		        crossorigin="anonymous"></script>
-		<!-- qrcodejs 1.0.0 replaces abandoned jquery.qrcode (no security fixes since 2012) -->
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
+		<!-- qrcode 1.5.4 (soldair) — direct canvas render, no img conversion, cross-platform -->
+		<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"
 		        crossorigin="anonymous"></script>
-		<!-- jsQR 1.4.0 — no newer version exists upstream, kept as-is -->
+		<!-- jsQR 1.4.0 — QR scanner (read), no newer version upstream, ISO standard stable -->
 		<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"
 		        crossorigin="anonymous"></script>
-		<!-- jQuery shim: $(el).qrcode(opts) → QRCode(el, opts) for qrcodejs compatibility -->
+		<!-- jQuery shim: $(el).qrcode(text) → QRCode.toCanvas(canvas, text) direct render -->
 		<script>
 			$.fn.qrcode = function(opts) {
+				var text = (typeof opts === 'string') ? opts : opts.text;
 				return this.each(function() {
-					var o = (typeof opts === 'string') ? {text: opts} : opts;
-					new QRCode(this, o);
+					var container = this;
+					var canvas = document.createElement('canvas');
+					container.appendChild(canvas);
+					QRCode.toCanvas(canvas, text, { width: 256, margin: 2, color: { dark: '#000000', light: '#ffffff' } }, function(err) {
+						if (err) console.error('QR render error:', err);
+					});
 				});
 			};
 		</script>
