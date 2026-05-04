@@ -1785,6 +1785,34 @@ function getAddressType() {
 				return set
 			}
 
+			// ── Seed state (outer scope — needed by openWallet cancel path) ──
+			var _seedState = { mnemonic: '', strength: 256, verifyPositions: [] }
+
+			function _hideSeedReveal() {
+				$('#wallet-seed-hidden').removeClass('d-none')
+				$('#wallet-seed-revealed').addClass('d-none')
+				$('#wallet-seed-grid').empty()
+				$('#wallet-seed-passphrase-row').addClass('d-none')
+				$('#wallet-seed-passphrase-val').text('')
+			}
+
+			function seedReset() {
+				$('#seed-entry').removeClass('d-none')
+				$('#seed-create').addClass('d-none')
+				$('#seed-restore').addClass('d-none')
+				$('#seed-create-step1').removeClass('d-none')
+				$('#seed-create-step2').addClass('d-none')
+				$('#seed-word-grid').empty()
+				$('#seed-generate-warning, #seed-verify-error').addClass('d-none')
+				$('#seed-verify-fields').empty()
+				$('#restore-input').val('')
+				$('#restore-word-error').addClass('d-none')
+				$('#restore-passphrase').val('')
+				$('#restore-path').val("m/84'/0'/0'/0/0")
+				$('#restore-advanced').removeClass('show')
+				_seedState = { mnemonic: '', strength: 256, verifyPositions: [] }
+			}
+
 			// identity, password params removed — pass offerPin=true to trigger PIN save dialog
 			// Show wallet UI and start balance polling. Called only AFTER PIN is collected.
 			function _showWalletUI(keys) {
@@ -1827,13 +1855,20 @@ function getAddressType() {
 				if (offerPin && !hasSavedWallet()) {
 					var pin = await askPinSetup()
 					if (pin === null) {
-						// User cancelled — wipe key from memory, reset seed UI
+						// User cancelled — wipe plaintext mnemonic from memory, reset seed UI
 						globalData.keys = undefined
+						_seedState.mnemonic = ''
+						_seedState.verifyPositions = []
 						seedReset()
 						return
 					}
 					if (bip39Data && bip39Data.mnemonic) {
 						await saveBip39(bip39Data.mnemonic, bip39Data.passphrase || '', keys.toWIF(), pin)
+						// Wipe plaintext mnemonic after encrypted save
+						bip39Data.mnemonic = ''
+						bip39Data.passphrase = ''
+						_seedState.mnemonic = ''
+						_seedState.verifyPositions = []
 					} else {
 						await saveWif(keys.toWIF(), pin)
 					}
@@ -2596,26 +2631,8 @@ function getAddressType() {
 				//  BIP39 SEED PHRASE LOGIC
 				// ══════════════════════════════════════════════════════════════
 
-				// Runtime state for the create flow
-				var _seedState = { mnemonic: '', strength: 256, verifyPositions: [] }
-
-				// Reset entire seed UI back to entry screen
-				function seedReset() {
-					$('#seed-entry').removeClass('d-none')
-					$('#seed-create').addClass('d-none')
-					$('#seed-restore').addClass('d-none')
-					$('#seed-create-step1').removeClass('d-none')
-					$('#seed-create-step2').addClass('d-none')
-					$('#seed-word-grid').empty()
-					$('#seed-generate-warning, #seed-verify-error').addClass('d-none')
-					$('#seed-verify-fields').empty()
-					$('#restore-input').val('')
-					$('#restore-word-error').addClass('d-none')
-					$('#restore-passphrase').val('')
-					$('#restore-path').val("m/84'/0'/0'/0/0")
-					$('#restore-advanced').removeClass('show')
-					_seedState = { mnemonic: '', strength: 256, verifyPositions: [] }
-				}
+				// _seedState, seedReset, _hideSeedReveal — defined in outer scope (above document.ready)
+				// so openWallet / _showWalletUI can call them without scope issues.
 
 				// Render numbered word grid (read-only)
 				function seedRenderGrid(words, containerId) {
@@ -2728,6 +2745,7 @@ function getAddressType() {
 					try {
 						var privBytes = bip39Bundle.mnemonicToPrivKey(_seedState.mnemonic, "m/84'/0'/0'/0/0")
 						var keys = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes))
+						privBytes.fill(0)  // wipe raw key bytes
 						globalData.isBip39 = true
 						openWallet(keys, true, { mnemonic: _seedState.mnemonic, passphrase: '' })
 					} catch(err) {
@@ -2769,22 +2787,21 @@ function getAddressType() {
 					try {
 						var privBytes = bip39Bundle.mnemonicToPrivKey(raw, path, passphrase)
 						var keys = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes))
+						privBytes.fill(0)  // wipe raw key bytes
 						globalData.isBip39 = true
-						openWallet(keys, true, { mnemonic: raw, passphrase: passphrase })
+						await openWallet(keys, true, { mnemonic: raw, passphrase: passphrase })
+						// Wipe plaintext mnemonic from DOM inputs after wallet opens
+						$('#restore-input').val('')
+						$('#restore-passphrase').val('')
+						raw = ''
+						passphrase = ''
 					} catch(err) {
 						$('#restore-word-error').text('Derivation error: ' + err.message).removeClass('d-none')
 					}
 				})
 
 				// ── Wallet Keys tab: Show/hide seed ──
-
-				function _hideSeedReveal() {
-					$('#wallet-seed-hidden').removeClass('d-none')
-					$('#wallet-seed-revealed').addClass('d-none')
-					$('#wallet-seed-grid').empty()
-					$('#wallet-seed-passphrase-row').addClass('d-none')
-					$('#wallet-seed-passphrase-val').text('')
-				}
+				// _hideSeedReveal is defined in outer scope — accessible here too.
 
 				$('#btn-show-seed').click(async function() {
 					var raw = localStorage.getItem(STORAGE_KEY)
