@@ -467,9 +467,9 @@
 						</div>
 					</div>
 					<div class="modal-footer">
-						<button id="send-cancel" type="button" class="btn me-auto btn-dark" data-bs-dismiss="modal" tkey="cancel"></button>
+						<button id="send-cancel" type="button" class="btn me-auto btn-danger" data-bs-dismiss="modal" tkey="cancel"></button>
 						<button id="send-confirm" type="button" class="btn mt-0 me-auto btn-primary" tkey="send-it"></button>
-						<button id="send-close-footer" type="button" class="btn mt-0 me-auto btn-dark d-none disabled" data-bs-dismiss="modal" tkey="close"></button>
+						<button id="send-close-footer" type="button" class="btn mt-0 me-auto btn-danger d-none disabled" data-bs-dismiss="modal" tkey="close"></button>
 					</div>
 				</div>
 			</div>
@@ -579,37 +579,51 @@
 			// Canvas private key display — WIF never goes into input.value
 			// ================================================================
 			// Draw masked dots on a canvas (initial/hidden state)
-			function _privkeyMask(canvasId) {
+			function _canvasSetup(canvasId) {
 				var canvas = document.getElementById(canvasId)
-				if (!canvas) return
-				var w = canvas.parentElement ? canvas.parentElement.offsetWidth - 120 : 300
-				if (w < 100) w = 300
-				canvas.width = w
+				if (!canvas) return null
+				var dpr = window.devicePixelRatio || 1
+				var lw = canvas.parentElement ? canvas.parentElement.offsetWidth - 120 : 300
+				if (lw < 100) lw = 300
+				var lh = 38
+				canvas.width  = Math.round(lw * dpr)
+				canvas.height = Math.round(lh * dpr)
+				canvas.style.width  = lw + 'px'
+				canvas.style.height = lh + 'px'
 				var ctx = canvas.getContext('2d')
-				ctx.clearRect(0, 0, canvas.width, canvas.height)
-				ctx.fillStyle = '#aaa'
-				var r = 4, spacing = 16, y = canvas.height / 2, x = 10
-				for (var i = 0; i < 12; i++) {
-					ctx.beginPath()
-					ctx.arc(x + i * spacing, y, r, 0, Math.PI * 2)
-					ctx.fill()
+				ctx.setTransform(1, 0, 0, 1, 0, 0)
+				ctx.scale(dpr, dpr)
+				ctx.clearRect(0, 0, lw, lh)
+				return { ctx: ctx, w: lw, h: lh }
+			}
+
+			function _privkeyMask(canvasId) {
+				var d = _canvasSetup(canvasId)
+				if (!d) return
+				var isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark'
+				d.ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)'
+				d.ctx.lineWidth = 2
+				d.ctx.lineCap = 'round'
+				var y = d.h / 2, x = 8, len = 16, gap = 8
+				var step = len + gap
+				var count = Math.floor((d.w - x * 2) / step)
+				for (var i = 0; i < count; i++) {
+					d.ctx.beginPath()
+					d.ctx.moveTo(x + i * step, y)
+					d.ctx.lineTo(x + i * step + len, y)
+					d.ctx.stroke()
 				}
 			}
 
 			// Draw actual WIF text on canvas (revealed state)
 			function _privkeyReveal(canvasId, wif) {
-				var canvas = document.getElementById(canvasId)
-				if (!canvas) return
-				var w = canvas.parentElement ? canvas.parentElement.offsetWidth - 120 : 300
-				if (w < 100) w = 300
-				canvas.width = w
-				var ctx = canvas.getContext('2d')
-				ctx.clearRect(0, 0, canvas.width, canvas.height)
+				var d = _canvasSetup(canvasId)
+				if (!d) return
 				var isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark'
-				ctx.fillStyle = isDark ? '#dee2e6' : '#212529'
-				ctx.font = '12px monospace'
-				ctx.textBaseline = 'middle'
-				ctx.fillText(wif, 4, canvas.height / 2)
+				d.ctx.fillStyle = isDark ? '#e9ecef' : '#212529'
+				d.ctx.font = '13px monospace'
+				d.ctx.textBaseline = 'middle'
+				d.ctx.fillText(wif, 6, d.h / 2)
 			}
 
 			// Wipe canvas completely (on close / navigation away)
