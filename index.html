@@ -36,7 +36,7 @@
 
 		<!-- https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js -->
 		<script src="js/jsQR.min.js"
-                integrity="sha512-KbmR1Et+8VJSKLeI7vJKCWY9q5ZrdU21KcHFG8OUSeI0NPQK+dkABkTs1WUYWVINZwgv8ePueskqbquPjrQNVw=="
+                integrity="sha512-KbmR1Et+8VJSKLeI7vJKCWY9q5ZrdU21KcHFG8OUSeI0NPQK+dkABkTs1WUYWVINZwgv8ePueskqbquPjrQNVw" 
 				crossorigin="anonymous"></script>
 
 		<!-- jQuery shim: $(el).qrcode(text) → QRCode.toCanvas(canvas, text) direct render -->
@@ -113,6 +113,21 @@
 			#history-list { max-height: 320px; overflow-y: auto; padding-right: 20px; }
 			.pin-login-card .card-body { padding: 1.5rem; }
 			.pin-login-title { font-size: 15px; color: var(--bs-secondary-color); margin-bottom: 12px; text-align: center; }
+			/* Seed phrase print area — hidden on screen, shown only when printing */
+			#_seed_print_area_ { display: none; }
+			@media print {
+				body > *:not(#_seed_print_area_) { display: none !important; }
+				#_seed_print_area_ {
+					display: block !important;
+					font-family: monospace;
+					font-size: 15px;
+					padding: 24px;
+				}
+				#_seed_print_area_ h2 { margin-bottom: 16px; }
+				#_seed_print_area_ ol { columns: 2; column-gap: 2em; padding-left: 1.5em; }
+				#_seed_print_area_ li { margin-bottom: 6px; }
+				#_seed_print_area_ ._seed_print_path_ { margin-top: 16px; color: #555; font-size: 12px; }
+			}
 		</style>
 		<title>Wallet</title>
 		<meta name="description" content="Bitweb Web Wallet">
@@ -183,10 +198,8 @@
 																	<button id="pin-login-btn" class="btn btn-primary b-width" tkey="pin-login-btn">Open</button>
 							</div>
 							<div id="pin-login-error" class="text-danger small mb-2 d-none" tkey="pin-login-error">Wrong PIN, try again.</div>
-							<div class="text-center">
-								<a href="#" id="pin-login-manual" class="text-muted small" tkey="pin-login-manual">Enter credentials manually</a>
-								<span class="text-muted small mx-2">·</span>
-								<a href="#" id="pin-login-forget" class="text-muted small" tkey="pin-login-forget">Forget saved wallet</a>
+							<div class="text-center mt-2">
+								<button id="pin-login-forget" class="btn btn-danger btn-sm" type="button" tkey="pin-login-forget">Forget saved wallet</button>
 							</div>
 						</div>
 					</div>
@@ -561,13 +574,8 @@
 								<select class="form-select"></select>
 							</div>
 						</div>
-						<div id="forget-wallet-section" class="d-none">
-							<label tkey="saved-wallet-label">Saved wallet</label>
-							<div class="input-group">
-								<button id="settings-forget-wallet" class="btn btn-outline-danger" tkey="settings-forget-wallet">
-									Forget saved wallet
-								</button>
-							</div>
+						<div id="forget-wallet-section" class="d-none text-center mt-2">
+							<button id="settings-forget-wallet" class="btn btn-danger" type="button" tkey="settings-forget-wallet">Forget saved wallet</button>
 						</div>
 					</div>
 					<div class="card-footer">
@@ -2334,12 +2342,6 @@ function getAddressType() {
 				$('#pin-login-btn').click(doPinLogin)
 				$('#pin-login-input').on('keydown', function(e) { if (e.key === 'Enter') doPinLogin() })
 
-				$('#pin-login-manual').click(function(e) {
-					e.preventDefault()
-					$('#pin-login-block').addClass('d-none')
-					$('#open-block').removeClass('d-none')
-				})
-
 				$('#pin-login-forget').click(function(e) {
 					e.preventDefault()
 					forgetSavedWallet()
@@ -2677,31 +2679,28 @@ function getAddressType() {
 				$('#seed-btn-print').click(function() {
 					if (!_seedState.mnemonic) return
 					var words = _seedState.mnemonic.split(' ')
-					var w = window.open('', '_blank', 'width=520,height=440')
-					var doc = w.document
-					doc.open()
-					doc.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' +
-						escHtml(getText('seed-print-secret')) + '</title>' +
-						'<style>body{font-family:monospace;font-size:15px;padding:24px}' +
-						'h2{margin-bottom:16px}ol{columns:2;column-gap:2em}' +
-						'li{margin-bottom:6px}.path{margin-top:16px;color:#555;font-size:12px}' +
-						'@media print{body{padding:12px}}</style></head><body>')
-					doc.write('<h2>' + escHtml(getText('seed-print-secret')) + '</h2><ol>')
-					words.forEach(function(word) {
-						// BIP39 words are [a-z]+ — escHtml used anyway for defense-in-depth
-						doc.write('<li>' + escHtml(word) + '</li>')
-					})
-					doc.write('</ol><p class="path">' +
-						escHtml(getText('seed-path-label')) +
-						' m/84\'/0\'/0\'/0/0 (BIP84 native SegWit)</p></body></html>')
-					doc.close()
-					// Close the window automatically after printing (or cancelling)
-					w.onafterprint = function() {
-						// Wipe DOM content before closing so seed doesn't linger in browser history
-						try { w.document.body.innerHTML = '' } catch(e) {}
-						w.close()
-					}
-					w.print()
+
+					// Build numbered list rows (2 columns via CSS)
+					var liHtml = ''
+					words.forEach(function(word) { liHtml += '<li>' + escHtml(word) + '</li>' })
+
+					// Inject a hidden print-only div directly into the current page.
+					// This avoids popup windows entirely — no orphaned window on cancel/dismiss.
+					var $area = $(
+						'<div id="_seed_print_area_">' +
+						'<h2>' + escHtml(getText('seed-print-secret')) + '</h2>' +
+						'<ol>' + liHtml + '</ol>' +
+						'<p class="_seed_print_path_">' +
+							escHtml(getText('seed-path-label')) +
+							' m/84\'/0\'/0\'/0/0 (BIP84 native SegWit)' +
+						'</p>' +
+						'</div>'
+					).appendTo('body')
+
+					window.print()
+
+					// Remove immediately after print() returns — seed never lingers in DOM
+					$area.remove()
 				})
 
 				$('#seed-btn-copy').click(function() {
