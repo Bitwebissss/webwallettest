@@ -105,7 +105,7 @@
 			.wallet-unconfirmed { font-size: 13px; display: block; margin-top: 2px; }
 			.history-item { font-size: 13px; padding: 6px 0; }
 			.history-item:last-child { border-bottom: none !important; }
-			#history-list { max-height: 320px; overflow-y: auto; }
+			#history-list { max-height: 320px; overflow-y: auto; scrollbar-gutter: stable; padding-right: 2px; }
 			.pin-login-card .card-body { padding: 1.5rem; }
 			.pin-login-title { font-size: 15px; color: #495057; margin-bottom: 12px; text-align: center; }
 		</style>
@@ -207,13 +207,13 @@
 								<div class="input-group">
 									<input id="open-password" name="open-password" class="form-control" type="password" tkey="password">
 									<input id="open-password-confirm" name="open-password-confirm" class="form-control" type="password" tkey="password-confirm">
-																			<button class="btn btn-outline-dark b-width" type="submit" id="open-regular-wallet" tkey="open"></button>
+																			<button class="btn btn-outline-secondary b-width" type="submit" id="open-regular-wallet" tkey="open"></button>
 								</div>
 							</form>
 							<form id="open-key-form" class="open-form tab-item d-none" data-tab="open-key">
 								<div class="input-group">
 									<input id="passphrase" name="passphrase" class="form-control" type="password" tkey="wif-key">
-																			<button class="btn btn-outline-dark b-width" type="submit" id="open-key-wallet" tkey="open"></button>
+																			<button class="btn btn-outline-secondary b-width" type="submit" id="open-key-wallet" tkey="open"></button>
 								</div>
 							</form>
 						</div>
@@ -300,7 +300,7 @@
 									<div class="input-group send-outputs-item mb-2">
 										<input name="send-address" class="form-control" type="text" value="" tkey="enter-address">
 										<input name="send-ammount" class="form-control" type="text" value="" tkey="amount">
-																					<button id="add-output" class="btn btn-outline-dark">
+																					<button id="add-output" class="btn btn-outline-secondary">
 												<span class="fa-solid fa-plus"></span>
 											</button>
 									</div>
@@ -308,7 +308,7 @@
 
 								<div class="input-group">
 									<input id="send-fee" class="form-control" placeholder="Fee" type="text" value="">
-																			<button class="btn btn-outline-dark b-width" type="submit" id="send-tx" tkey="send"></button>
+																			<button class="btn btn-outline-secondary b-width" type="submit" id="send-tx" tkey="send"></button>
 								</div>
 
 								<!-- Coin Control (collapsible) -->
@@ -357,7 +357,7 @@
 										<div class="d-flex align-items-center pb-2" style="gap:4px">
 											<canvas id="wallet-privkey-canvas" class="form-control p-1" style="height:38px;cursor:default;flex:1 1 auto" height="38"></canvas>
 											<button id="wallet-privkey-copy-btn" class="btn btn-outline-secondary flex-shrink-0 d-none" type="button" title="Copy"><span class="fa-solid fa-copy"></span></button>
-											<button id="toggle-wallet-privkey" class="btn btn-outline-dark flex-shrink-0 b-width" type="button" tkey="show"></button>
+											<button id="toggle-wallet-privkey" class="btn btn-outline-secondary flex-shrink-0 b-width" type="button" tkey="show"></button>
 										</div>
 									</div>
 									<div id="wallet-keys-script">
@@ -421,7 +421,7 @@
 							<label tkey="wallet-backend"></label>
 							<div class="input-group pb-2">
 								<input class="form-control" type="text" tkey="wallet-api">
-																	<button class="btn btn-outline-dark b-width" type="button" tkey="update"></button>
+																	<button class="btn btn-outline-secondary b-width" type="button" tkey="update"></button>
 							</div>
 						</div>
 						<div id="wallet-language-select">
