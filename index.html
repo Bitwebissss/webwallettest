@@ -512,6 +512,16 @@
 								<select class="form-select"></select>
 							</div>
 						</div>
+                        <!-- Новый блок: защита отправки по PIN -->
+                        <div id="send-protection-switch">
+                            <label tkey="send-protection-label">Require PIN for Send</label>
+                            <div class="input-group pb-2">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="send-protection-checkbox">
+                                    <label class="form-check-label" for="send-protection-checkbox" id="send-protection-status-text" tkey="send-protection-off">Disabled</label>
+                                </div>
+                            </div>
+                        </div>
 						<div id="forget-wallet-section" class="d-none text-center mt-2">
 							<button id="settings-forget-wallet" class="btn btn-danger" type="button" tkey="settings-forget-wallet">Forget saved wallet</button>
 						</div>
@@ -533,6 +543,11 @@
 						<div id="send-modal-error" class="alert alert-danger d-none" role="alert"></div>
 						<div id="confirm-screen">
 							<span tkey="send-warning"></span> <strong id="confirm-amount"></strong>. <span tkey="send-warning-reverse"></span>
+							<!-- Поле PIN при включённой защите -->
+							<div id="send-pin-block" class="d-none mt-2">
+								<input id="send-pin-input" type="password" class="form-control" tkey="send-pin-placeholder" placeholder="Enter PIN to sign" autocomplete="current-password">
+								<div id="send-pin-error" class="text-danger small mt-1 d-none" tkey="pin-login-error">Wrong PIN, try again.</div>
+							</div>
 						</div>
 						<div id="status-screen" class="break-lines d-none">
 							<span></span>
@@ -1479,7 +1494,7 @@
 				$('#wallet-seed-hidden').removeClass('d-none')
 				$('#wallet-seed-revealed').addClass('d-none')
 				$('#wallet-seed-grid').empty()
-							}
+			}
 			function seedReset() {
 				$('#seed-entry').removeClass('d-none')
 				$('#seed-create').addClass('d-none')
@@ -1495,6 +1510,62 @@
 				$('#restore-advanced').removeClass('show')
 				_seedState = { mnemonic: '', strength: 256, verifyPositions: [] }
 			}
+
+			// ---------- Send PIN Protection ----------
+			function getSendProtectionSetting() {
+				try {
+					return localStorage.getItem('bte_cfg_send_protection') === 'true';
+				} catch(e) { return false; }
+			}
+			function setSendProtectionSetting(value) {
+				try { localStorage.setItem('bte_cfg_send_protection', value ? 'true' : 'false'); } catch(e) {}
+			}
+			function updateSendProtectionUI() {
+				var enabled = getSendProtectionSetting();
+				$('#send-protection-checkbox').prop('checked', enabled);
+				$('#send-protection-status-text').text(enabled ? getText('send-protection-on') : getText('send-protection-off'));
+			}
+			async function toggleSendProtection(enable) {
+				if (enable === getSendProtectionSetting()) return; // already that state
+				if (!hasSavedWallet()) {
+					showMessage(getText('wallet-not-saved'));
+					return;
+				}
+				var pinVal = await askPin(
+					enable ? getText('send-protection-enable-pin-title') : getText('send-protection-disable-pin-title'),
+					enable ? getText('send-protection-enable-pin-desc') : getText('send-protection-disable-pin-desc'),
+					null, false
+				);
+				if (pinVal === null) { updateSendProtectionUI(); return; }
+				var creds = await loadCredentials(pinVal);
+				if (!creds) {
+					showMessage(getText('pin-login-error'));
+					updateSendProtectionUI();
+					return;
+				}
+				if (enable) {
+					// Convert to public-only
+					var fullKeys = bitcoin.ECPair.fromWIF(creds.wif || creds.privateKeyHex, getConfig()['network']);
+					globalData.keys = bitcoin.ECPair.fromPublicKeyBuffer(fullKeys.publicKey);
+					setSendProtectionSetting(true);
+					showMessage(getText('send-protection-enabled-msg'));
+				} else {
+					// Restore full keypair
+					var fullKeys = bitcoin.ECPair.fromWIF(creds.wif || creds.privateKeyHex, getConfig()['network']);
+					globalData.keys = fullKeys;
+					setSendProtectionSetting(false);
+					showMessage(getText('send-protection-disabled-msg'));
+				}
+				// Cleanup credentials
+				creds.wif = ''; creds.mnemonic = ''; creds.privateKeyHex = '';
+				updateSendProtectionUI();
+				// Update UI that depends on key presence
+				_privkeyClear('wallet-privkey-canvas');
+				_privkeyMask('wallet-privkey-canvas');
+				$('#wallet-privkey-copy-btn').addClass('d-none');
+				$('#toggle-wallet-privkey').text(getText('show'));
+			}
+
 			function _showWalletUI(keys) {
 				var pubkey = globalData.pubKeyHex
 				var redeem = '0014' + bitcoin.Buffer.from(getP2WPKHScript(keys.publicKey).hash).toString('hex')
@@ -1549,8 +1620,14 @@
 				globalData.pubKeyHex      = bitcoin.Buffer.from(keys.publicKey).toString('hex')
 				globalData.allScriptHexes = getAllScriptHexes(keys)
 				globalData.allAddresses   = getAllAddresses(keys)
-
-				_showWalletUI(keys)
+				// Apply send protection after setting keys
+				if (getSendProtectionSetting()) {
+					// keep only public key
+					globalData.keys = bitcoin.ECPair.fromPublicKeyBuffer(keys.publicKey);
+				} else {
+					globalData.keys = keys;
+				}
+				_showWalletUI(globalData.keys)
 			}
 			function closeWallet() {
 				_stopAutoLock()
@@ -1639,6 +1716,12 @@
 				$('#confirm-screen').removeClass('d-none')
 				$('#status-screen').addClass('d-none')
 				$('#status-screen span').html('')
+				// Show/hide PIN block
+				if (getSendProtectionSetting()) {
+					$('#send-pin-block').removeClass('d-none');
+				} else {
+					$('#send-pin-block').addClass('d-none');
+				}
 				$.each($('#send-outputs .send-outputs-item'), function(key, item) {
 					var address = $('[name="send-address"]', item).val().trim()
 					var value   = $('[name="send-ammount"]', item).val() * 1
@@ -1655,9 +1738,9 @@
 						return data.result
 					})
 			}
-			function sendTransaction() {
+			function sendTransaction(signKeysOverride) {
 				var network = getConfig()['network']
-				var keys    = globalData.keys
+				var keys    = signKeysOverride || globalData.keys   // use provided signKeys or the global one
 				var outputs = globalData.tx.outputs
 				var amount  = globalData.tx.amount
 				var address = globalData.address
@@ -1872,6 +1955,7 @@
 				$('#address-type-select select').val(getAddressType())
 				routePage()
 				updateSavedWalletUI()
+				updateSendProtectionUI()
 				$('#pin-confirm').click(function() {
 					var pin = $('#pin-input').val()
 					if (_pinResolve) {
@@ -2024,24 +2108,87 @@
 					e.preventDefault()
 				})
 				$('.wallet-balance').click(function(e) { walletBalance(); e.preventDefault() })
-				$('#send-confirm').click(function(e) { sendTransaction(); e.preventDefault() })
+				$('#send-confirm').click(function(e) {
+					e.preventDefault();
+					if (getSendProtectionSetting()) {
+						var pin = $('#send-pin-input').val();
+						if (!pin) {
+							$('#send-pin-error').text(getText('pin-login-error')).removeClass('d-none');
+							return;
+						}
+						$('#send-pin-error').addClass('d-none');
+						loadCredentials(pin).then(function(creds) {
+							if (!creds) {
+								$('#send-pin-error').text(getText('pin-login-error')).removeClass('d-none');
+								return;
+							}
+							var wif = creds.wif;
+							creds.wif = ''; creds.mnemonic = '';
+							var signKeys = bitcoin.ECPair.fromWIF(wif, getConfig()['network']);
+							sendTransaction(signKeys);
+						}).catch(function() {
+							$('#send-pin-error').text(getText('pin-login-error')).removeClass('d-none');
+						});
+					} else {
+						sendTransaction();
+					}
+				})
 				$('#toggle-wallet-privkey').click(function() {
 					if ($(this).text() == getText('show')) {
-						if (globalData.keys && globalData.keys.privateKey) {
-							_privkeyReveal('wallet-privkey-canvas', globalData.keys.toWIF())
-							$('#wallet-privkey-copy-btn').removeClass('d-none')
-							$(this).text(getText('hide'))
+						if (getSendProtectionSetting()) {
+							// PIN required to show private key
+							askPin(
+								getText('show-private-key-pin-title'),
+								getText('show-private-key-pin-desc'),
+								null, false
+							).then(function(pin) {
+								if (pin === null) return;
+								loadCredentials(pin).then(function(creds) {
+									if (!creds) { showMessage(getText('pin-login-error')); return; }
+									var wif = creds.wif;
+									creds.wif = ''; creds.mnemonic = '';
+									_privkeyReveal('wallet-privkey-canvas', wif);
+									$('#wallet-privkey-copy-btn').removeClass('d-none');
+									$('#toggle-wallet-privkey').text(getText('hide'));
+									// Auto-hide after 60 seconds
+									clearTimeout(window._privkeyHideTimeout);
+									window._privkeyHideTimeout = setTimeout(function() {
+										_privkeyClear('wallet-privkey-canvas');
+										_privkeyMask('wallet-privkey-canvas');
+										$('#wallet-privkey-copy-btn').addClass('d-none');
+										$('#toggle-wallet-privkey').text(getText('show'));
+									}, 60000);
+								});
+							});
+						} else {
+							// Normal reveal
+							if (globalData.keys && globalData.keys.privateKey) {
+								_privkeyReveal('wallet-privkey-canvas', globalData.keys.toWIF());
+								$('#wallet-privkey-copy-btn').removeClass('d-none');
+								$(this).text(getText('hide'));
+							}
 						}
 					} else {
-						_privkeyClear('wallet-privkey-canvas')
-						_privkeyMask('wallet-privkey-canvas')
-						$('#wallet-privkey-copy-btn').addClass('d-none')
-						$(this).text(getText('show'))
+						_privkeyClear('wallet-privkey-canvas');
+						_privkeyMask('wallet-privkey-canvas');
+						$('#wallet-privkey-copy-btn').addClass('d-none');
+						$(this).text(getText('show'));
+						clearTimeout(window._privkeyHideTimeout);
 					}
 				})
 				$('#wallet-privkey-copy-btn').click(function() {
-					if (globalData.keys && globalData.keys.privateKey) {
-						copyToClipboard(globalData.keys.toWIF(), $(this))
+					var wif = '';
+					if (getSendProtectionSetting()) {
+						// In protected mode, WIF is on canvas - read from canvas text?
+						// For simplicity, just disable copy if canvas doesn't have text? 
+						// Actually, we can't easily extract text from canvas after reveal.
+						// We'll skip this edge case or recommend to hide and show again with PIN.
+						// For now, do nothing or show message.
+						showMessage(getText('copy-private-key-unavailable'));
+					} else {
+						if (globalData.keys && globalData.keys.privateKey) {
+							copyToClipboard(globalData.keys.toWIF(), $(this));
+						}
 					}
 				})
 				$('#add-output').click(function(e) {
@@ -2154,6 +2301,23 @@
 				$('#copy-address-btn').click(function() {
 					if (globalData.address) copyToClipboard(globalData.address, $(this))
 				})
+				// Send protection checkbox handler
+				$('#send-protection-checkbox').on('change', function() {
+					var enable = $(this).is(':checked');
+					if (enable) {
+						if (!confirm(getText('send-protection-confirm-enable'))) {
+							updateSendProtectionUI();
+							return;
+						}
+						toggleSendProtection(true);
+					} else {
+						if (!confirm(getText('send-protection-confirm-disable'))) {
+							updateSendProtectionUI();
+							return;
+						}
+						toggleSendProtection(false);
+					}
+				});
 				function seedRenderGrid(words, containerId) {
 					var $g = $(containerId).empty()
 					words.forEach(function(w, i) {
