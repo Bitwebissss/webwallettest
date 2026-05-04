@@ -7,38 +7,31 @@
 		<link rel="stylesheet" href="css/all.min.css"
 			integrity="sha384-rWj9FmWWt3OMqd9vBkWRhFavvVUYalYqGPoMdL1brs/qvvqz88gvLShYa4hKNyqb"
 			crossorigin="anonymous">
-
 		<!-- https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/css/bootstrap.min.css -->
 		<link rel="stylesheet" href="css/bootstrap.min.css"
 				integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
 				crossorigin="anonymous">
 		<link rel="icon" type="image/svg+xml" href="images/logo.svg">
-
 		<!-- https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js -->
 		<script src="js/jquery.min.js"
 				integrity="sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs"
 				crossorigin="anonymous"></script>
-
 		<!-- https://cdnjs.cloudflare.com/ajax/libs/js-sha256/0.11.1/sha256.min.js -->
 		<script src="js/sha256.min.js"
 				integrity="sha384-2hE+62EhDTI8GB1l6/KBZldM8qsy8CUJ/e5YlZaSbD6Bi4z0YhdrH2LCjDqYXAkg"
 				crossorigin="anonymous"></script>
-
 		<!-- https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js -->
 		<script src="js/bootstrap.bundle.min.js"
 				integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
 				crossorigin="anonymous"></script>
-
 		<!-- Self build see https://github.com/bitweb-project/qrcode-browser-1.5.4 -->
 		<script src="js/qrcode-browser.min.js"
                 integrity="sha512-Fylkwjj7d5d/OCmgh3/usBPvSY5+Q/cYSl1myDVYCw1alMz4Sam6/IWwuXh8D3auWeq2L6vD8hT/p/CI8ppYPg==" 
 				crossorigin="anonymous"></script>
-
 		<!-- https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js -->
 		<script src="js/jsQR.min.js"
                 integrity="sha512-KbmR1Et+8VJSKLeI7vJKCWY9q5ZrdU21KcHFG8OUSeI0NPQK+dkABkTs1WUYWVINZwgv8ePueskqbquPjrQNVw" 
 				crossorigin="anonymous"></script>
-
 		<!-- jQuery shim: $(el).qrcode(text) → QRCode.toCanvas(canvas, text) direct render -->
 		<script>
 			$.fn.qrcode = function(opts) {
@@ -53,9 +46,7 @@
 				});
 			};
 		</script>
-
 		<script src="multilang.js"></script>
-
 		<!-- Self build see BUILD4_bip39.md -->
 		<script src="js/bip39-bundle.min.js"
 				integrity="sha512-9qS0/lQ8HZTImQ/TbprR/xgDSdMkW1aPHsts+AN1SDQ/l7aVWMcEYfeYKWZpOiZkW7K7OWmyqXi0zKo4SUFgpw=="
@@ -65,7 +56,6 @@
 		<script src="js/bitcoin-bundle-v7.min.js"
                 integrity="sha512-mUri5zVIyWAlxMgapxp3iWXDVt4zLH0Lq2hnKtE0NsD132msKfOxM3ktH7qV5rTwocurwpvTfuaseKiXSDIctA==" 
 				crossorigin="anonymous"></script>
-
 		<style>
 			html { height: 100%; }
 			html, body { min-height: 100%; }
@@ -130,7 +120,6 @@
 		</style>
 		<title>Wallet</title>
 		<meta name="description" content="Bitweb Web Wallet">
-		<!-- Early theme: читаем localStorage до рендера body, предотвращаем вспышку белого -->
 		<script>
 			(function(){
 				var t;
@@ -143,7 +132,6 @@
 		</script>
 	</head>
 	<body>
-		<!-- Navbar -->
 		<nav class="navbar fixed-top navbar-expand-lg navbar-dark bg-dark">
 			<div class="container">
 				<a href="#" class="navbar-brand d-flex align-items-center">
@@ -177,17 +165,13 @@
 				</div>
 			</div>
 		</nav>
-
 		<div class="container">
 			<div id="error-message" class="alert alert-warning d-none" role="alert">
 				Error, yay ∠( ᐛ 」∠)
 			</div>
 		</div>
-
-		<!-- Home page -->
 		<div id="homepage" class="router-page">
 			<div class="container">
-				<!-- PIN login (shown instead of open-block when wallet is saved) -->
 				<div id="pin-login-block" class="d-none">
 					<div class="card mb-3 pin-login-card">
 						<div class="card-body">
@@ -203,7 +187,6 @@
 						</div>
 					</div>
 				</div>
-
 				<div id="open-block">
 					<div class="card mb-3">
 						<div class="card-header">
@@ -220,21 +203,14 @@
 							</ul>
 						</div>
 						<div class="card-body">
-
-							<!-- ══════════════ SEED TAB ══════════════ -->
 							<div class="tab-item" data-tab="open-seed" id="seed-tab-root">
-
-								<!-- Entry: Create / Restore choice -->
 								<div id="seed-entry">
 									<div class="d-grid gap-2">
 										<button class="btn btn-primary" id="seed-btn-create" type="button" tkey="seed-btn-create">✨ Create New Wallet</button>
 										<button class="btn btn-outline-secondary" id="seed-btn-restore" type="button" tkey="seed-btn-restore">🔑 Restore from Seed Phrase</button>
 									</div>
 								</div>
-
-								<!-- ─── CREATE FLOW ─── -->
 								<div id="seed-create" class="d-none">
-									<!-- Step 1: Generate -->
 									<div id="seed-create-step1">
 										<div class="d-flex align-items-center justify-content-between mb-2">
 											<small class="text-muted fw-semibold" tkey="seed-step1-label">Step 1 of 2 — Your Seed Phrase</small>
@@ -252,8 +228,6 @@
 											<button class="btn btn-sm btn-primary ms-auto" id="seed-btn-to-verify" type="button" tkey="seed-next">Next →</button>
 										</div>
 									</div>
-
-									<!-- Step 2: Verify 3 words -->
 									<div id="seed-create-step2" class="d-none">
 										<small class="text-muted fw-semibold d-block mb-2" tkey="seed-step2-label">Step 2 of 2 — Verify Seed Phrase</small>
 										<p class="small" tkey="seed-verify-desc">Enter the words at these positions to confirm you saved them correctly:</p>
@@ -266,8 +240,6 @@
 										</div>
 									</div>
 								</div>
-
-								<!-- ─── RESTORE FLOW ─── -->
 								<div id="seed-restore" class="d-none">
 									<small class="text-muted fw-semibold d-block mb-2" tkey="seed-restore-title">Restore from Seed Phrase</small>
 									<div class="d-flex align-items-center gap-2 mb-2">
@@ -281,8 +253,6 @@
 										tkey="seed-restore-placeholder" placeholder="Enter your seed phrase words separated by spaces…"
 										autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
 									<div id="restore-word-error" class="text-danger small mb-2 d-none"></div>
-
-									<!-- Advanced options -->
 									<div class="mb-2">
 										<a class="small text-muted" data-bs-toggle="collapse" href="#restore-advanced" role="button" tkey="seed-advanced">Advanced ▼</a>
 										<div class="collapse" id="restore-advanced">
@@ -295,17 +265,12 @@
 											</div>
 										</div>
 									</div>
-
 									<div class="d-flex gap-2">
 										<button id="seed-restore-cancel" class="btn btn-danger btn-sm" type="button" tkey="cancel">Cancel</button>
 										<button class="btn btn-primary ms-auto" id="seed-restore-btn" type="button" tkey="seed-restore-btn">Restore &amp; Set PIN</button>
 									</div>
 								</div>
-
 							</div>
-							<!-- ══════════════ END SEED TAB ══════════════ -->
-
-							<!-- LEGACY: Password tab -->
 							<form id="open-regular-form" class="open-form tab-item d-none" data-tab="open-regular">
 								<div class="alert alert-warning small py-2 mb-2" role="alert">
 									<span tkey="legacy-warn-password">⚠️ <strong>Not recommended.</strong> This method derives a key from a password hash and is kept for backward compatibility only. Please migrate your funds to a Seed Phrase wallet.</span>
@@ -319,8 +284,6 @@
 									<button class="btn btn-primary b-width" type="submit" id="open-regular-wallet" tkey="open"></button>
 								</div>
 							</form>
-
-							<!-- LEGACY: WIF key tab -->
 							<form id="open-key-form" class="open-form tab-item d-none" data-tab="open-key">
 								<div class="alert alert-warning small py-2 mb-2" role="alert">
 									<span tkey="legacy-warn-key">⚠️ <strong>Not recommended.</strong> Raw private key import is provided for compatibility only. Use a Seed Phrase wallet for better security and recoverability.</span>
@@ -340,7 +303,6 @@
 						</div>
 					</div>
 				</div>
-
 				<div id="wallet-block" class="d-none">
 					<div class="card mb-3">
 						<div class="card-header">
@@ -373,7 +335,6 @@
 										<span class="font-monospace amount"></span>
 										<span class="ticker" tkey="loading"></span>
 									</div>
-									<!-- Immature coinbase balance (shown only when > 0) -->
 									<div id="immature-balance-row-main" class="d-none mt-1">
 										<small class="text-warning">
 											<span class="fa-solid fa-lock"></span>
@@ -383,7 +344,6 @@
 									</div>
 								</div>
 							</div>
-
 							<div id="wallet-send" class="tab-item d-none" data-tab="wallet-send">
 								<div class="mb-2">
 									<span>
@@ -393,7 +353,6 @@
 											<span class="ticker" tkey="loading"></span>
 										</b>
 									</span>
-									<!-- Immature coinbase balance row -->
 									<div id="immature-balance-row" class="d-none mt-1">
 										<span class="text-warning" style="font-size:12px">
 											<span class="fa-solid fa-lock"></span>
@@ -412,7 +371,6 @@
 										</a>
 									</div>
 								</div>
-
 								<div id="send-outputs">
 									<div class="input-group send-outputs-item mb-2">
 										<input name="send-address" class="form-control" type="text" value="" tkey="enter-address">
@@ -422,13 +380,10 @@
 											</button>
 									</div>
 								</div>
-
 								<div class="input-group">
 									<input id="send-fee" class="form-control" placeholder="Fee" type="text" value="">
 																			<button class="btn btn-primary b-width" type="submit" id="send-tx" tkey="send"></button>
 								</div>
-
-								<!-- Coin Control (collapsible) -->
 								<div class="mt-2">
 									<a href="#" id="coin-control-toggle" class="text-muted small" style="text-decoration:none">
 										<span class="fa-solid fa-sliders"></span>
@@ -460,7 +415,6 @@
 									<div id="coin-control-selected-info" class="mt-1 text-muted"></div>
 								</div>
 							</div>
-
 							<div class="tab-item d-none" data-tab="wallet-keys">
 								<div id="wallet-keys">
 									<div id="wallet-keys-pubkey">
@@ -483,7 +437,6 @@
 											<input class="form-control" readonly type="text">
 										</div>
 									</div>
-									<!-- Seed phrase backup section (only shown for bip39 wallets) -->
 									<div id="wallet-keys-seed" class="d-none">
 										<label tkey="seed-backup-label">Seed Phrase Backup</label>
 										<div id="wallet-seed-hidden">
@@ -514,8 +467,6 @@
 				</div>
 			</div>
 		</div>
-
-		<!-- Broadcast transaction -->
 		<div id="broadcast" class="router-page">
 			<div class="container">
 				<div class="card mb-3">
@@ -531,8 +482,6 @@
 				</div>
 			</div>
 		</div>
-
-		<!-- Settings -->
 		<div id="settings" class="router-page">
 			<div class="container">
 				<div class="card mb-3">
@@ -573,8 +522,6 @@
 				</div>
 			</div>
 		</div>
-
-		<!-- Send modal -->
 		<div id="send-modal" class="modal" tabindex="-1" role="dialog">
 			<div class="modal-dialog modal-md" role="document">
 				<div class="modal-content">
@@ -600,8 +547,6 @@
 				</div>
 			</div>
 		</div>
-
-		<!-- Scan modal -->
 		<div id="scan-modal" class="modal" tabindex="-1" role="dialog">
 			<div class="modal-dialog modal-md" role="document">
 				<div class="modal-content">
@@ -616,8 +561,6 @@
 				</div>
 			</div>
 		</div>
-
-		<!-- PIN modal -->
 		<div id="pin-modal" class="modal" tabindex="-1" role="dialog">
 			<div class="modal-dialog modal-sm" role="document">
 				<div class="modal-content">
@@ -648,11 +591,7 @@
 				<span class="fa-brands fa-github"></span> <a target="_blank" rel="noopener noreferrer" href="https://github.com/bitweb-project/web-wallet">Bitweb</a>
 			</div>
 		</footer>
-
 		<script>
-			// ================================================================
-			// Theme
-			// ================================================================
 			function applyTheme(mode) {
 				var resolved = mode === 'auto'
 					? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
@@ -661,23 +600,14 @@
 				var labels = { light: getText('theme-light'), dark: getText('theme-dark'), auto: getText('theme-auto') };
 				$('#theme-label').text(labels[mode] || getText('theme-auto'));
 			}
-
 			function setTheme(mode) {
 				try { localStorage.setItem('bte_cfg_theme', mode) } catch(e) {}
 				applyTheme(mode);
 			}
-
-			// Следим за системной темой — меняется только если mode === 'auto'
 			window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
 				var saved; try { saved = localStorage.getItem('bte_cfg_theme') } catch(e) {}
 				if ((saved || 'auto') === 'auto') applyTheme('auto');
 			});
-
-			// Validate backend URL:
-			//   - must be absolute http(s) URL
-			//   - no embedded credentials (user:pass@host)
-			//   - rejects javascript:, data:, blob:, etc.
-			//   - http allowed only for localhost (dev)
 			function isValidBackendUrl(url) {
 				try {
 					var u = new URL(url)
@@ -687,10 +617,6 @@
 					return true
 				} catch(e) { return false }
 			}
-
-			// ================================================================
-			// Utility: HTML entity escaping (XSS prevention)
-			// ================================================================
 			function escHtml(s) {
 				if (s == null) return ''
 				return String(s)
@@ -700,11 +626,6 @@
 					.replace(/"/g, '&quot;')
 					.replace(/'/g, '&#039;')
 			}
-
-			// ================================================================
-			// Canvas private key display — WIF never goes into input.value
-			// ================================================================
-			// Draw masked dots on a canvas (initial/hidden state)
 			function _canvasSetup(canvasId) {
 				var canvas = document.getElementById(canvasId)
 				if (!canvas) return null
@@ -722,7 +643,6 @@
 				ctx.clearRect(0, 0, lw, lh)
 				return { ctx: ctx, w: lw, h: lh }
 			}
-
 			function _privkeyMask(canvasId) {
 				var d = _canvasSetup(canvasId)
 				if (!d) return
@@ -740,8 +660,6 @@
 					d.ctx.stroke()
 				}
 			}
-
-			// Draw actual WIF text on canvas (revealed state)
 			function _privkeyReveal(canvasId, wif) {
 				var d = _canvasSetup(canvasId)
 				if (!d) return
@@ -751,19 +669,13 @@
 				d.ctx.textBaseline = 'middle'
 				d.ctx.fillText(wif, 6, d.h / 2)
 			}
-
-			// Wipe canvas completely (on close / navigation away)
 			function _privkeyClear(canvasId) {
 				var canvas = document.getElementById(canvasId)
 				if (!canvas) return
 				var ctx = canvas.getContext('2d')
 				ctx.clearRect(0, 0, canvas.width, canvas.height)
-				canvas.width = 1  // forces GPU buffer release
+				canvas.width = 1
 			}
-
-			// ================================================================
-			// Config
-			// ================================================================
 			var stream        = undefined
 			var walletTimer   = false
 			var walletVersion = '0.5'
@@ -785,23 +697,20 @@
 						'scriptHash': 0x1E,
 						'wif':     0x80
 					},
-					// Coinbase maturity config — parametrized for reuse in other projects
 					'maturity': {
-						'coinbase': 100,         // standard COINBASE_MATURITY
+						'coinbase': 100,
 						'extended': {
-							'enabled': true,     // set false to use standard maturity only
-							'start':   1177,     // EXT_MATURITY_START block height
-							'depth':   8000      // EXT_COINBASE_MATURITY blocks
+							'enabled': true,
+							'start':   1177,
+							'depth':   8000
 						}
 					}
 				}
 			}
-
 			var blockExplorer = {
 				'address': function(address) { return 'https://explorer.bitwebcore.net/address/' + address + '/' },
 				'tx':      function(tx)      { return 'https://explorer.bitwebcore.net/tx/' + tx + '/' }
 			}
-
 			var globalData = {
 				'status':          'locked',
 				'balance':         0,
@@ -816,7 +725,6 @@
 				'coinControl':     false,
 				'selectedUtxos':   null,
 				'tx':              { 'amount': 0, 'outputs': [], 'fee': 0 },
-				// Track last rendered values — skip DOM update if nothing changed
 				'_lastRendered':   { balance: -1, immature: -1, utxoFingerprint: '' },
 				'resetTx':         function() { this.tx = { 'amount': 0, 'outputs': [], 'fee': 0 } },
 				'clear':           function() {
@@ -828,24 +736,11 @@
 					this.resetTx()
 				}
 			}
-
 			var messages = initMessages()
-
-			// ================================================================
-			// Encrypted storage (WebCrypto AES-GCM + PBKDF2)
-			// ================================================================
 			var STORAGE_KEY = 'bte_wallet_v2'
-
-			// ================================================================
-			// Auto-lock: closes wallet after 20 min of inactivity.
-			// Uses the same closeWallet() path — if wallet is saved in localStorage,
-			// PIN login appears automatically (hasSavedWallet() is still true).
-			// ================================================================
-			var AUTO_LOCK_MS   = 20 * 60 * 1000   // 20 minutes
+			var AUTO_LOCK_MS   = 20 * 60 * 1000
 			var _autoLockTimer = null
-
 			function _resetAutoLock() {
-				// Only tick when wallet is open (ECPair has privateKey buffer)
 				if (!globalData.keys || !globalData.keys.privateKey) return
 				clearTimeout(_autoLockTimer)
 				_autoLockTimer = setTimeout(function() {
@@ -854,12 +749,10 @@
 					showMessage(msg || 'Wallet locked after inactivity')
 				}, AUTO_LOCK_MS)
 			}
-
 			function _stopAutoLock() {
 				clearTimeout(_autoLockTimer)
 				_autoLockTimer = null
 			}
-
 			async function deriveKey(pin, salt) {
 				var enc = new TextEncoder()
 				var km  = await crypto.subtle.importKey(
@@ -873,9 +766,6 @@
 					['encrypt', 'decrypt']
 				)
 			}
-
-			// Save WIF key encrypted by PIN.
-			// Stores the private key directly — no need to re-derive from identity+password every open.
 			async function saveWif(wif, pin) {
 				var enc     = new TextEncoder()
 				var salt    = crypto.getRandomValues(new Uint8Array(16))
@@ -889,9 +779,6 @@
 					data: Array.from(new Uint8Array(ct))
 				}))
 			}
-
-			// Save BIP39 mnemonic encrypted by PIN.
-			// Also stores the WIF of the derived key for fast PIN-login open.
 			async function saveBip39(mnemonic, wif, pin) {
 				var enc     = new TextEncoder()
 				var salt    = crypto.getRandomValues(new Uint8Array(16))
@@ -905,8 +792,6 @@
 					data: Array.from(new Uint8Array(ct))
 				}))
 			}
-
-			// Load credentials by PIN — returns {type, identity, password} or null
 			async function loadCredentials(pin) {
 				var raw = localStorage.getItem(STORAGE_KEY)
 				if (!raw) return null
@@ -920,27 +805,20 @@
 					)
 					return JSON.parse(new TextDecoder().decode(pt))
 				} catch(e) {
-					return null   // wrong PIN
+					return null
 				}
 			}
-
-			// Reconstruct key from saved blob and open wallet (no PIN save re-offer)
-			// Handles new formats {type:'bip39'} and {type:'wif'} and legacy {type:'credentials'}
 			function openFromCredentials(creds) {
 				if (!creds) return false
 				try {
 					if (creds.type === 'bip39') {
-						// Fast path: WIF already stored alongside mnemonic
 						globalData.keys = bitcoin.ECPair.fromWIF(creds.wif, getConfig()['network'])
 						globalData.isBip39 = true
-						// Wipe mnemonic immediately — only WIF is needed at runtime
 						creds.mnemonic = ''
 					} else if (creds.type === 'wif') {
-						// New format: WIF stored directly — fast path, no re-derivation
 						globalData.keys = bitcoin.ECPair.fromWIF(creds.wif, getConfig()['network'])
 						globalData.isBip39 = false
 					} else if (creds.type === 'credentials') {
-						// Legacy format: re-derive key from identity+password hash chain
 						var identity = creds.identity
 						var pass     = creds.password
 						var s = identity
@@ -960,20 +838,17 @@
 						return false
 					}
 				} catch(e) { return false } finally {
-					// Wipe all sensitive credential fields regardless of success/failure
 					if (creds) {
 						creds.wif = ''; creds.mnemonic = ''
 						creds.identity = ''; creds.password = ''
 					}
 				}
-				openWallet(globalData.keys, false)  // don't offer PIN save — already saved
+				openWallet(globalData.keys, false)
 				return true
 			}
-
 			function hasSavedWallet() {
 				return localStorage.getItem(STORAGE_KEY) !== null
 			}
-
 			function forgetSavedWallet() {
 				try {
 					Object.keys(localStorage).forEach(function(k) {
@@ -987,7 +862,6 @@
 				} catch(e) {}
 				updateSavedWalletUI()
 			}
-
 			function updateSavedWalletUI() {
 				if (hasSavedWallet()) {
 					$('#pin-login-block').removeClass('d-none')
@@ -999,13 +873,8 @@
 					$('#forget-wallet-section').addClass('d-none')
 				}
 			}
-
-			// ================================================================
-			// PIN modal (async modal instead of prompt)
-			// ================================================================
 			var _pinResolve   = null
-			var _pinValidator = null  // function(pin) -> error string or null
-
+			var _pinValidator = null
 			function askPin(title, desc, validator, mandatory) {
 				return new Promise(function(resolve) {
 					_pinResolve   = resolve
@@ -1024,9 +893,6 @@
 					setTimeout(function() { $('#pin-input').focus() }, 400)
 				})
 			}
-
-			// Two-step mandatory PIN setup: enter then confirm. Returns confirmed PIN.
-			// Two-step PIN setup. Returns confirmed PIN string, or null if user cancelled.
 			async function askPinSetup() {
 				var pin = await askPin(
 					getText('pin-create-title'),
@@ -1035,19 +901,14 @@
 					false
 				)
 				if (pin === null) return null
-
 				var confirmed = await askPin(
 					getText('pin-confirm-title'),
 					getText('pin-confirm-desc'),
 					function(p) { return (p !== pin) ? getText('pin-mismatch') : null },
 					false
 				)
-				return confirmed  // null = cancelled, string = confirmed PIN
+				return confirmed
 			}
-
-			// ================================================================
-			// Messages / lang helpers
-			// ================================================================
 			function initMessages() {
 				return {
 					'settings': {
@@ -1087,7 +948,6 @@
 					}
 				}
 			}
-
 			function initLang() {
 				var language; try { language = localStorage.getItem('bte_cfg_language') } catch(e) {}
 				var set_lang = 'en'
@@ -1109,7 +969,6 @@
 						$(this).html(getText($(this).attr('tkey')))
 					}
 				})
-				// Translate title attributes separately (avoids replacing innerHTML)
 				$('[data-tkey-title]').each(function() {
 					$(this).attr('title', getText($(this).attr('data-tkey-title')))
 				})
@@ -1117,17 +976,12 @@
 				setTitle(getText('wallet-settings'))
 				return language
 			}
-
 			function getText(token) {
 				var language; try { language = localStorage.getItem('bte_cfg_language') } catch(e) {}
 				if (language == undefined) language = initLang()
 				if (token in walletLanguages[language]) return walletLanguages[language][token]
 				return walletLanguages['en'][token]
 			}
-
-			// ================================================================
-			// Network / config helpers
-			// ================================================================
 			function getConfig() {
 				var network; try { network = localStorage.getItem('bte_cfg_network') } catch(e) {}
 				if (network == null || networkConfigs[network] == undefined) {
@@ -1136,7 +990,6 @@
 				}
 				return networkConfigs[network]
 			}
-
 			function switchConfig(network, page) {
 				page = page || ''
 				network = network.toUpperCase()
@@ -1147,8 +1000,7 @@
 				}
 				switchPage(page)
 			}
-
-function getAddressType() {
+            function getAddressType() {
 				var type; try { type = localStorage.getItem('bte_cfg_type') } catch(e) {}
 				if (type == null || !['bech32', 'segwit', 'legacy'].includes(type)) {
 					type = 'bech32'
@@ -1156,11 +1008,9 @@ function getAddressType() {
 				}
 				return type
 			}
-
 			function switchAddressType(type) {
 				if (['bech32', 'segwit', 'legacy'].includes(type)) try { localStorage.setItem('bte_cfg_type', type) } catch(e) {}
 			}
-
 			function getBackend() {
 				var backend; try { backend = localStorage.getItem('bte_cfg_backend') } catch(e) {}
 				if (backend == null) {
@@ -1169,7 +1019,6 @@ function getAddressType() {
 				}
 				return backend
 			}
-
 			function switchBackend(url) {
 				if (!isValidBackendUrl(url)) {
 					showMessage(messages.settings.backendNotWorking(url))
@@ -1184,11 +1033,6 @@ function getAddressType() {
 					$('#wallet-backend input').val(getBackend())
 				})
 			}
-
-			// ================================================================
-			// Copy to clipboard — works on HTTPS mobile + desktop
-			// Falls back to execCommand for old browsers
-			// ================================================================
 			function copyToClipboard(text, $btn) {
 				var doFeedback = function(ok) {
 					var $icon = $btn.find('#copy-address-icon')
@@ -1206,7 +1050,6 @@ function getAddressType() {
 						doFeedback(false)
 					})
 				} else {
-					// Fallback: hidden textarea + execCommand
 					var ta = document.createElement('textarea')
 					ta.value = text
 					ta.style.position = 'fixed'
@@ -1219,12 +1062,6 @@ function getAddressType() {
 					doFeedback(ok)
 				}
 			}
-			// ================================================================
-
-			// Returns required depth (confirmations) for a coinbase UTXO to be spendable.
-			// coinHeight = block height where the coinbase was mined
-			// Uses maturity config from current network (parametrized — disable extended
-			// for non-Bitweb networks by setting maturity.extended.enabled = false).
 			function getRequiredMaturity(coinHeight) {
 				var cfg = getConfig()['maturity']
 				if (!cfg) return 100
@@ -1233,40 +1070,25 @@ function getAddressType() {
 				if (ext && ext.enabled) {
 					var EXT_END = ext.start + ext.depth
 					if (coinHeight >= ext.start && coinHeight < EXT_END) {
-						// Extended rule: required = (EXT_END - coinHeight) + COINBASE_MATURITY
 						return (EXT_END - coinHeight) + m
 					}
 				}
 				return m
 			}
-
-			// Returns true if a UTXO is mature (safe to spend).
-			// utxo must have { coinbase: bool, height: int }
-			// currentHeight = current blockchain tip
 			function isUtxoMature(utxo, currentHeight) {
 				if (!utxo.coinbase) return true
-				if (utxo.height === 0) return false   // unconfirmed coinbase — never mature
+				if (utxo.height === 0) return false
 				var depth    = currentHeight - utxo.height + 1
 				var required = getRequiredMaturity(utxo.height)
 				return depth >= required
 			}
-
-			// Blocks remaining until UTXO matures (0 if already mature)
 			function blocksToMature(utxo, currentHeight) {
 				if (!utxo.coinbase || utxo.height === 0) return 0
 				var depth    = currentHeight - utxo.height + 1
 				var required = getRequiredMaturity(utxo.height)
 				return Math.max(0, required - depth)
 			}
-
-			// ================================================================
-			// UTXO localStorage cache
-			// Key: bte_utxo_{address}
-			// Stored: { utxos: [...], height: N, ts: timestamp }
-			// Invalidate when height changes or after 60s
-			// ================================================================
 			var UTXO_CACHE_TTL = 60000  // ms
-
 			function loadUtxoCache(address) {
 				try {
 					var raw = localStorage.getItem('bte_utxo_' + address)
@@ -1276,7 +1098,6 @@ function getAddressType() {
 					return c
 				} catch(e) { return null }
 			}
-
 			function saveUtxoCache(address, utxos, height) {
 				try {
 					localStorage.setItem('bte_utxo_' + address, JSON.stringify({
@@ -1284,14 +1105,9 @@ function getAddressType() {
 					}))
 				} catch(e) {}
 			}
-
 			function clearUtxoCache(address) {
 				try { localStorage.removeItem('bte_utxo_' + address) } catch(e) {}
 			}
-
-			// ================================================================
-			// Router
-			// ================================================================
 			function routePage() {
 				var urlParams = readParams()
 				if (window.location.hash == '') window.location.replace(window.location.href.split('#')[0] + '#/')
@@ -1316,21 +1132,14 @@ function getAddressType() {
 					}
 				}
 			}
-
 			function switchPage(url, params) {
 				url    = url    || ''
 				params = params || []
 				var p  = params.length > 0 ? '/' + params.join('/') : ''
 				window.location.hash = '#/' + url + p
 			}
-
 			function readParams() { return window.location.hash.split('/') }
-
 			function setTitle(title) { document.title = title + ' | ' + getConfig()['title'] }
-
-			// ================================================================
-			// API calls
-			// ================================================================
 			function transactionBroadcast(rawtx) {
 				return Promise.resolve($.ajax({
 					'method': 'POST',
@@ -1338,32 +1147,21 @@ function getAddressType() {
 					'data':   { 'raw': rawtx }
 				}))
 			}
-
 			function estimateFee() {
 				return Promise.resolve($.ajax({ 'url': getBackend() + '/fee' }))
 			}
-
 			function addressBalance(address) {
 				return Promise.resolve($.ajax({ 'url': getBackend() + '/balance/' + address }))
 			}
-
-			// confirmedOnly=true — use only confirmed UTXOs
 			function getUnspent(address, amount, confirmedOnly) {
 				var url = getBackend() + '/unspent/' + address + '?amount=' + amount
 				if (confirmedOnly) url += '&confirmed=true'
 				return Promise.resolve($.ajax({ 'url': url }))
 			}
-
-			// Fetch UTXOs, compute maturity, cache in localStorage + globalData.
-			// Calls renderCoinControl() and updates immature balance display.
-			// forceRefresh=true bypasses TTL cache.
 			function updateUtxos(forceRefresh) {
 				if (!globalData.address) return Promise.resolve()
-
 				var address = globalData.address
 				var height  = globalData.height
-
-				// Check cache unless forced
 				if (!forceRefresh) {
 					var cached = loadUtxoCache(address)
 					if (cached && cached.height === height && height > 0) {
@@ -1372,13 +1170,11 @@ function getAddressType() {
 						return Promise.resolve()
 					}
 				}
-
 				return fetch(getBackend() + '/unspent/' + address + '?confirmed=true')
 					.then(function(r) { return r.json() })
 					.then(function(data) {
 						if (!data || data.error !== null) return
 						var utxos = data.result || []
-						// Annotate each UTXO with mature flag and blocksLeft
 						utxos.forEach(function(u) {
 							u.mature     = isUtxoMature(u, height)
 							u.blocksLeft = blocksToMature(u, height)
@@ -1389,45 +1185,32 @@ function getAddressType() {
 					})
 					.catch(function() {})
 			}
-
-			// Compute + display immature balance, re-render coin control only if UTXOs changed
 			function _applyUtxoData() {
 				var immature = 0
 				globalData.utxos.forEach(function(u) {
 					if (!u.mature) immature += u.value
 				})
 				globalData.immatureBalance = immature
-
-				// Fingerprint = sorted txid:index:mature list — skip coin control re-render if identical
 				var fp = globalData.utxos.map(function(u) {
 					return u.txid + ':' + u.index + ':' + (u.mature ? 1 : 0)
 				}).join('|')
-
 				var fpChanged = fp !== globalData._lastRendered.utxoFingerprint
 				if (fpChanged) {
 					globalData._lastRendered.utxoFingerprint = fp
 					renderCoinControl()
 				}
-
 				_renderBalanceDisplay()
 			}
-
-			// ================================================================
-			// Formatters / UI helpers
-			// ================================================================
 			function amountFormat(amount, invert) {
 				var decimals = getConfig()['decimals']
 				if (!invert) return parseFloat((amount / Math.pow(10, decimals)).toFixed(decimals))
 				return parseInt(amount * Math.pow(10, decimals))
 			}
-
 			function showMessage(message) {
 				$('#error-message').html(message)
 				$('#error-message').removeClass('d-none')
 				setTimeout(function() { $('#error-message').addClass('d-none') }, 3400)
 			}
-
-			// Show error inside the send modal (opens modal if not already open)
 			function showSendError(message) {
 				$('#send-modal-error').html(message).removeClass('d-none')
 				$('#confirm-screen').addClass('d-none')
@@ -1440,62 +1223,40 @@ function getAddressType() {
 					$('#send-modal').modal('show')
 				}
 			}
-
 			function showQrAddress(text) {
 				$('#qr-code-addres').empty()
 				$('#qr-code-addres').qrcode(text)
 			}
-
-			// ================================================================
-			// Transaction history  (last 10 fetched client-side, direction computed from vout)
-			// ================================================================
 			var HISTORY_LIMIT = 10
-
 			function loadHistory() {
 				var key = 'bte_history_' + globalData.address
 				try { return JSON.parse(localStorage.getItem(key) || '[]') } catch(e) { return [] }
 			}
-
 			function saveHistory(txs) {
 				if (!globalData.address) return
 				try { localStorage.setItem('bte_history_' + globalData.address, JSON.stringify(txs)) } catch(e) {}
 			}
-
-			// Annotate a tx using full verbose tx data (vin + vout)
-			// Determines direction by looking for our pubkey in vin inputs:
-			//   - bech32 (P2WPKH)    : txinwitness[1] = compressed pubkey
-			//   - segwit (P2SH-P2WPKH): txinwitness[1] = compressed pubkey (same witness structure)
-			//   - legacy (P2PKH)     : scriptSig.hex ends with "21" + pubkey (no witness)
 			function annotateTx(txMeta, txDetail) {
 				var vin  = txDetail.vin  || []
 				var vout = txDetail.vout || []
 				var myPub = (globalData.pubKeyHex || '').toLowerCase()
-
 				var weAreSender = vin.some(function(input) {
-					// bech32 and segwit: pubkey is txinwitness[1]
 					var wit = input.txinwitness || []
 					if (wit[1] && wit[1].toLowerCase() === myPub) return true
-
-					// legacy P2PKH: scriptSig ends with OP_PUSHDATA(33) + pubkey = "21" + pubkey_hex
 					var sig = (input.scriptSig && input.scriptSig.hex) ? input.scriptSig.hex.toLowerCase() : ''
 					if (sig.length >= 68 && sig.slice(-68) === '21' + myPub) return true
 
 					return false
 				})
-
-				// Sum vout: received = to us (any of our addresses), sentToOthers = to other addresses
 				var received = 0, sentToOthers = 0
 				vout.forEach(function(o) {
 					var sat = (o.value_sat != null) ? o.value_sat : Math.round((o.value || 0) * 1e8)
 					var hex = (o.scriptPubKey && o.scriptPubKey.hex) ? o.scriptPubKey.hex.toLowerCase() : ''
-					// Primary: match by scriptPubKey hex against all our known scripts
 					var isOurs = hex
 						? (globalData.allScriptHexes
 							? globalData.allScriptHexes.has(hex)
 							: (hex === (globalData.scriptHex || '').toLowerCase()))
 						: false
-					// Fallback: match by address string — catches cases where ElectrumX
-					// returns a different scriptPubKey structure or hex doesn't match
 					if (!isOurs) {
 						var outAddr = ''
 						if (o.scriptPubKey) {
@@ -1515,10 +1276,6 @@ function getAddressType() {
 						sentToOthers += sat
 					}
 				})
-
-				// direction + display amount
-				// Note: fee = inputs_total - all_vout_total; it's not in any vout so it's
-				// not included in sentToOthers. Display shows "sent X to recipient (+ fee)".
 				var direction, amount, isSelfSend
 				if (weAreSender) {
 					isSelfSend = (sentToOthers === 0)
@@ -1528,7 +1285,6 @@ function getAddressType() {
 					direction = 'in'
 					amount    = received
 				}
-
 				return {
 					tx_hash:   txMeta.tx_hash,
 					height:    txMeta.height,
@@ -1536,13 +1292,9 @@ function getAddressType() {
 					amount:    amount
 				}
 			}
-
 			function updateHistory() {
 				if (globalData.status !== 'unlocked') return
-
 				$('#history-list').html('<div class="text-muted text-center py-3 small">' + escHtml(getText('history-loading')) + '</div>')
-
-				// 1. Fetch full history list (lightweight — just hashes + heights)
 				fetch(getBackend() + '/history/' + globalData.address)
 				.then(function(r) { return r.json() })
 				.then(function(data) {
@@ -1552,12 +1304,8 @@ function getAddressType() {
 					}
 					var all    = data.result || []
 					var total  = all.length
-					// Take last HISTORY_LIMIT, reversed so newest first
 					var recent = all.slice(-HISTORY_LIMIT).reverse()
-
 					if (recent.length === 0) { renderHistory([], total); return }
-
-					// 2. Fetch verbose details for each tx in parallel
 					var fetches = recent.map(function(txMeta) {
 						return fetch(getBackend() + '/tx/' + txMeta.tx_hash)
 						.then(function(r) { return r.json() })
@@ -1566,11 +1314,9 @@ function getAddressType() {
 							return annotateTx(txMeta, txDetail)
 						})
 						.catch(function() {
-							// If /tx fetch fails, show row without amount
 							return { tx_hash: txMeta.tx_hash, height: txMeta.height, direction: 'unknown', amount: null }
 						})
 					})
-
 					Promise.all(fetches).then(function(annotated) {
 						if (!globalData.address) return
 						saveHistory(annotated)
@@ -1581,13 +1327,11 @@ function getAddressType() {
 					$('#history-list').html('<div class="text-danger text-center py-3 small">' + escHtml(getText('history-network-error')) + '</div>')
 				})
 			}
-
 			function renderHistory(txs, total) {
 				if (!txs || txs.length === 0) {
 					$('#history-list').html('<div class="text-muted text-center py-3 small">' + escHtml(getText('no-transactions')) + '</div>')
 					return
 				}
-
 				var html = ''
 				txs.forEach(function(tx) {
 					var confirmed  = tx.height !== 0
@@ -1597,12 +1341,9 @@ function getAddressType() {
 					var confBadge  = confirmed
 						? '<span class="badge text-bg-success ms-1">' + escHtml(confs) + '</span>'
 						: '<span class="badge text-bg-warning ms-1">' + escHtml(getText('history-pending')) + '</span>'
-
-					// Amount + direction label (left side, before txid)
 					var dir    = tx.direction || 'unknown'
 					var amt    = (tx.amount != null) ? amountFormat(tx.amount) : '?'
 					var ticker = getConfig()['ticker']
-
 					var dirLabel = ''
 					if (dir === 'in') {
 						dirLabel = '<span class="font-weight-bold text-success" style="min-width:110px;display:inline-block">&#x2193; +' + escHtml(String(amt)) + ' ' + escHtml(ticker) + '</span>'
@@ -1613,11 +1354,9 @@ function getAddressType() {
 					} else {
 						dirLabel = '<span class="text-muted" style="min-width:110px;display:inline-block">— ? ' + escHtml(ticker) + '</span>'
 					}
-
 					var safeHash  = escHtml(tx.tx_hash || '')
 					var txUrl     = escHtml(blockExplorer.tx(tx.tx_hash || ''))
 					var shortHash = safeHash.substr(0, 10) + '…' + safeHash.substr(-6)
-
 					html += '<div class="history-item d-flex align-items-center border-bottom" style="gap:6px">' +
 						dirLabel +
 						'<div class="font-monospace text-truncate flex-grow-1" style="font-size:11px">' +
@@ -1626,58 +1365,38 @@ function getAddressType() {
 						'<div class="flex-shrink-0">' + confBadge + '</div>' +
 					'</div>'
 				})
-
-				// "See more" link when history is longer than HISTORY_LIMIT
 				if (total && total > HISTORY_LIMIT) {
 					var explorerUrl = escHtml(blockExplorer.address(globalData.address))
 					html += '<div class="text-center py-2"><small><a href="' + explorerUrl + '" target="_blank" rel="noopener noreferrer">' + escHtml(getText('history-view-all')) + ' ' + total + ' ' + escHtml(getText('history-on-explorer')) + ' &#x2197;</a></small></div>'
 				}
-
 				$('#history-list').html(html)
 			}
-
-			// ================================================================
-			// Wallet balance — with confirmations and network height
-			// silent=true: update in background without clearing displayed value (auto-refresh)
-			// silent=false (default): show Loading state (first open / manual refresh)
 			function walletBalance(silent) {
 				if (globalData.status !== 'unlocked') return
 				if (!silent) {
 					$('.wallet-balance .amount').text('')
 					$('.wallet-balance .ticker').text(getText('loading'))
-					// Reset last rendered so next call forces DOM update
 					globalData._lastRendered.balance  = -1
 					globalData._lastRendered.immature = -1
 				}
-
 				Promise.all([
 					$.ajax({ url: getBackend() + '/info' }),
 					addressBalance(globalData.address)
 				]).then(function(results) {
 					var infoData    = results[0]
 					var balanceData = results[1]
-
 					var prevHeight  = globalData.height
 					var prevBalance = globalData.balance
-
 					if (infoData && infoData.result) {
 						globalData.height = infoData.result.blocks
 					}
-
 					if (balanceData && balanceData.error == null) {
 						globalData.balance = balanceData.result.balance
-
-						// Balance changed → refresh history
 						if (globalData.balance !== prevBalance && globalData.address) updateHistory()
 					} else {
 						if (!silent) showMessage(messages.error['balance-load-failed'])
 					}
-
-					// Render balance (available = balance - immature, already computed)
 					_renderBalanceDisplay()
-
-					// Refresh UTXOs when height changed or first load — they recompute immature
-					// which triggers _renderBalanceDisplay again with correct immature value
 					var heightChanged = globalData.height !== prevHeight
 					if (heightChanged || globalData.utxos.length === 0) {
 						updateUtxos(heightChanged)
@@ -1689,31 +1408,20 @@ function getAddressType() {
 					}
 				})
 			}
-
-			// Render available + immature balances.
-			// Skips DOM update entirely if nothing changed since last render.
 			function _renderBalanceDisplay() {
 				var total    = globalData.balance
 				var immature = globalData.immatureBalance
 				var avail    = Math.max(0, total - immature)
-
-				// Skip if nothing changed
 				var lr = globalData._lastRendered
 				if (lr.balance === total && lr.immature === immature) return
 				lr.balance = total
 				lr.immature = immature
-
 				var ticker = getConfig()['ticker']
-
-				// Main balance shows AVAILABLE (spendable) amount
 				$('.wallet-balance .amount').text(amountFormat(avail))
 				$('.wallet-balance .ticker').text(ticker)
-
-				// Immature row — both tabs — visible only when > 0
 				var immatureText = immature > 0
 					? amountFormat(immature) + ' ' + ticker
 					: ''
-
 				$('#immature-balance-row-main, #immature-balance-row').each(function() {
 					if (immature > 0) {
 						$(this).find('.immature-amount').text(immatureText)
@@ -1723,25 +1431,18 @@ function getAddressType() {
 					}
 				})
 			}
-
 			function setHomeTitle() {
 				if (globalData.keys != undefined) setTitle(getText('address') + ' ' + globalData.address)
 				else setTitle(getText('open-wallet'))
 			}
-
 			function checkBalanceLoop() {
 				clearTimeout(walletTimer)
 				walletTimer = setTimeout(function() {
-					if (globalData.status !== 'unlocked') return  // wallet locked or closed — stop loop
+					if (globalData.status !== 'unlocked') return
 					if ($('.wallet-balance .ticker').text() != getText('loading')) walletBalance(true)
 					checkBalanceLoop()
 				}, 40000)
 			}
-
-			// ================================================================
-			// Open wallet
-			// ================================================================
-			// Compute scriptPubKey hex for this address type — used to match vout in tx history
 			function getScriptHex(keys) {
 				var network = getConfig()['network']
 				var type    = getAddressType()
@@ -1753,23 +1454,14 @@ function getAddressType() {
 					return bitcoin.Buffer.from(bitcoin.payments.p2pkh({ pubkey: keys.publicKey, network: network }).output).toString('hex')
 				}
 			}
-
-			// Build a Set of ALL scriptPubKey hex strings for this key (bech32 + segwit + legacy).
-			// One key produces three addresses — history may contain change outputs to any of them.
 			function getAllScriptHexes(keys) {
 				var network = getConfig()['network']
 				var set = new Set()
-				// P2WPKH (bech32)
 				set.add(bitcoin.Buffer.from(getP2WPKHScript(keys.publicKey).output).toString('hex').toLowerCase())
-				// P2SH-P2WPKH (segwit)
 				set.add(bitcoin.Buffer.from(getP2SHScript(getP2WPKHScript(keys.publicKey)).output).toString('hex').toLowerCase())
-				// P2PKH (legacy)
 				set.add(bitcoin.Buffer.from(bitcoin.payments.p2pkh({ pubkey: keys.publicKey, network: network }).output).toString('hex').toLowerCase())
 				return set
 			}
-
-			// Build a Set of ALL address strings for this key (bech32 + segwit + legacy).
-			// Used as a reliable fallback when scriptPubKey.hex matching fails.
 			function getAllAddresses(keys) {
 				var network = getConfig()['network']
 				var set = new Set()
@@ -1781,8 +1473,6 @@ function getAddressType() {
 				try { set.add(bitcoin.payments.p2pkh({ pubkey: keys.publicKey, network: network }).address) } catch(e) {}
 				return set
 			}
-
-			// ── Seed state (outer scope — needed by openWallet cancel path) ──
 			var _seedState = { mnemonic: '', strength: 256, verifyPositions: [] }
 
 			function _hideSeedReveal() {
@@ -1790,7 +1480,6 @@ function getAddressType() {
 				$('#wallet-seed-revealed').addClass('d-none')
 				$('#wallet-seed-grid').empty()
 							}
-
 			function seedReset() {
 				$('#seed-entry').removeClass('d-none')
 				$('#seed-create').addClass('d-none')
@@ -1806,50 +1495,37 @@ function getAddressType() {
 				$('#restore-advanced').removeClass('show')
 				_seedState = { mnemonic: '', strength: 256, verifyPositions: [] }
 			}
-
-			// identity, password params removed — pass offerPin=true to trigger PIN save dialog
-			// Show wallet UI and start balance polling. Called only AFTER PIN is collected.
 			function _showWalletUI(keys) {
 				var pubkey = globalData.pubKeyHex
 				var redeem = '0014' + bitcoin.Buffer.from(getP2WPKHScript(keys.publicKey).hash).toString('hex')
-
 				$('#wallet-keys-pubkey input').val(pubkey)
-				// Private key: canvas masked, never in input.value
 				_privkeyClear('wallet-privkey-canvas')
 				_privkeyMask('wallet-privkey-canvas')
 				$('#wallet-privkey-copy-btn').addClass('d-none')
 				$('#toggle-wallet-privkey').text(getText('show'))
 				$('#wallet-keys-script input').val(redeem)
-
-				// Show seed phrase section only for BIP39 wallets
 				if (globalData.isBip39) {
 					$('#wallet-keys-seed').removeClass('d-none')
 				} else {
 					$('#wallet-keys-seed').addClass('d-none')
 				}
 				_hideSeedReveal()
-
 				$('#wallet-address').text(globalData.address)
 				$('#pin-login-block').addClass('d-none')
 				$('#open-block').addClass('d-none')
 				$('#wallet-block').removeClass('d-none')
 				$('#send-fee').attr('placeholder', getText('fee') + ' (' + getText('recommended') + ' ' + globalData.rfee + ' ' + getConfig()['ticker'] + ')')
 				showQrAddress(getConfig()['uri'] + globalData.address)
-
 				renderHistory(loadHistory())
 				walletBalance()
 				checkBalanceLoop()
 				setHomeTitle()
 				_resetAutoLock()
 			}
-
-			// Open wallet: if offerPin && no saved wallet -> collect PIN first, then show UI.
 			async function openWallet(keys, offerPin, bip39Data) {
-				// bip39Data = { mnemonic } when called from seed flow
 				if (offerPin && !hasSavedWallet()) {
 					var pin = await askPinSetup()
 					if (pin === null) {
-						// User cancelled — wipe plaintext mnemonic from memory, reset seed UI
 						globalData.keys = undefined
 						_seedState.mnemonic = ''
 						_seedState.verifyPositions = []
@@ -1858,7 +1534,6 @@ function getAddressType() {
 					}
 					if (bip39Data && bip39Data.mnemonic) {
 						await saveBip39(bip39Data.mnemonic, keys.toWIF(), pin)
-						// Wipe plaintext mnemonic after encrypted save
 						bip39Data.mnemonic = ''
 						_seedState.mnemonic = ''
 						_seedState.verifyPositions = []
@@ -1868,8 +1543,6 @@ function getAddressType() {
 					showMessage(getText('wallet-saved'))
 					updateSavedWalletUI()
 				}
-
-				// Only set runtime state after PIN is confirmed (or not required)
 				globalData.status         = 'unlocked'
 				globalData.address        = getAddress(keys)
 				globalData.scriptHex      = getScriptHex(keys)
@@ -1879,11 +1552,9 @@ function getAddressType() {
 
 				_showWalletUI(keys)
 			}
-
 			function closeWallet() {
 				_stopAutoLock()
 				clearTimeout(walletTimer)
-				// Wipe private key canvas — forces GPU buffer release
 				_privkeyClear('wallet-privkey-canvas')
 				_privkeyMask('wallet-privkey-canvas')
 				$('#wallet-privkey-copy-btn').addClass('d-none')
@@ -1898,10 +1569,6 @@ function getAddressType() {
 				updateSavedWalletUI()
 				setHomeTitle()
 			}
-
-			// ================================================================
-			// Coin Control UI
-			// ================================================================
 			function renderCoinControl() {
 				var utxos  = globalData.utxos
 				var height = globalData.height
@@ -1945,10 +1612,8 @@ function getAddressType() {
 						'</tr>'
 					)
 				})
-
 				_updateCoinControlInfo()
 			}
-
 			function _updateCoinControlInfo() {
 				if (!globalData.coinControl || !globalData.selectedUtxos) {
 					$('#coin-control-selected-info').text('')
@@ -1963,10 +1628,6 @@ function getAddressType() {
 					count + ' ' + getText('coin-control-selected') + ' — ' + amountFormat(total) + ' ' + getConfig()['ticker']
 				)
 			}
-
-			// ================================================================
-			// Send transaction — spend only confirmed UTXOs
-			// ================================================================
 			function showConfirmation(amount) {
 				$('#confirm-amount').text(amount + ' ' + getConfig()['ticker'])
 				$('#send-modal-error').addClass('d-none').html('')
@@ -1978,22 +1639,14 @@ function getAddressType() {
 				$('#confirm-screen').removeClass('d-none')
 				$('#status-screen').addClass('d-none')
 				$('#status-screen span').html('')
-
 				$.each($('#send-outputs .send-outputs-item'), function(key, item) {
 					var address = $('[name="send-address"]', item).val().trim()
 					var value   = $('[name="send-ammount"]', item).val() * 1
 					globalData.tx.outputs.push({ 'address': address, 'amount': amountFormat(value, true) })
 				})
-
 				globalData.tx.amount = amountFormat(amount, true)
 				globalData.tx.fee    = amountFormat(($('#send-fee').val() != '') ? $('#send-fee').val() : globalData.rfee, true)
 			}
-
-			// ================================================================
-			// Fetch raw transaction hex from backend — needed for legacy P2PKH
-			// inputs in Psbt. Backend must expose:
-			//   GET /rawtx/{txid}  →  { result: "<rawhex>", error: null }
-			// ================================================================
 			function getRawTx(txid) {
 				return fetch(getBackend() + '/rawtx/' + txid)
 					.then(function(r) { return r.json() })
@@ -2002,21 +1655,14 @@ function getAddressType() {
 						return data.result
 					})
 			}
-
-			// ================================================================
-			// Send transaction using Psbt (replaces legacy TransactionBuilder)
-			// Supports bech32 (P2WPKH), segwit (P2SH-P2WPKH), legacy (P2PKH)
-			// ================================================================
 			function sendTransaction() {
 				var network = getConfig()['network']
 				var keys    = globalData.keys
 				var outputs = globalData.tx.outputs
 				var amount  = globalData.tx.amount
 				var address = globalData.address
-
 				var psbt = new bitcoin.Psbt({ network: network })
 				psbt.setVersion(2)
-
 				$('#send-cancel').addClass('disabled')
 				$('#send-confirm').addClass('disabled')
 				$('#confirm-screen').addClass('d-none')
@@ -2024,29 +1670,21 @@ function getAddressType() {
 				$('#send-title').text(messages.title['processing'])
 				$('#status-screen .extra-info').empty()
 				$('#status-screen span').html(messages.tx['generating'])
-
 				for (var i = 0; i < outputs.length; i++) {
 					psbt.addOutput({ address: outputs[i].address, value: BigInt(outputs[i].amount) })
 				}
-
 				$('#status-screen span').html(messages.tx['loading-utxo'])
-
-				// Use cached UTXOs (already filtered to confirmed) + refresh if empty
 				var doSend = function(utxos) {
-					// Filter: exclude immature coinbase; if coin control enabled, use selection
 					var spendable
 					if (globalData.coinControl && globalData.selectedUtxos && globalData.selectedUtxos.size > 0) {
 						spendable = utxos.filter(function(u) {
 							return globalData.selectedUtxos.has(u.txid + ':' + u.index) && u.mature
 						})
 					} else {
-						// Default: skip immature coinbase automatically
 						spendable = utxos.filter(function(u) { return u.mature })
 					}
-
 					var value     = 0
-					var inputMeta = []  // per-input type metadata
-
+					var inputMeta = []
 					for (var i = 0; i < spendable.length; i++) {
 						var u      = spendable[i]
 						var script = bitcoin.Buffer.from(u.script, 'hex')
@@ -2060,7 +1698,6 @@ function getAddressType() {
 								witnessUtxo: { script: p2wpkh.output, value: BigInt(u.value) }
 							})
 							inputMeta.push({ type: 'bech32' })
-
 						} else if (type === 'segwit') {
 							var p2wpkh2 = getP2WPKHScript(keys.publicKey)
 							var p2sh2   = getP2SHScript(p2wpkh2)
@@ -2071,10 +1708,7 @@ function getAddressType() {
 								redeemScript: p2wpkh2.output
 							})
 							inputMeta.push({ type: 'segwit' })
-
 						} else if (type === 'legacy') {
-							// P2PKH: needs full raw previous tx (nonWitnessUtxo).
-							// Placeholder input — raw tx added after fetch below.
 							psbt.addInput({ hash: u.txid, index: u.index })
 							inputMeta.push({ type: 'legacy', psbtIdx: inputMeta.length, txid: u.txid })
 
@@ -2082,17 +1716,13 @@ function getAddressType() {
 							showSendError(messages.error['bad-utxo'])
 							return
 						}
-
 						value += u.value
 						if (value >= amount) break
 					}
-
 					if (value < amount) {
 						showSendError(messages.error['not-enough-funds'])
 						return
 					}
-
-					// Fetch raw txs for any legacy inputs, then sign + broadcast
 					var legacyFetches = inputMeta
 						.filter(function(m) { return m.type === 'legacy' })
 						.map(function(m) {
@@ -2102,7 +1732,6 @@ function getAddressType() {
 								})
 							})
 						})
-
 					Promise.all(legacyFetches).then(function() {
 						var change = value - amount
 						if (change > 0) psbt.addOutput({ address: address, value: BigInt(change) })
@@ -2110,7 +1739,6 @@ function getAddressType() {
 						psbt.signAllInputs(keys)
 						psbt.finalizeAllInputs()
 						var tx = psbt.extractTransaction()
-
 						transactionBroadcast(tx.toHex()).then(function(data) {
 							if (data.error == null) {
 								clearUtxoCache(address)  // invalidate UTXO cache after spend
@@ -2127,7 +1755,6 @@ function getAddressType() {
 							}
 							resetTxForm()
 						})
-
 						$('#send-cancel').addClass('d-none')
 						$('#send-confirm').addClass('d-none')
 						$('#send-close-footer').removeClass('d-none disabled')
@@ -2136,8 +1763,6 @@ function getAddressType() {
 						showSendError(messages.error['bad-utxo'])
 					})
 				}
-
-				// Use cached UTXOs if available; otherwise re-fetch from backend
 				if (globalData.utxos.length > 0) {
 					doSend(globalData.utxos)
 				} else {
@@ -2156,25 +1781,18 @@ function getAddressType() {
 					.catch(function() { showSendError(messages.error['not-enough-utxo']) })
 				}
 			}
-
-			// ================================================================
-			// Script / address helpers
-			// ================================================================
 			function getScriptType(script) {
 				if (script[0] == bitcoin.opcodes.OP_0 && script[1] == 20) return 'bech32'
 				if (script[0] == bitcoin.opcodes.OP_HASH160 && script[1] == 20) return 'segwit'
 				if (script[0] == bitcoin.opcodes.OP_DUP && script[1] == bitcoin.opcodes.OP_HASH160 && script[2] == 20) return 'legacy'
 				return undefined
 			}
-
 			function getP2SHScript(redeem) {
 				return bitcoin.payments.p2sh({ 'redeem': redeem, 'network': getConfig()['network'] })
 			}
-
 			function getP2WPKHScript(pubkey) {
 				return bitcoin.payments.p2wpkh({ 'pubkey': pubkey, 'network': getConfig()['network'] })
 			}
-
 			function getAddress(keys) {
 				var network = getConfig()['network']
 				if (getAddressType() == 'bech32') {
@@ -2185,28 +1803,21 @@ function getAddressType() {
 					return bitcoin.payments.p2pkh({ 'pubkey': keys.publicKey, 'network': network }).address
 				}
 			}
-
 			function validateAddress(address) {
 				var network = getConfig()['network']
 				try { bitcoin.address.fromBase58Check(address, network); return true } catch(e) {}
 				try { bitcoin.address.fromBech32(address, network); return true } catch(e) {}
 				return false
 			}
-
-			// ================================================================
-			// Scan helpers
-			// ================================================================
 			function stopStream() {
 				if (stream != undefined) stream.getTracks().forEach(function(t) { t.stop() })
 			}
-
 			function startStream() {
 				var canvasElement = document.getElementById('scan-canvas')
 				var canvas = canvasElement.getContext('2d')
 				var video  = document.createElement('video')
 				canvasElement.hidden = true
 				$('#loading-message').text(getText('webcam-message')).removeClass('d-none')
-
 				navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(function(gstream) {
 					stream = gstream
 					video.srcObject = stream
@@ -2214,7 +1825,6 @@ function getAddressType() {
 					video.play()
 					requestAnimationFrame(tick)
 				})
-
 				function tick() {
 					$('#loading-message').text(getText('webcam-loading'))
 					var stop = false
@@ -2241,27 +1851,19 @@ function getAddressType() {
 					else { $('#scan-modal').modal('toggle'); stopStream() }
 				}
 			}
-
 			function showScanModal() {
 				$('#scan-modal').modal('toggle')
 				startStream()
 			}
-
 			function resetTxForm() {
 				$('.send-additional-output').remove()
 				$('#wallet-send input').val('')
 				globalData.resetTx()
 			}
-
-			// ================================================================
-			// document.ready
-			// ================================================================
 			$(document).ready(function() {
 				initLang()
 				var _t; try { _t = localStorage.getItem('bte_cfg_theme') } catch(e) {}
 				applyTheme(_t || 'auto')
-
-				// Reset auto-lock timer on any user interaction (only effective when wallet is open)
 				;['click', 'keydown', 'touchstart', 'mousemove'].forEach(function(evt) {
 					document.addEventListener(evt, function() { _resetAutoLock() }, { passive: true, capture: false })
 				})
@@ -2270,8 +1872,6 @@ function getAddressType() {
 				$('#address-type-select select').val(getAddressType())
 				routePage()
 				updateSavedWalletUI()
-
-				// PIN modal — confirm button (validates before closing)
 				$('#pin-confirm').click(function() {
 					var pin = $('#pin-input').val()
 					if (_pinResolve) {
@@ -2300,8 +1900,6 @@ function getAddressType() {
 				$('#pin-input').on('keydown', function(e) {
 					if (e.key === 'Enter') $('#pin-confirm').click()
 				})
-
-				// PIN login block — main open button
 				function doPinLogin() {
 					var pin = $('#pin-login-input').val()
 					if (!pin) {
@@ -2327,7 +1925,6 @@ function getAddressType() {
 						$('#pin-login-error').text(getText('pin-login-error')).removeClass('d-none')
 					})
 				}
-
 				$('#pin-login-btn').click(doPinLogin)
 				$('#pin-login-input').on('keydown', function(e) { if (e.key === 'Enter') doPinLogin() })
 
@@ -2336,18 +1933,13 @@ function getAddressType() {
 					forgetSavedWallet()
 					showMessage(getText('wallet-deleted'))
 				})
-
-				// Forget saved wallet (in settings)
 				$('#settings-forget-wallet').click(function() {
 					forgetSavedWallet()
 					showMessage(getText('wallet-deleted'))
 				})
-
-				// Tabs
 				$('.tab-link').click(function(e) {
 					var tabFamily = $(this).data('tab-family')
 					var tabName   = $(this).data('tab-name')
-					// Leaving Keys tab — wipe canvas immediately
 					if (tabFamily === 'wallet-block' && tabName !== 'wallet-keys') {
 						_privkeyClear('wallet-privkey-canvas')
 						_privkeyMask('wallet-privkey-canvas')
@@ -2358,15 +1950,11 @@ function getAddressType() {
 					$('#' + tabFamily + ' .card-header .card-header-tabs .nav-link').removeClass('active')
 					$('#' + tabFamily + ' [data-tab=' + tabName + ']').removeClass('d-none')
 					$(this).addClass('active')
-					// When history tab opens — fetch from API
 					if (tabName === 'wallet-history') updateHistory()
 					e.preventDefault()
 				})
-
 				$(window).on('hashchange', routePage)
 				if (window.location.hash) $(window).trigger('hashchange')
-
-				// Send button
 				$('#send-tx').click(function() {
 					var error = false
 					var txFee = ($('#send-fee').val() != '') ? $('#send-fee').val() : globalData.rfee
@@ -2377,7 +1965,6 @@ function getAddressType() {
 					} else if (txFee < getConfig()['fee']) {
 						showSendError(messages.error['small-fee']); error = true
 					}
-
 					$.each($('#send-outputs .send-outputs-item'), function(key, item) {
 						var address = $('[name="send-address"]', item).val().trim()
 						var amount  = $('[name="send-ammount"]', item).val()
@@ -2385,24 +1972,20 @@ function getAddressType() {
 						if (!validateAddress(address))    { showSendError(messages.error['not-valid-address']); error = true }
 						total += amount * 1
 					})
-
 					total = parseFloat((total + txFee * 1).toFixed(getConfig()['decimals']))
-					// spendable = total balance minus immature coinbase
 					var spendable = amountFormat(globalData.balance - globalData.immatureBalance)
 					if (!error) {
 						if (total <= spendable) showConfirmation(total)
 						else showSendError(messages.error['not-enough-funds'])
 					}
 				})
-
-				// Open by WIF
 				$('#open-key-form').submit(function(e) {
 					var wif = $('#passphrase').val().trim()
 					if ([51, 52].includes(wif.length)) {
 						try {
 							globalData.keys = bitcoin.ECPair.fromWIF(wif, getConfig()['network'])
 							$('#passphrase').val('')
-							openWallet(globalData.keys, true)  // offer PIN save — same as regular form
+							openWallet(globalData.keys, true)
 						} catch(err) {
 							showMessage(messages.error['bad-priv-key'])
 						}
@@ -2411,8 +1994,6 @@ function getAddressType() {
 					}
 					e.preventDefault()
 				})
-
-				// Open by identity+password (email or any text)
 				$('#open-regular-form').submit(function(e) {
 					var identity    = $('#open-email').val().trim()
 					var pass        = $('#open-password').val()
@@ -2442,11 +2023,8 @@ function getAddressType() {
 					} else { showMessage(getText('identity-too-short')) }
 					e.preventDefault()
 				})
-
 				$('.wallet-balance').click(function(e) { walletBalance(); e.preventDefault() })
 				$('#send-confirm').click(function(e) { sendTransaction(); e.preventDefault() })
-
-				// ── Wallet keys tab: toggle reveal/hide via canvas ──
 				$('#toggle-wallet-privkey').click(function() {
 					if ($(this).text() == getText('show')) {
 						if (globalData.keys && globalData.keys.privateKey) {
@@ -2461,13 +2039,11 @@ function getAddressType() {
 						$(this).text(getText('show'))
 					}
 				})
-
 				$('#wallet-privkey-copy-btn').click(function() {
 					if (globalData.keys && globalData.keys.privateKey) {
 						copyToClipboard(globalData.keys.toWIF(), $(this))
 					}
 				})
-
 				$('#add-output').click(function(e) {
 					$('#send-outputs').append(
 						'<div class="send-additional-output send-outputs-item input-group mb-2">' +
@@ -2479,12 +2055,9 @@ function getAddressType() {
 					$('.remove-additional-output').click(function(e) { $(this).closest('.send-additional-output').remove(); e.preventDefault() })
 					e.preventDefault()
 				})
-
 				$('#send-reset').click(function(e) { resetTxForm(); e.preventDefault() })
 				$('#send-qr').click(function(e)    { showScanModal(); e.preventDefault() })
 				$('#footer-close').click(function(e) { closeWallet(); e.preventDefault() })
-
-				// Coin control toggle button
 				$('#coin-control-toggle').click(function(e) {
 					$('#coin-control-panel').toggleClass('d-none')
 					var open = !$('#coin-control-panel').hasClass('d-none')
@@ -2492,12 +2065,9 @@ function getAddressType() {
 					if (open) renderCoinControl()
 					e.preventDefault()
 				})
-
-				// Enable/disable manual selection
 				$(document).on('change', '#coin-control-enable', function() {
 					globalData.coinControl = $(this).is(':checked')
 					if (globalData.coinControl) {
-						// Pre-select all mature UTXOs
 						globalData.selectedUtxos = new Set()
 						globalData.utxos.forEach(function(u) {
 							if (u.mature) globalData.selectedUtxos.add(u.txid + ':' + u.index)
@@ -2507,8 +2077,6 @@ function getAddressType() {
 					}
 					renderCoinControl()
 				})
-
-				// Select all mature
 				$('#coin-control-select-all').click(function(e) {
 					if (!globalData.coinControl) return e.preventDefault()
 					globalData.selectedUtxos = new Set()
@@ -2518,8 +2086,6 @@ function getAddressType() {
 					renderCoinControl()
 					e.preventDefault()
 				})
-
-				// Individual UTXO checkbox
 				$(document).on('change', '.cc-utxo-check', function() {
 					if (!globalData.coinControl || !globalData.selectedUtxos) return
 					var key = $(this).data('key')
@@ -2527,7 +2093,6 @@ function getAddressType() {
 					else globalData.selectedUtxos.delete(key)
 					_updateCoinControlInfo()
 				})
-
 				$('#footer-broadcast').click(function() {
 					var rawtx = $('#transaction-broadcast-raw')
 					transactionBroadcast(rawtx.val()).then(function(data) {
@@ -2539,40 +2104,29 @@ function getAddressType() {
 					})
 					rawtx.val('')
 				})
-
 				$('#address-type-select select').on('change', function() {
 					var newType = $(this).val();
 					switchAddressType(newType);
 					showMessage(messages.settings.typeSwitched(newType));
-					
 					if (!globalData.keys) return;
-					
-					// Discard UTXOs and cache for the old address
 					if (globalData.address) clearUtxoCache(globalData.address);
 					globalData.utxos = [];
 					globalData.coinControl = false;
 					globalData.selectedUtxos = null;
 					globalData.immatureBalance = 0;
 					globalData._lastRendered = { balance: -1, immature: -1, utxoFingerprint: '' };
-					
-					// Compute new address and scripts for the selected type
 					globalData.address   = getAddress(globalData.keys);
 					globalData.scriptHex = getScriptHex(globalData.keys);
 					globalData.allScriptHexes = getAllScriptHexes(globalData.keys);
 					globalData.allAddresses   = getAllAddresses(globalData.keys);
-					
-					// Update the UI
 					$('#wallet-address').text(globalData.address);
 					showQrAddress(getConfig()['uri'] + globalData.address);
 					$('#wallet-keys-pubkey input').val(globalData.pubKeyHex);
-					// Reset privkey canvas to masked — user must click Show again
 					_privkeyClear('wallet-privkey-canvas');
 					_privkeyMask('wallet-privkey-canvas');
 					$('#wallet-privkey-copy-btn').addClass('d-none');
 					$('#toggle-wallet-privkey').text(getText('show'));
 					$('#wallet-keys-script input').val('0014' + bitcoin.Buffer.from(getP2WPKHScript(globalData.keys.publicKey).hash).toString('hex'));
-					
-					// Fetch UTXOs and balance for the new address – Coin Control now shows only those UTXOs
 					walletBalance();
 					setHomeTitle();
 				});
@@ -2586,41 +2140,20 @@ function getAddressType() {
 					initLang()
 					var _ct; try { _ct = localStorage.getItem('bte_cfg_theme') } catch(e) {}
 					applyTheme(_ct || 'auto')
-					// Re-render dynamic content that uses getText but is NOT covered by [tkey] scan:
-					//   - Coin control panel rows (use getText for status labels)
-					//   - Wallet history rows (use getText for direction/badge labels)
-					//   - send-fee placeholder (set in openWallet, re-applied via openWallet below)
-					//   - messages object (already updated inside initLang via initMessages())
 					if (globalData.keys) {
-						// openWallet re-applies all getText-based placeholders and titles
 						openWallet(globalData.keys, false)
-						// Re-render coin control if panel is visible
 						if (!$('#coin-control-panel').hasClass('d-none')) renderCoinControl()
-						// Re-render history (uses getText for conf labels, direction labels)
 						updateHistory()
 					}
 				})
-
 				estimateFee().then(function(data) {
 					if (data.error == null) globalData.rfee = amountFormat(data.result.feerate)
 					else globalData.rfee = getConfig()['fee']
 				})
-
 				$('#scan-modal').on('hide.bs.modal', function() { stopStream() })
-
-				// Copy address to clipboard
 				$('#copy-address-btn').click(function() {
 					if (globalData.address) copyToClipboard(globalData.address, $(this))
 				})
-
-				// ══════════════════════════════════════════════════════════════
-				//  BIP39 SEED PHRASE LOGIC
-				// ══════════════════════════════════════════════════════════════
-
-				// _seedState, seedReset, _hideSeedReveal — defined in outer scope (above document.ready)
-				// so openWallet / _showWalletUI can call them without scope issues.
-
-				// Render numbered word grid (read-only)
 				function seedRenderGrid(words, containerId) {
 					var $g = $(containerId).empty()
 					words.forEach(function(w, i) {
@@ -2631,50 +2164,35 @@ function getAddressType() {
 						)
 					})
 				}
-
-				// ── Entry buttons ──
 				$('#seed-btn-create').click(function() {
 					$('#seed-entry').addClass('d-none')
 					$('#seed-create').removeClass('d-none')
 					_seedDoGenerate()
 				})
-
 				$('#seed-btn-restore').click(function() {
 					$('#seed-entry').addClass('d-none')
 					$('#seed-restore').removeClass('d-none')
 				})
-
 				$('#seed-create-cancel1, #seed-create-cancel2, #seed-restore-cancel').click(function(e) {
 					e.preventDefault()
 					seedReset()
 				})
-
-				// ── Create Step 1: Generate ──
-
-				// Word length toggle buttons
 				$(document).on('click', '.seed-wlen-btn', function() {
 					$('.seed-wlen-btn').removeClass('active')
 					$(this).addClass('active')
 					_seedState.strength = parseInt($(this).data('len'), 10)
 					_seedDoGenerate()
 				})
-
 				function _seedDoGenerate() {
 					if (typeof bip39Bundle === 'undefined') { alert('bip39-bundle.min.js not loaded'); return }
 					_seedState.mnemonic = bip39Bundle.generateMnemonic(_seedState.strength)
 					seedRenderGrid(_seedState.mnemonic.split(' '), '#seed-word-grid')
 				}
-
 				$('#seed-btn-print').click(function() {
 					if (!_seedState.mnemonic) return
 					var words = _seedState.mnemonic.split(' ')
-
-					// Build numbered list rows (2 columns via CSS)
 					var liHtml = ''
 					words.forEach(function(word) { liHtml += '<li>' + escHtml(word) + '</li>' })
-
-					// Inject a hidden print-only div directly into the current page.
-					// This avoids popup windows entirely — no orphaned window on cancel/dismiss.
 					var $area = $(
 						'<div id="_seed_print_area_">' +
 						'<h2>' + escHtml(getText('seed-print-secret')) + '</h2>' +
@@ -2685,23 +2203,16 @@ function getAddressType() {
 						'</p>' +
 						'</div>'
 					).appendTo('body')
-
 					window.print()
-
-					// Remove immediately after print() returns — seed never lingers in DOM
 					$area.remove()
 				})
-
 				$('#seed-btn-copy').click(function() {
 					if (_seedState.mnemonic) copyToClipboard(_seedState.mnemonic, $(this))
 				})
-
-				// Next: build verify step
 				$('#seed-btn-to-verify').click(function() {
 					if (!_seedState.mnemonic) return
 					var words = _seedState.mnemonic.split(' ')
 					var len = words.length
-					// Pick 3 positions from different thirds
 					function rnd(lo, hi) {
 						var buf = new Uint32Array(1)
 						crypto.getRandomValues(buf)
@@ -2710,7 +2221,6 @@ function getAddressType() {
 					var third = Math.floor(len / 3)
 					var pos = [rnd(0, third - 1), rnd(third, third * 2 - 1), rnd(third * 2, len - 1)]
 					_seedState.verifyPositions = pos
-
 					var $fields = $('#seed-verify-fields').empty()
 					pos.forEach(function(p) {
 						$fields.append(
@@ -2725,14 +2235,10 @@ function getAddressType() {
 					$('#seed-create-step2').removeClass('d-none')
 					setTimeout(function() { $('.seed-verify-word').first().focus() }, 100)
 				})
-
-				// ── Create Step 2: Verify ──
-
 				$('#seed-verify-back').click(function() {
 					$('#seed-create-step2').addClass('d-none')
 					$('#seed-create-step1').removeClass('d-none')
 				})
-
 				$('#seed-verify-confirm').click(function() {
 					var words = _seedState.mnemonic.split(' ')
 					var ok = true
@@ -2746,37 +2252,29 @@ function getAddressType() {
 						return
 					}
 					$('#seed-verify-error').addClass('d-none')
-					// Derive key and open wallet — PIN dialog is inside openWallet
 					try {
 						var privBytes = bip39Bundle.mnemonicToPrivKey(_seedState.mnemonic, "m/84'/0'/0'/0/0")
 						var keys = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes))
-						privBytes.fill(0)  // wipe raw key bytes
+						privBytes.fill(0)
 						globalData.isBip39 = true
 						openWallet(keys, true, { mnemonic: _seedState.mnemonic })
 					} catch(err) {
 						alert('Key derivation error: ' + err.message)
 					}
 				})
-
-				// ── Restore flow ──
-
 				$('#restore-wordcount').change(function() {
 					var cnt = parseInt($(this).val(), 10)
 					var words = $('#restore-input').val().trim().split(/\s+/).filter(Boolean)
-					// If user wants 12 and has more, trim; if wants 24, don't truncate input
 					if (cnt === 12 && words.length > 12) {
 						$('#restore-input').val(words.slice(0, 12).join(' '))
 					}
 				})
-
 				$('#seed-restore-btn').click(async function() {
 					if (typeof bip39Bundle === 'undefined') { alert('bip39-bundle.min.js not loaded'); return }
 					$('#restore-word-error').addClass('d-none')
-
 					var raw = $('#restore-input').val().trim().toLowerCase().replace(/\s+/g, ' ')
 					var words = raw.split(' ')
 					var expectedLen = parseInt($('#restore-wordcount').val(), 10)
-
 					if (words.length !== expectedLen) {
 						$('#restore-word-error').text(getText('seed-count-mismatch').replace('{n}', expectedLen).replace('{m}', words.length)).removeClass('d-none')
 						return
@@ -2785,30 +2283,21 @@ function getAddressType() {
 						$('#restore-word-error').text(getText('seed-invalid-phrase')).removeClass('d-none')
 						return
 					}
-
 					var path = ($('#restore-path').val().trim() || "m/84'/0'/0'/0/0")
-					
 					try {
 						var privBytes = bip39Bundle.mnemonicToPrivKey(raw, path)
 						var keys = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes))
-						privBytes.fill(0)  // wipe raw key bytes
+						privBytes.fill(0)
 						globalData.isBip39 = true
 						await openWallet(keys, true, { mnemonic: raw })
-						// Wipe plaintext mnemonic from DOM inputs after wallet opens
 						$('#restore-input').val('')
 						raw = ''
 					} catch(err) {
 						$('#restore-word-error').text(getText('seed-deriv-error') + ' ' + err.message).removeClass('d-none')
 					}
 				})
-
-				// ── Wallet Keys tab: Show/hide seed ──
-				// _hideSeedReveal is defined in outer scope — accessible here too.
-
 				$('#btn-show-seed').click(async function() {
 					if (!localStorage.getItem(STORAGE_KEY)) return
-
-					// Re-enter PIN to decrypt — plaintext mnemonic never leaves this scope
 					var seedData = await new Promise(function(resolve) {
 						$('#pin-modal-title').text(getText('seed-pin-modal-title'))
 						$('#pin-modal-desc').text(getText('seed-pin-modal-desc'))
@@ -2822,15 +2311,13 @@ function getAddressType() {
 							loadCredentials(p).then(function(creds) {
 								if (!creds || creds.type !== 'bip39') {
 									$('#pin-error').removeClass('d-none')
-									creds = null  // wipe immediately on failure
+									creds = null
 									return
 								}
-								// Extract only what's needed, wipe full creds immediately
 								var result = { mnemonic: creds.mnemonic }
 								creds.mnemonic = ''
 								creds = null
 								modal.hide()
-								// Detach listener before resolve so closure is released
 								$('#pin-confirm').off('click', onConfirm)
 								resolve(result)
 							})
@@ -2848,41 +2335,31 @@ function getAddressType() {
 					})
 
 					if (!seedData) return
-
-					// Render grid then immediately wipe seedData strings
 					var words = seedData.mnemonic.split(' ')
-					seedData.mnemonic = ''   // wipe before rendering
+					seedData.mnemonic = ''
 					seedData = null
 
 					seedRenderGrid(words, '#wallet-seed-grid')
-					words.fill('')  // wipe word array
+					words.fill('')
 					words = null
 
 					$('#wallet-seed-hidden').addClass('d-none')
 					$('#wallet-seed-revealed').removeClass('d-none')
-
-					// Auto-hide after 60 seconds — also clears DOM words
 					setTimeout(_hideSeedReveal, 60000)
 				})
-
 				$('#btn-hide-seed').click(_hideSeedReveal)
-
 				$('#btn-copy-seed').click(function() {
 					var mnemonic = []
 					$('#wallet-seed-grid strong').each(function() { mnemonic.push($(this).text()) })
 					if (mnemonic.length) copyToClipboard(mnemonic.join(' '), $(this))
-					mnemonic.fill('')  // wipe reconstructed plaintext from memory
+					mnemonic.fill('')
 					mnemonic = null
 				})
-
-				// Hide seed when leaving keys tab
 				$('.tab-link').on('click', function() {
 					if ($(this).data('tab-family') === 'wallet-block' && $(this).data('tab-name') !== 'wallet-keys') {
 						_hideSeedReveal()
 					}
 				})
-
-				// ══════════════════════════════════════════════════════════════
 			})
 		</script>
 	</body>
