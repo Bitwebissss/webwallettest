@@ -107,7 +107,7 @@
 			.history-item:last-child { border-bottom: none !important; }
 			#history-list { max-height: 320px; overflow-y: auto; scrollbar-gutter: stable; padding-right: 2px; }
 			.pin-login-card .card-body { padding: 1.5rem; }
-			.pin-login-title { font-size: 15px; color: #495057; margin-bottom: 12px; text-align: center; }
+			.pin-login-title { font-size: 15px; color: var(--bs-secondary-color); margin-bottom: 12px; text-align: center; }
 		</style>
 		<title>Wallet</title>
 		<meta name="description" content="Bitweb Web Wallet">
@@ -285,11 +285,11 @@
 										</span>
 									</div>
 									<div class="float-md-end">
-										<a href="#" id="send-qr" class="text-dark pe-1">
+										<a href="#" id="send-qr" class="text-body pe-1">
 											<span tkey="scan-qr"></span>
 											<span class="fa-solid fa-camera"></span>
 										</a>
-										<a href="#" id="send-reset" class="text-dark">
+										<a href="#" id="send-reset" class="text-body">
 											<span tkey="reset"></span>
 											<span class="fa-solid fa-rotate"></span>
 										</a>
@@ -308,7 +308,7 @@
 
 								<div class="input-group">
 									<input id="send-fee" class="form-control" placeholder="Fee" type="text" value="">
-																			<button class="btn btn-outline-secondary b-width" type="submit" id="send-tx" tkey="send"></button>
+																			<button class="btn btn-primary b-width" type="submit" id="send-tx" tkey="send"></button>
 								</div>
 
 								<!-- Coin Control (collapsible) -->
@@ -1712,7 +1712,7 @@ function getAddressType() {
 					}
 					var typeLabel = isCbase
 						? '<span class="badge text-bg-secondary">' + escHtml(getText('coin-control-coinbase')) + '</span>'
-						: '<span class="badge text-bg-light">' + escHtml(getText('coin-control-regular')) + '</span>'
+						: '<span class="badge text-bg-secondary">' + escHtml(getText('coin-control-regular')) + '</span>'
 					var shortTx   = escHtml(u.txid.substr(0,6)) + '…' + escHtml(u.txid.substr(-4))
 					var amt       = amountFormat(u.value)
 
