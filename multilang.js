@@ -156,7 +156,7 @@ var walletLanguages = {
 		'seed-pin-modal-desc': 'Your seed phrase will be shown briefly.',
 		'seed-count-mismatch': 'Expected {n} words, got {m}.',
 		'seed-invalid-phrase': 'Invalid seed phrase. Check spelling and word order.',
-		'seed-deriv-error': 'Derivation error:'
+		'seed-deriv-error': 'Derivation error:',
 	
 		'legacy-warn-password': '⚠️ <strong>Not recommended.</strong> This method derives a key from a password hash and is kept for backward compatibility only. Please migrate your funds to a Seed Phrase wallet.',
 	
@@ -323,7 +323,7 @@ var walletLanguages = {
 		'seed-pin-modal-desc': 'Ваша seed-фраза буде показана на короткий час.',
 		'seed-count-mismatch': 'Очікується {n} слів, отримано {m}.',
 		'seed-invalid-phrase': 'Невірна seed-фраза. Перевірте орфографію та порядок слів.',
-		'seed-deriv-error': 'Помилка деривації:'
+		'seed-deriv-error': 'Помилка деривації:',
 	
 		'legacy-warn-password': '⚠️ <strong>Не рекомендовано.</strong> Цей метод виводить ключ із хешу пароля та підтримується лише для зворотної сумісності. Перенесіть кошти на гаманець з Seed Phrase.',
 	
@@ -490,7 +490,7 @@ var walletLanguages = {
 		'seed-pin-modal-desc': 'Seed phrase Anda akan ditampilkan sebentar.',
 		'seed-count-mismatch': 'Diharapkan {n} kata, didapat {m}.',
 		'seed-invalid-phrase': 'Seed phrase tidak valid. Periksa ejaan dan urutan kata.',
-		'seed-deriv-error': 'Kesalahan derivasi:'
+		'seed-deriv-error': 'Kesalahan derivasi:',
 	
 		'legacy-warn-password': '⚠️ <strong>Tidak disarankan.</strong> Metode ini menurunkan kunci dari hash kata sandi dan disimpan hanya untuk kompatibilitas mundur. Harap migrasikan dana Anda ke dompet Seed Phrase.',
 	
@@ -657,7 +657,7 @@ var walletLanguages = {
 		'seed-pin-modal-desc': 'シードフレーズが短時間表示されます。',
 		'seed-count-mismatch': '{n}単語が期待されましたが、{m}単語が入力されました。',
 		'seed-invalid-phrase': '無効なシードフレーズです。スペルと単語の順序を確認してください。',
-		'seed-deriv-error': '派生エラー：'
+		'seed-deriv-error': '派生エラー：',
 	
 		'legacy-warn-password': '⚠️ <strong>非推奨。</strong> この方式はパスワードハッシュから鍵を導出するもので、後方互換性のためにのみ保持されています。資金をシードフレーズウォレットに移行してください。',
 	
@@ -824,7 +824,7 @@ var walletLanguages = {
 		'seed-pin-modal-desc': '您的助记词将短暂显示。',
 		'seed-count-mismatch': '预期 {n} 个词，实际输入了 {m} 个。',
 		'seed-invalid-phrase': '助记词无效，请检查拼写和单词顺序。',
-		'seed-deriv-error': '派生错误：'
+		'seed-deriv-error': '派生错误：',
 	
 		'legacy-warn-password': '⚠️ <strong>不推荐。</strong> 此方法从密码哈希派生密钥，仅为向后兼容而保留。请将您的资金迁移到助记词钱包。',
 	
@@ -991,7 +991,7 @@ var walletLanguages = {
 		'seed-pin-modal-desc': 'Tu frase semilla se mostrará brevemente.',
 		'seed-count-mismatch': 'Se esperaban {n} palabras, se obtuvo {m}.',
 		'seed-invalid-phrase': 'Frase semilla no válida. Verifica la ortografía y el orden de las palabras.',
-		'seed-deriv-error': 'Error de derivación:'
+		'seed-deriv-error': 'Error de derivación:',
 	
 		'legacy-warn-password': '⚠️ <strong>No recomendado.</strong> Este método deriva una clave de un hash de contraseña y se mantiene solo por compatibilidad con versiones anteriores. Por favor, migre sus fondos a una cartera con Frase Semilla.',
 	
@@ -1158,7 +1158,7 @@ var walletLanguages = {
 		'seed-pin-modal-desc': 'Ваша seed-фраза будет показана на короткое время.',
 		'seed-count-mismatch': 'Ожидается {n} слов, получено {m}.',
 		'seed-invalid-phrase': 'Неверная seed-фраза. Проверьте орфографию и порядок слов.',
-		'seed-deriv-error': 'Ошибка деривации:'
+		'seed-deriv-error': 'Ошибка деривации:',
 	
 		'legacy-warn-password': '⚠️ <strong>Не рекомендуется.</strong> Этот метод получает ключ из хэша пароля и сохранён только для обратной совместимости. Пожалуйста, перенесите средства на кошелёк с Seed Phrase.',
 	
@@ -1325,7 +1325,7 @@ var walletLanguages = {
 		'seed-pin-modal-desc': '시드 문구가 잠시 표시됩니다.',
 		'seed-count-mismatch': '{n}개의 단어가 필요하지만 {m}개가 입력되었습니다.',
 		'seed-invalid-phrase': '유효하지 않은 시드 문구입니다. 철자와 단어 순서를 확인하세요.',
-		'seed-deriv-error': '파생 오류:'
+		'seed-deriv-error': '파생 오류:',
 	
 		'legacy-warn-password': '⚠️ <strong>권장하지 않습니다.</strong> 이 방법은 비밀번호 해시에서 키를 파생하며 하위 호환성만을 위해 유지됩니다. 시드 구문 지갑으로 자금을 이전하세요.',
 	
@@ -1492,7 +1492,7 @@ var walletLanguages = {
 		'seed-pin-modal-desc': 'Ihre Seed-Phrase wird kurz angezeigt.',
 		'seed-count-mismatch': '{n} Wörter erwartet, {m} erhalten.',
 		'seed-invalid-phrase': 'Ungültige Seed-Phrase. Überprüfen Sie Schreibweise und Wortreihenfolge.',
-		'seed-deriv-error': 'Ableitungsfehler:'
+		'seed-deriv-error': 'Ableitungsfehler:',
 	
 		'legacy-warn-password': '⚠️ <strong>Nicht empfohlen.</strong> Diese Methode leitet einen Schlüssel aus einem Passwort-Hash ab und wird nur aus Gründen der Abwärtskompatibilität beibehalten. Bitte migrieren Sie Ihre Mittel zu einem Seed-Phrase-Wallet.',
 	
