@@ -129,8 +129,8 @@ var walletLanguages = {
 		'seed-btn-restore': '🔑 Restore from Seed Phrase',
 		'seed-step1-label': 'Step 1 of 2 — Your Seed Phrase',
 		'seed-write-warning': '⚠️ Write these words down in order and store them safely. Anyone with these words controls your funds.',
-		'seed-print': '🖨 Print',
-		'seed-copy': '📋 Copy',
+		'seed-print': 'Print',
+		'seed-copy': 'Copy',
 		'seed-next': 'Next →',
 		'seed-step2-label': 'Step 2 of 2 — Verify Seed Phrase',
 		'seed-verify-desc': 'Enter the words at these positions to confirm you saved them correctly:',
@@ -157,6 +157,14 @@ var walletLanguages = {
 		'seed-count-mismatch': 'Expected {n} words, got {m}.',
 		'seed-invalid-phrase': 'Invalid seed phrase. Check spelling and word order.',
 		'seed-deriv-error': 'Derivation error:'
+	
+		'legacy-warn-password': '⚠️ <strong>Not recommended.</strong> This method derives a key from a password hash and is kept for backward compatibility only. Please migrate your funds to a Seed Phrase wallet.',
+	
+		'legacy-warn-key': '⚠️ <strong>Not recommended.</strong> Raw private key import is provided for compatibility only. Use a Seed Phrase wallet for better security and recoverability.',
+	
+		'seed-print-secret': 'Your Seed Phrase — Keep Secret!',
+	
+		'seed-path-label': 'Path:',
 	},
 	'uk': {
 		'lang-alias': 'Українська',
@@ -288,8 +296,8 @@ var walletLanguages = {
 		'seed-btn-restore': '🔑 Відновити з seed-фрази',
 		'seed-step1-label': 'Крок 1 з 2 — Ваша seed-фраза',
 		'seed-write-warning': '⚠️ Запишіть ці слова по порядку і зберігайте у безпеці. Будь-хто, хто знає ці слова, має доступ до ваших коштів.',
-		'seed-print': '🖨 Друк',
-		'seed-copy': '📋 Копіювати',
+		'seed-print': 'Друк',
+		'seed-copy': 'Копіювати',
 		'seed-next': 'Далі →',
 		'seed-step2-label': 'Крок 2 з 2 — Перевірка seed-фрази',
 		'seed-verify-desc': 'Введіть слова на зазначених позиціях, щоб підтвердити, що ви їх записали:',
@@ -316,6 +324,14 @@ var walletLanguages = {
 		'seed-count-mismatch': 'Очікується {n} слів, отримано {m}.',
 		'seed-invalid-phrase': 'Невірна seed-фраза. Перевірте орфографію та порядок слів.',
 		'seed-deriv-error': 'Помилка деривації:'
+	
+		'legacy-warn-password': '⚠️ <strong>Не рекомендовано.</strong> Цей метод виводить ключ із хешу пароля та підтримується лише для зворотної сумісності. Перенесіть кошти на гаманець з Seed Phrase.',
+	
+		'legacy-warn-key': '⚠️ <strong>Не рекомендовано.</strong> Імпорт необробленого приватного ключа надається лише для сумісності. Використовуйте гаманець Seed Phrase для кращої безпеки та відновлення.',
+	
+		'seed-print-secret': 'Ваша Seed Phrase — Тримайте в таємниці!',
+	
+		'seed-path-label': 'Шлях:',
 	},
 	'id': {
 		'lang-alias': 'Indonesian',
@@ -447,8 +463,8 @@ var walletLanguages = {
 		'seed-btn-restore': '🔑 Pulihkan dari Seed Phrase',
 		'seed-step1-label': 'Langkah 1 dari 2 — Seed Phrase Anda',
 		'seed-write-warning': '⚠️ Catat kata-kata ini secara berurutan dan simpan dengan aman. Siapa pun yang memiliki kata-kata ini mengontrol dana Anda.',
-		'seed-print': '🖨 Cetak',
-		'seed-copy': '📋 Salin',
+		'seed-print': 'Cetak',
+		'seed-copy': 'Salin',
 		'seed-next': 'Selanjutnya →',
 		'seed-step2-label': 'Langkah 2 dari 2 — Verifikasi Seed Phrase',
 		'seed-verify-desc': 'Masukkan kata-kata pada posisi ini untuk mengonfirmasi bahwa Anda telah menyimpannya:',
@@ -475,6 +491,14 @@ var walletLanguages = {
 		'seed-count-mismatch': 'Diharapkan {n} kata, didapat {m}.',
 		'seed-invalid-phrase': 'Seed phrase tidak valid. Periksa ejaan dan urutan kata.',
 		'seed-deriv-error': 'Kesalahan derivasi:'
+	
+		'legacy-warn-password': '⚠️ <strong>Tidak disarankan.</strong> Metode ini menurunkan kunci dari hash kata sandi dan disimpan hanya untuk kompatibilitas mundur. Harap migrasikan dana Anda ke dompet Seed Phrase.',
+	
+		'legacy-warn-key': '⚠️ <strong>Tidak disarankan.</strong> Impor kunci privat mentah disediakan hanya untuk kompatibilitas. Gunakan dompet Seed Phrase untuk keamanan dan pemulihan yang lebih baik.',
+	
+		'seed-print-secret': 'Frasa Benih Anda — Jaga Kerahasiaannya!',
+	
+		'seed-path-label': 'Jalur:',
 	},
 	'ja': {
 		'lang-alias': '日本語',
@@ -606,8 +630,8 @@ var walletLanguages = {
 		'seed-btn-restore': '🔑 シードフレーズから復元',
 		'seed-step1-label': 'ステップ 1/2 — シードフレーズ',
 		'seed-write-warning': '⚠️ これらの単語を順番に書き留め、安全に保管してください。これらの単語を知っている人は誰でもあなたの資金にアクセスできます。',
-		'seed-print': '🖨 印刷',
-		'seed-copy': '📋 コピー',
+		'seed-print': '印刷',
+		'seed-copy': 'コピー',
 		'seed-next': '次へ →',
 		'seed-step2-label': 'ステップ 2/2 — シードフレーズを確認',
 		'seed-verify-desc': 'これらの位置の単語を入力して、正しく保存されたことを確認してください：',
@@ -634,6 +658,14 @@ var walletLanguages = {
 		'seed-count-mismatch': '{n}単語が期待されましたが、{m}単語が入力されました。',
 		'seed-invalid-phrase': '無効なシードフレーズです。スペルと単語の順序を確認してください。',
 		'seed-deriv-error': '派生エラー：'
+	
+		'legacy-warn-password': '⚠️ <strong>非推奨。</strong> この方式はパスワードハッシュから鍵を導出するもので、後方互換性のためにのみ保持されています。資金をシードフレーズウォレットに移行してください。',
+	
+		'legacy-warn-key': '⚠️ <strong>非推奨。</strong> 生の秘密鍵のインポートは互換性のためにのみ提供されています。より高いセキュリティと回復性のためにシードフレーズウォレットをご利用ください。',
+	
+		'seed-print-secret': 'シードフレーズ — 秘密にしてください！',
+	
+		'seed-path-label': 'パス:',
 	},
 	'zh': {
 		'lang-alias': '简体中文',
@@ -765,8 +797,8 @@ var walletLanguages = {
 		'seed-btn-restore': '🔑 从助记词恢复',
 		'seed-step1-label': '第 1 步 / 共 2 步 — 您的助记词',
 		'seed-write-warning': '⚠️ 请按顺序写下这些单词并妥善保存。任何拥有这些单词的人都可以控制您的资金。',
-		'seed-print': '🖨 打印',
-		'seed-copy': '📋 复制',
+		'seed-print': '打印',
+		'seed-copy': '复制',
 		'seed-next': '下一步 →',
 		'seed-step2-label': '第 2 步 / 共 2 步 — 验证助记词',
 		'seed-verify-desc': '输入这些位置的单词以确认您已正确保存：',
@@ -793,6 +825,14 @@ var walletLanguages = {
 		'seed-count-mismatch': '预期 {n} 个词，实际输入了 {m} 个。',
 		'seed-invalid-phrase': '助记词无效，请检查拼写和单词顺序。',
 		'seed-deriv-error': '派生错误：'
+	
+		'legacy-warn-password': '⚠️ <strong>不推荐。</strong> 此方法从密码哈希派生密钥，仅为向后兼容而保留。请将您的资金迁移到助记词钱包。',
+	
+		'legacy-warn-key': '⚠️ <strong>不推荐。</strong> 提供原始私钥导入仅为了兼容性。请使用助记词钱包以获得更好的安全性和可恢复性。',
+	
+		'seed-print-secret': '您的助记词 — 请保密！',
+	
+		'seed-path-label': '路径：',
 	},
 	'es': {
 		'lang-alias': 'Español',
@@ -924,8 +964,8 @@ var walletLanguages = {
 		'seed-btn-restore': '🔑 Restaurar desde frase semilla',
 		'seed-step1-label': 'Paso 1 de 2 — Tu frase semilla',
 		'seed-write-warning': '⚠️ Escribe estas palabras en orden y guárdalas de forma segura. Cualquiera con estas palabras controla tus fondos.',
-		'seed-print': '🖨 Imprimir',
-		'seed-copy': '📋 Copiar',
+		'seed-print': 'Imprimir',
+		'seed-copy': 'Copiar',
 		'seed-next': 'Siguiente →',
 		'seed-step2-label': 'Paso 2 de 2 — Verificar frase semilla',
 		'seed-verify-desc': 'Ingresa las palabras en estas posiciones para confirmar que las guardaste correctamente:',
@@ -952,6 +992,14 @@ var walletLanguages = {
 		'seed-count-mismatch': 'Se esperaban {n} palabras, se obtuvo {m}.',
 		'seed-invalid-phrase': 'Frase semilla no válida. Verifica la ortografía y el orden de las palabras.',
 		'seed-deriv-error': 'Error de derivación:'
+	
+		'legacy-warn-password': '⚠️ <strong>No recomendado.</strong> Este método deriva una clave de un hash de contraseña y se mantiene solo por compatibilidad con versiones anteriores. Por favor, migre sus fondos a una cartera con Frase Semilla.',
+	
+		'legacy-warn-key': '⚠️ <strong>No recomendado.</strong> La importación de clave privada sin procesar se proporciona solo por compatibilidad. Use una cartera de Frase Semilla para mayor seguridad y recuperabilidad.',
+	
+		'seed-print-secret': 'Su Frase Semilla — ¡Manténgala en Secreto!',
+	
+		'seed-path-label': 'Ruta:',
 	},
 	'ru': {
 		'lang-alias': 'Русский',
@@ -1083,8 +1131,8 @@ var walletLanguages = {
 		'seed-btn-restore': '🔑 Восстановить из seed-фразы',
 		'seed-step1-label': 'Шаг 1 из 2 — Ваша seed-фраза',
 		'seed-write-warning': '⚠️ Запишите эти слова по порядку и храните в надёжном месте. Любой, кто знает эти слова, имеет доступ к вашим средствам.',
-		'seed-print': '🖨 Печать',
-		'seed-copy': '📋 Копировать',
+		'seed-print': 'Печать',
+		'seed-copy': 'Копировать',
 		'seed-next': 'Далее →',
 		'seed-step2-label': 'Шаг 2 из 2 — Проверка seed-фразы',
 		'seed-verify-desc': 'Введите слова на указанных позициях, чтобы подтвердить, что вы их записали:',
@@ -1111,6 +1159,14 @@ var walletLanguages = {
 		'seed-count-mismatch': 'Ожидается {n} слов, получено {m}.',
 		'seed-invalid-phrase': 'Неверная seed-фраза. Проверьте орфографию и порядок слов.',
 		'seed-deriv-error': 'Ошибка деривации:'
+	
+		'legacy-warn-password': '⚠️ <strong>Не рекомендуется.</strong> Этот метод получает ключ из хэша пароля и сохранён только для обратной совместимости. Пожалуйста, перенесите средства на кошелёк с Seed Phrase.',
+	
+		'legacy-warn-key': '⚠️ <strong>Не рекомендуется.</strong> Импорт необработанного закрытого ключа предоставляется только для совместимости. Используйте кошелёк с Seed Phrase для лучшей безопасности и возможности восстановления.',
+	
+		'seed-print-secret': 'Ваша Seed Phrase — Храните в тайне!',
+	
+		'seed-path-label': 'Путь:',
 	},
 	'kr': {
 		'lang-alias': '한국어',
@@ -1242,8 +1298,8 @@ var walletLanguages = {
 		'seed-btn-restore': '🔑 시드 문구로 복원',
 		'seed-step1-label': '1단계 / 2단계 — 시드 문구',
 		'seed-write-warning': '⚠️ 이 단어들을 순서대로 적어 안전한 곳에 보관하세요. 이 단어를 가진 누구든 자금을 통제할 수 있습니다.',
-		'seed-print': '🖨 인쇄',
-		'seed-copy': '📋 복사',
+		'seed-print': '인쇄',
+		'seed-copy': '복사',
 		'seed-next': '다음 →',
 		'seed-step2-label': '2단계 / 2단계 — 시드 문구 확인',
 		'seed-verify-desc': '올바르게 저장했는지 확인하기 위해 해당 위치의 단어를 입력하세요:',
@@ -1270,6 +1326,14 @@ var walletLanguages = {
 		'seed-count-mismatch': '{n}개의 단어가 필요하지만 {m}개가 입력되었습니다.',
 		'seed-invalid-phrase': '유효하지 않은 시드 문구입니다. 철자와 단어 순서를 확인하세요.',
 		'seed-deriv-error': '파생 오류:'
+	
+		'legacy-warn-password': '⚠️ <strong>권장하지 않습니다.</strong> 이 방법은 비밀번호 해시에서 키를 파생하며 하위 호환성만을 위해 유지됩니다. 시드 구문 지갑으로 자금을 이전하세요.',
+	
+		'legacy-warn-key': '⚠️ <strong>권장하지 않습니다.</strong> 원시 개인 키 가져오기는 호환성만을 위해 제공됩니다. 더 나은 보안과 복구 가능성을 위해 시드 구문 지갑을 사용하세요.',
+	
+		'seed-print-secret': '당신의 시드 구문 — 비밀로 유지하세요!',
+	
+		'seed-path-label': '경로:',
 	},
 	'de': {
 		'lang-alias': 'Deutsch',
@@ -1401,8 +1465,8 @@ var walletLanguages = {
 		'seed-btn-restore': '🔑 Aus Seed-Phrase wiederherstellen',
 		'seed-step1-label': 'Schritt 1 von 2 — Ihre Seed-Phrase',
 		'seed-write-warning': '⚠️ Schreiben Sie diese Wörter in der richtigen Reihenfolge auf und bewahren Sie sie sicher auf. Jeder mit diesen Wörtern hat Kontrolle über Ihre Mittel.',
-		'seed-print': '🖨 Drucken',
-		'seed-copy': '📋 Kopieren',
+		'seed-print': 'Drucken',
+		'seed-copy': 'Kopieren',
 		'seed-next': 'Weiter →',
 		'seed-step2-label': 'Schritt 2 von 2 — Seed-Phrase verifizieren',
 		'seed-verify-desc': 'Geben Sie die Wörter an diesen Positionen ein, um zu bestätigen, dass Sie sie gespeichert haben:',
@@ -1429,5 +1493,13 @@ var walletLanguages = {
 		'seed-count-mismatch': '{n} Wörter erwartet, {m} erhalten.',
 		'seed-invalid-phrase': 'Ungültige Seed-Phrase. Überprüfen Sie Schreibweise und Wortreihenfolge.',
 		'seed-deriv-error': 'Ableitungsfehler:'
+	
+		'legacy-warn-password': '⚠️ <strong>Nicht empfohlen.</strong> Diese Methode leitet einen Schlüssel aus einem Passwort-Hash ab und wird nur aus Gründen der Abwärtskompatibilität beibehalten. Bitte migrieren Sie Ihre Mittel zu einem Seed-Phrase-Wallet.',
+	
+		'legacy-warn-key': '⚠️ <strong>Nicht empfohlen.</strong> Der Import eines rohen privaten Schlüssels wird nur aus Kompatibilitätsgründen bereitgestellt. Verwenden Sie ein Seed-Phrase-Wallet für bessere Sicherheit und Wiederherstellbarkeit.',
+	
+		'seed-print-secret': 'Ihre Seed Phrase — Geheim halten!',
+	
+		'seed-path-label': 'Pfad:',
 	}
 }
