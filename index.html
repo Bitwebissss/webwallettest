@@ -3,31 +3,43 @@
 	<head>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<!-- Font Awesome 7.0.1 -->
-		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
-		      crossorigin="anonymous">
-		<!-- Bootstrap 5.3.8 -->
-		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/css/bootstrap.min.css"
-		      crossorigin="anonymous">
+		<!-- https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css -->
+		<link rel="stylesheet" href="css/all.min.css"
+			integrity="sha384-rWj9FmWWt3OMqd9vBkWRhFavvVUYalYqGPoMdL1brs/qvvqz88gvLShYa4hKNyqb"
+			crossorigin="anonymous">
 
+		<!-- https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/css/bootstrap.min.css -->
+		<link rel="stylesheet" href="css/bootstrap.min.css"
+				integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
+				crossorigin="anonymous">
 		<link rel="icon" type="image/png" href="images/logo.png">
 		<link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600&display=swap" rel="stylesheet">
 
-		<!-- jQuery 3.7.1 -->
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"
-		        crossorigin="anonymous"></script>
+		<!-- https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js -->
+		<script src="js/jquery.min.js"
+				integrity="sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs"
+				crossorigin="anonymous"></script>
+
 		<!-- js-sha256 0.11.1 -->
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sha256/0.11.1/sha256.min.js"
-		        crossorigin="anonymous"></script>
-		<!-- Bootstrap 5.3.8 bundle (includes Popper.js — standalone Popper removed) -->
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/js/bootstrap.bundle.min.js"
-		        crossorigin="anonymous"></script>
+		<script src="js/sha256.min.js"
+				integrity="sha384-2hE+62EhDTI8GB1l6/KBZldM8qsy8CUJ/e5YlZaSbD6Bi4z0YhdrH2LCjDqYXAkg"
+				crossorigin="anonymous"></script>
+
+		<!-- https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js -->
+		<script src="js/bootstrap.bundle.min.js"
+				integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
+				crossorigin="anonymous"></script>
+
 		<!-- qrcode 1.5.4 (soldair) — direct canvas render, no img conversion, cross-platform -->
-		<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"
-		        crossorigin="anonymous"></script>
+		<script src="js/qrcode-browser.min.js"
+                integrity="sha512-Fylkwjj7d5d/OCmgh3/usBPvSY5+Q/cYSl1myDVYCw1alMz4Sam6/IWwuXh8D3auWeq2L6vD8hT/p/CI8ppYPg==" 
+				crossorigin="anonymous"></script>
+
 		<!-- jsQR 1.4.0 — QR scanner (read), no newer version upstream, ISO standard stable -->
-		<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"
-		        crossorigin="anonymous"></script>
+		<script src="js/jsQR.min.js"
+                integrity="sha384-9Q0jWoineiIq95JeIyBsNV90KKLfDsbkj29k/YFxf76a2JwkHDYkMuSbNGN6XJfV" 
+				crossorigin="anonymous"></script>
+
 		<!-- jQuery shim: $(el).qrcode(text) → QRCode.toCanvas(canvas, text) direct render -->
 		<script>
 			$.fn.qrcode = function(opts) {
@@ -43,7 +55,9 @@
 			};
 		</script>
 		<script src="multilang.js"></script>
-		<script src="js/bitcoin-bundle-v7.min.js"></script>
+		<script src="js/bitcoin-bundle-v7.min.js"
+                integrity="sha512-mUri5zVIyWAlxMgapxp3iWXDVt4zLH0Lq2hnKtE0NsD132msKfOxM3ktH7qV5rTwocurwpvTfuaseKiXSDIctA==" 
+				crossorigin="anonymous"></script>
 
 		<style>
 			html { height: 100%; }
