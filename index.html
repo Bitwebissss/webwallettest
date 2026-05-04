@@ -12,7 +12,7 @@
 		<link rel="stylesheet" href="css/bootstrap.min.css"
 				integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
 				crossorigin="anonymous">
-		<link rel="icon" type="image/png" href="images/logo.png">
+		<link rel="icon" type="image/svg+xml" href="images/logo.svg">
 
 		<!-- https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js -->
 		<script src="js/jquery.min.js"
@@ -127,7 +127,10 @@
 		<!-- Navbar -->
 		<nav class="navbar fixed-top navbar-expand-lg navbar-dark bg-dark">
 			<div class="container">
-				<a href="#" class="navbar-brand"></a>
+				<a href="#" class="navbar-brand d-flex align-items-center">
+						<img id="logo" src="images/logo.svg" alt="Bitweb">
+						Bitweb
+					</a>
 				<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
 					<span class="navbar-toggler-icon"></span>
 				</button>
@@ -142,11 +145,7 @@
 						<li class="nav-item">
 							<a href="#/settings" class="nav-link router-link me-md-2" data-route="settings" tkey="settings"></a>
 						</li>
-						<li class="nav-item dropdown" id="network-list">
-							<a class="nav-item nav-link dropdown-toggle" href="#" id="network-versions" data-bs-toggle="dropdown">NETWORK</a>
-							<div class="dropdown-menu dropdown-menu-end" aria-labelledby="network-versions"></div>
-						</li>
-						<li class="nav-item dropdown ms-2">
+<li class="nav-item dropdown ms-2">
 							<a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" id="theme-label">🔄 AUTO</a>
 							<ul class="dropdown-menu dropdown-menu-end">
 								<li><a class="dropdown-item" href="#" onclick="setTheme('light');return false;" tkey="theme-light"></a></li>
@@ -970,25 +969,12 @@
 				if (networkConfigs[network] != undefined && networkConfigs[network] != getConfig()) {
 					try { localStorage.setItem('bte_cfg_network', network) } catch(e) {}
 					closeWallet()
-					displayNetworks()
 					switchBackend(networkConfigs[network]['api'])
 				}
 				switchPage(page)
 			}
 
-			function displayNetworks() {
-				var network = getConfig()
-				$('#network-versions').text(network['name'])
-				$('#network-list .dropdown-menu').empty()
-				for (var key in networkConfigs) {
-					$('#network-list .dropdown-menu').append(
-						'<a class="dropdown-item ' + (networkConfigs[key]['name'] == network['name'] ? 'active' : '') +
-						'" href="#/network/' + key + '">' + networkConfigs[key]['name'] + '</a>'
-					)
-				}
-			}
-
-			function getAddressType() {
+function getAddressType() {
 				var type; try { type = localStorage.getItem('bte_cfg_type') } catch(e) {}
 				if (type == null || !['bech32', 'segwit', 'legacy'].includes(type)) {
 					type = 'bech32'
@@ -2064,7 +2050,6 @@
 				$('#wallet-version').text(walletVersion)
 				$('#wallet-backend input').val(getBackend())
 				$('#address-type-select select').val(getAddressType())
-				displayNetworks()
 				routePage()
 				updateSavedWalletUI()
 
