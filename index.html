@@ -2,36 +2,43 @@
 <html>
 	<head>
 		<meta charset="utf-8">
-		<meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
-		<meta http-equiv="X-UA-Compatible" content="IE=edge">
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<!-- SRI hashes verified by get_sri.sh — cdnjs/jsdelivr versioned URLs are immutable -->
-		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
-		      integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous">
-		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/css/bootstrap.min.css"
-		      integrity="sha512-tDXPcamuZsWWd6OsKFyH6nAqh/MjZ/5Yk88T5o+aMfygqNFPan1pLyPFAndRzmOWHKT+jSDzWpJv8krj6x1LMA==" crossorigin="anonymous">
-		<link rel="stylesheet" href="css/wizardry.min.css">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<!-- Font Awesome 7.0.1 -->
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
+		      crossorigin="anonymous">
+		<!-- Bootstrap 5.3.8 -->
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/css/bootstrap.min.css"
+		      crossorigin="anonymous">
 
 		<link rel="icon" type="image/png" href="images/logo.png">
-		<!-- Google Fonts: SRI impossible — server returns different CSS per browser/OS.
-		     To fully lock down: self-host the font file. -->
-		<link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro&display=swap" rel="stylesheet">
+		<link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600&display=swap" rel="stylesheet">
 
+		<!-- jQuery 3.7.1 -->
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"
-		        integrity="sha512-v2CJ7UaYy4JwqLDIrZUI/4hqeoQieOmAZNXBeQyjo21dadnwR+8ZaIJVT8EE2iyI61OV8e6M8PP2/4hpQINQ/g==" crossorigin="anonymous"></script>
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sha256/0.9.0/sha256.min.js"
-		        integrity="sha512-szJ5FSo9hEmXXe7b5AUVtn/WnL8a5VofnFeYC2i2z03uS2LhAch7ewNLbl5flsEmTTimMN0enBZg/3sQ+YOSzQ==" crossorigin="anonymous"></script>
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.1/umd/popper.min.js"
-		        integrity="sha512-ubuT8Z88WxezgSqf3RLuNi5lmjstiJcyezx34yIU2gAHonIi27Na7atqzUZCOoY4CExaoFumzOsFQ2Ch+I/HCw==" crossorigin="anonymous"></script>
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.6.2/js/bootstrap.min.js"
-		        integrity="sha512-7rusk8kGPFynZWu26OKbTeI+QPoYchtxsmPeBqkHIEXJxeun4yJ4ISYe7C6sz9wdxeE1Gk3VxsIWgCZTc+vX3g==" crossorigin="anonymous"></script>
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.qrcode/1.0/jquery.qrcode.min.js"
-		        integrity="sha512-NFUcDlm4V+a2sjPX7gREIXgCSFja9cHtKPOL1zj6QhnE0vcY695MODehqkaGYTLyL2wxe/wtr4Z49SvqXq12UQ==" crossorigin="anonymous"></script>
+		        crossorigin="anonymous"></script>
+		<!-- js-sha256 0.11.1 -->
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sha256/0.11.1/sha256.min.js"
+		        crossorigin="anonymous"></script>
+		<!-- Bootstrap 5.3.8 bundle (includes Popper.js — standalone Popper removed) -->
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/js/bootstrap.bundle.min.js"
+		        crossorigin="anonymous"></script>
+		<!-- qrcodejs 1.0.0 replaces abandoned jquery.qrcode (no security fixes since 2012) -->
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
+		        crossorigin="anonymous"></script>
+		<!-- jsQR 1.4.0 — no newer version exists upstream, kept as-is -->
 		<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"
-		        integrity="sha512-oGXgZXbDc7hvUdHPZCP6d3SAk4cQnjp+jmnqUjgDw87vHMCFESVifMfBm+Gg4Mev6XPZ8nKwI4Rzm0gLZPCUIw==" crossorigin="anonymous"></script>
+		        crossorigin="anonymous"></script>
+		<!-- jQuery shim: $(el).qrcode(opts) → QRCode(el, opts) for qrcodejs compatibility -->
+		<script>
+			$.fn.qrcode = function(opts) {
+				return this.each(function() {
+					var o = (typeof opts === 'string') ? {text: opts} : opts;
+					new QRCode(this, o);
+				});
+			};
+		</script>
 		<script src="multilang.js"></script>
-		<script src="js/bitcoin-bundle-v7.min.js"
-		        integrity="sha512-mUri5zVIyWAlxMgapxp3iWXDVt4zLH0Lq2hnKtE0NsD132msKfOxM3ktH7qV5rTwocurwpvTfuaseKiXSDIctA==" crossorigin="anonymous"></script>
+		<script src="js/bitcoin-bundle-v7.min.js"></script>
 
 		<style>
 			html { height: 100%; }
@@ -59,7 +66,7 @@
 			}
 			.qr-code canvas { max-width: 100%; }
 			.wallet-balance { font-size: 23px; }
-			.wallet-balance .text-monospace { font-size: 20px; }
+			.wallet-balance .font-monospace { font-size: 20px; }
 			@media (max-width: 991.98px) {
 				.navbar-expand-lg>.container, .navbar-expand-lg>.container-fluid {
 					padding-right: 15px;
@@ -84,23 +91,23 @@
 		<nav class="navbar fixed-top navbar-expand-lg navbar-dark bg-dark">
 			<div class="container">
 				<a href="#" class="navbar-brand"></a>
-				<button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse" data-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+				<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
 					<span class="navbar-toggler-icon"></span>
 				</button>
 				<div class="collapse navbar-collapse" id="navbarResponsive">
-					<ul class="navbar-nav ml-auto">
+					<ul class="navbar-nav ms-auto">
 						<li class="nav-item">
-							<a href="#" class="nav-link router-link mr-md-2" data-route="homepage" tkey="home"></a>
+							<a href="#" class="nav-link router-link me-md-2" data-route="homepage" tkey="home"></a>
 						</li>
 						<li class="nav-item">
-							<a href="#/broadcast" class="nav-link router-link mr-md-2" data-route="broadcast" tkey="broadcast"></a>
+							<a href="#/broadcast" class="nav-link router-link me-md-2" data-route="broadcast" tkey="broadcast"></a>
 						</li>
 						<li class="nav-item">
-							<a href="#/settings" class="nav-link router-link mr-md-2" data-route="settings" tkey="settings"></a>
+							<a href="#/settings" class="nav-link router-link me-md-2" data-route="settings" tkey="settings"></a>
 						</li>
 						<li class="nav-item dropdown" id="network-list">
-							<a class="nav-item nav-link dropdown-toggle" href="#" id="network-versions" data-toggle="dropdown">NETWORK</a>
-							<div class="dropdown-menu dropdown-menu-right" aria-labelledby="network-versions"></div>
+							<a class="nav-item nav-link dropdown-toggle" href="#" id="network-versions" data-bs-toggle="dropdown">NETWORK</a>
+							<div class="dropdown-menu dropdown-menu-end" aria-labelledby="network-versions"></div>
 						</li>
 					</ul>
 				</div>
@@ -120,12 +127,10 @@
 				<div id="pin-login-block" class="d-none">
 					<div class="card mb-3 pin-login-card">
 						<div class="card-body">
-							<p class="pin-login-title"><span class="fa fa-lock"></span> <span tkey="pin-login-title">Saved wallet found</span></p>
+							<p class="pin-login-title"><span class="fa-solid fa-lock"></span> <span tkey="pin-login-title">Saved wallet found</span></p>
 							<div class="input-group mb-2">
 								<input id="pin-login-input" type="password" class="form-control" tkey="pin-login-placeholder" placeholder="Enter PIN to open" maxlength="16" autocomplete="current-password">
-								<div class="input-group-append">
-									<button id="pin-login-btn" class="btn btn-primary b-width" tkey="pin-login-btn">Open</button>
-								</div>
+																	<button id="pin-login-btn" class="btn btn-primary b-width" tkey="pin-login-btn">Open</button>
 							</div>
 							<div id="pin-login-error" class="text-danger small mb-2 d-none" tkey="pin-login-error">Wrong PIN, try again.</div>
 							<div class="text-center">
@@ -141,7 +146,7 @@
 					<div class="card mb-3">
 						<div class="card-header">
 							<ul class="nav nav-tabs card-header-tabs">
-								<li class="nav-item mr-2">
+								<li class="nav-item me-2">
 									<a class="nav-link tab-link active" data-tab-name="open-regular" data-tab-family="open-block" href="#" tkey="open-regular"></a>
 								</li>
 								<li class="nav-item">
@@ -157,17 +162,13 @@
 								<div class="input-group">
 									<input id="open-password" name="open-password" class="form-control" type="password" tkey="password">
 									<input id="open-password-confirm" name="open-password-confirm" class="form-control" type="password" tkey="password-confirm">
-									<div class="input-group-append">
-										<button class="btn btn-outline-dark b-width" type="submit" id="open-regular-wallet" tkey="open"></button>
-									</div>
+																			<button class="btn btn-outline-dark b-width" type="submit" id="open-regular-wallet" tkey="open"></button>
 								</div>
 							</form>
 							<form id="open-key-form" class="open-form tab-item d-none" data-tab="open-key">
 								<div class="input-group">
 									<input id="passphrase" name="passphrase" class="form-control" type="password" tkey="wif-key">
-									<div class="input-group-append">
-										<button class="btn btn-outline-dark b-width" type="submit" id="open-key-wallet" tkey="open"></button>
-									</div>
+																			<button class="btn btn-outline-dark b-width" type="submit" id="open-key-wallet" tkey="open"></button>
 								</div>
 							</form>
 						</div>
@@ -185,13 +186,13 @@
 					<div class="card mb-3">
 						<div class="card-header">
 							<ul class="nav nav-tabs card-header-tabs">
-								<li class="nav-item mr-2">
+								<li class="nav-item me-2">
 									<a class="nav-link tab-link active" data-tab-name="wallet-balance" data-tab-family="wallet-block" href="#" tkey="wallet"></a>
 								</li>
-								<li class="nav-item mr-2">
+								<li class="nav-item me-2">
 									<a class="nav-link tab-link" data-tab-name="wallet-send" data-tab-family="wallet-block" href="#" tkey="send"></a>
 								</li>
-								<li class="nav-item mr-2">
+								<li class="nav-item me-2">
 									<a id="history-tab-link" class="nav-link tab-link" data-tab-name="wallet-history" data-tab-family="wallet-block" href="#" tkey="history"></a>
 								</li>
 								<li class="nav-item">
@@ -206,18 +207,18 @@
 									<div class="d-inline-flex align-items-center justify-content-center" style="gap:5px;max-width:100%">
 										<div id="wallet-address" class="break-word" style="font-size:13px;word-break:break-all"></div>
 										<button id="copy-address-btn" class="btn btn-sm btn-outline-secondary flex-shrink-0" data-tkey-title="copy-address" title="Copy address" style="padding:1px 7px;font-size:12px;line-height:1.6">
-											<span class="fa fa-copy" id="copy-address-icon"></span>
+											<span class="fa-solid fa-copy" id="copy-address-icon"></span>
 										</button>
 									</div>
 									<div class="wallet-balance mb-0 pb-0 c-pointer">
-										<span class="text-monospace amount"></span>
+										<span class="font-monospace amount"></span>
 										<span class="ticker" tkey="loading"></span>
 									</div>
 									<small class="wallet-unconfirmed text-warning d-none"></small>
 									<!-- Immature coinbase balance (shown only when > 0) -->
 									<div id="immature-balance-row-main" class="d-none mt-1">
 										<small class="text-warning">
-											<span class="fa fa-lock"></span>
+											<span class="fa-solid fa-lock"></span>
 											<span tkey="immature-mining">Immature (mining):</span> <b class="immature-amount"></b>
 											<span class="text-muted"> — <span tkey="immature-cannot-spend">cannot spend yet</span></span>
 										</small>
@@ -237,19 +238,19 @@
 									<!-- Immature coinbase balance row -->
 									<div id="immature-balance-row" class="d-none mt-1">
 										<span class="text-warning" style="font-size:12px">
-											<span class="fa fa-lock"></span>
+											<span class="fa-solid fa-lock"></span>
 											<span tkey="immature-mining">Immature (mining):</span>
 											<b class="immature-amount"></b>
 										</span>
 									</div>
-									<div class="float-md-right">
-										<a href="#" id="send-qr" class="text-dark pr-1">
+									<div class="float-md-end">
+										<a href="#" id="send-qr" class="text-dark pe-1">
 											<span tkey="scan-qr"></span>
-											<span class="fa fa-camera"></span>
+											<span class="fa-solid fa-camera"></span>
 										</a>
 										<a href="#" id="send-reset" class="text-dark">
 											<span tkey="reset"></span>
-											<span class="fa fa-sync"></span>
+											<span class="fa-solid fa-rotate"></span>
 										</a>
 									</div>
 								</div>
@@ -258,25 +259,21 @@
 									<div class="input-group send-outputs-item mb-2">
 										<input name="send-address" class="form-control" type="text" value="" tkey="enter-address">
 										<input name="send-ammount" class="form-control" type="text" value="" tkey="amount">
-										<div class="input-group-append">
-											<button id="add-output" class="btn btn-outline-dark">
-												<span class="fa fa-plus"></span>
+																					<button id="add-output" class="btn btn-outline-dark">
+												<span class="fa-solid fa-plus"></span>
 											</button>
-										</div>
 									</div>
 								</div>
 
 								<div class="input-group">
 									<input id="send-fee" class="form-control" placeholder="Fee" type="text" value="">
-									<div class="input-group-append">
-										<button class="btn btn-outline-dark b-width" type="submit" id="send-tx" tkey="send"></button>
-									</div>
+																			<button class="btn btn-outline-dark b-width" type="submit" id="send-tx" tkey="send"></button>
 								</div>
 
 								<!-- Coin Control (collapsible) -->
 								<div class="mt-2">
 									<a href="#" id="coin-control-toggle" class="text-muted small" style="text-decoration:none">
-										<span class="fa fa-sliders-h"></span>
+										<span class="fa-solid fa-sliders"></span>
 										<span id="coin-control-toggle-text" tkey="coin-control">Coin Control</span>
 									</a>
 								</div>
@@ -284,13 +281,13 @@
 									<div class="d-flex justify-content-between align-items-center mb-2">
 										<div>
 											<input type="checkbox" id="coin-control-enable">
-											<label for="coin-control-enable" class="mb-0 ml-1" tkey="coin-control-manual">Manual UTXO selection</label>
+											<label for="coin-control-enable" class="mb-0 ms-1" tkey="coin-control-manual">Manual UTXO selection</label>
 										</div>
 										<a href="#" id="coin-control-select-all" class="text-primary small" tkey="coin-control-select-all">Select all mature</a>
 									</div>
 									<div id="coin-control-list" class="table-responsive" style="max-height:200px;overflow-y:auto">
 										<table class="table table-sm table-borderless mb-0" id="coin-control-table">
-											<thead class="thead-light">
+											<thead class="table-light">
 												<tr>
 													<th style="width:28px"></th>
 													<th tkey="amount">Amount</th>
@@ -318,7 +315,7 @@
 										<label tkey="private-key"></label>
 										<div class="d-flex align-items-center pb-2" style="gap:4px">
 											<canvas id="wallet-privkey-canvas" class="form-control p-1" style="height:38px;cursor:default;flex:1 1 auto" height="38"></canvas>
-											<button id="wallet-privkey-copy-btn" class="btn btn-outline-secondary flex-shrink-0 d-none" type="button" title="Copy"><span class="fa fa-copy"></span></button>
+											<button id="wallet-privkey-copy-btn" class="btn btn-outline-secondary flex-shrink-0 d-none" type="button" title="Copy"><span class="fa-solid fa-copy"></span></button>
 											<button id="toggle-wallet-privkey" class="btn btn-outline-dark flex-shrink-0 b-width" type="button" tkey="show"></button>
 										</div>
 									</div>
@@ -337,7 +334,7 @@
 							</div>
 						</div>
 						<div class="card-footer">
-							<button id="footer-close" type="button" class="btn btn-danger btn-block footer-item" tkey="close"></button>
+							<button id="footer-close" type="button" class="btn btn-danger w-100 footer-item" tkey="close"></button>
 						</div>
 					</div>
 				</div>
@@ -355,7 +352,7 @@
 						<textarea class="form-control" id="transaction-broadcast-raw" rows="4" tkey="enter-transaction"></textarea>
 					</div>
 					<div class="card-footer">
-						<button id="footer-broadcast" type="button" class="btn btn-primary btn-block footer-item" tkey="broadcast"></button>
+						<button id="footer-broadcast" type="button" class="btn btn-primary w-100 footer-item" tkey="broadcast"></button>
 					</div>
 				</div>
 			</div>
@@ -372,7 +369,7 @@
 						<div id="address-type-select">
 							<label tkey="address-type"></label>
 							<div class="input-group pb-2">
-								<select class="custom-select">
+								<select class="form-select">
 									<option>bech32</option>
 									<option>segwit</option>
 									<option>legacy</option>
@@ -383,15 +380,13 @@
 							<label tkey="wallet-backend"></label>
 							<div class="input-group pb-2">
 								<input class="form-control" type="text" tkey="wallet-api">
-								<span class="input-group-append">
-									<button class="btn btn-outline-dark b-width" type="button" tkey="update"></button>
-								</span>
+																	<button class="btn btn-outline-dark b-width" type="button" tkey="update"></button>
 							</div>
 						</div>
 						<div id="wallet-language-select">
 							<label tkey="wallet-language"></label>
 							<div class="input-group pb-2">
-								<select class="custom-select"></select>
+								<select class="form-select"></select>
 							</div>
 						</div>
 						<div id="forget-wallet-section" class="d-none">
@@ -416,9 +411,7 @@
 				<div class="modal-content">
 					<div class="modal-header">
 						<h5 id="send-title" class="modal-title"></h5>
-						<button id="send-close" type="button" class="close" data-dismiss="modal" aria-label="Close">
-							<span aria-hidden="true">&times;</span>
-						</button>
+						<button id="send-close" type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
 					</div>
 					<div class="modal-body">
 						<div id="send-modal-error" class="alert alert-danger d-none" role="alert"></div>
@@ -431,9 +424,9 @@
 						</div>
 					</div>
 					<div class="modal-footer">
-						<button id="send-cancel" type="button" class="btn btn-block mr-auto btn-dark" data-dismiss="modal" tkey="cancel"></button>
-						<button id="send-confirm" type="button" class="btn btn-block mt-0 mr-auto btn-primary" tkey="send-it"></button>
-						<button id="send-close-footer" type="button" class="btn btn-block mt-0 mr-auto btn-dark d-none disabled" data-dismiss="modal" tkey="close"></button>
+						<button id="send-cancel" type="button" class="btn me-auto btn-dark" data-bs-dismiss="modal" tkey="cancel"></button>
+						<button id="send-confirm" type="button" class="btn mt-0 me-auto btn-primary" tkey="send-it"></button>
+						<button id="send-close-footer" type="button" class="btn mt-0 me-auto btn-dark d-none disabled" data-bs-dismiss="modal" tkey="close"></button>
 					</div>
 				</div>
 			</div>
@@ -445,9 +438,7 @@
 				<div class="modal-content">
 					<div class="modal-header">
 						<h5 class="modal-title" tkey="scan-modal-title"></h5>
-						<button id="scan-close" type="button" class="close" data-dismiss="modal" aria-label="Close">
-							<span aria-hidden="true">&times;</span>
-						</button>
+						<button id="scan-close" type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
 					</div>
 					<div class="modal-body">
 						<div id="loading-message"></div>
@@ -470,7 +461,7 @@
 						<div id="pin-error" class="text-danger small mt-1 d-none" tkey="pin-login-error">Wrong PIN, try again.</div>
 					</div>
 					<div class="modal-footer">
-						<button id="pin-cancel" type="button" class="btn btn-secondary" data-dismiss="modal" tkey="cancel">Cancel</button>
+						<button id="pin-cancel" type="button" class="btn btn-secondary" data-bs-dismiss="modal" tkey="cancel">Cancel</button>
 						<button id="pin-confirm" type="button" class="btn btn-primary" tkey="ok">OK</button>
 					</div>
 				</div>
@@ -485,7 +476,7 @@
 
 		<footer class="mb-3">
 			<div class="container text-center">
-				<span class="fab fa-github "></span> <a target="_blank" rel="noopener noreferrer" href="https://github.com/bitweb-project/web-wallet">Bitweb</a>
+				<span class="fa-brands fa-github"></span> <a target="_blank" rel="noopener noreferrer" href="https://github.com/bitweb-project/web-wallet">Bitweb</a>
 			</div>
 		</footer>
 
@@ -1409,8 +1400,8 @@
 						? (globalData.height > 0 ? (globalData.height - tx.height + 1) + ' ' + getText('history-conf') : getText('history-confirmed'))
 						: getText('history-pending')
 					var confBadge  = confirmed
-						? '<span class="badge badge-success ml-1">' + escHtml(confs) + '</span>'
-						: '<span class="badge badge-warning ml-1">' + escHtml(getText('history-pending')) + '</span>'
+						? '<span class="badge text-bg-success ms-1">' + escHtml(confs) + '</span>'
+						: '<span class="badge text-bg-warning ms-1">' + escHtml(getText('history-pending')) + '</span>'
 
 					// Amount + direction label (left side, before txid)
 					var dir    = tx.direction || 'unknown'
@@ -1434,7 +1425,7 @@
 
 					html += '<div class="history-item d-flex align-items-center border-bottom" style="gap:6px">' +
 						dirLabel +
-						'<div class="text-monospace text-truncate flex-grow-1" style="font-size:11px">' +
+						'<div class="font-monospace text-truncate flex-grow-1" style="font-size:11px">' +
 							'<a href="' + txUrl + '" target="_blank" rel="noopener noreferrer">' + shortHash + '</a>' +
 						'</div>' +
 						'<div class="flex-shrink-0">' + confBadge + '</div>' +
@@ -1694,13 +1685,13 @@
 					var status   = ''
 					if (!mature) {
 						status = '<span class="text-warning" title="' + escHtml(getText('coin-control-matures-in')) + ' ' + escHtml(String(u.blocksLeft)) + ' ' + escHtml(getText('coin-control-blocks')) + '">' +
-							'<span class="fa fa-lock"></span> ' + escHtml(String(u.blocksLeft)) + ' blk</span>'
+							'<span class="fa-solid fa-lock"></span> ' + escHtml(String(u.blocksLeft)) + ' blk</span>'
 					} else {
-						status = '<span class="text-success"><span class="fa fa-unlock"></span> ' + escHtml(getText('coin-control-mature')) + '</span>'
+						status = '<span class="text-success"><span class="fa-solid fa-unlock"></span> ' + escHtml(getText('coin-control-mature')) + '</span>'
 					}
 					var typeLabel = isCbase
-						? '<span class="badge badge-secondary">' + escHtml(getText('coin-control-coinbase')) + '</span>'
-						: '<span class="badge badge-light">' + escHtml(getText('coin-control-regular')) + '</span>'
+						? '<span class="badge text-bg-secondary">' + escHtml(getText('coin-control-coinbase')) + '</span>'
+						: '<span class="badge text-bg-light">' + escHtml(getText('coin-control-regular')) + '</span>'
 					var shortTx   = escHtml(u.txid.substr(0,6)) + '…' + escHtml(u.txid.substr(-4))
 					var amt       = amountFormat(u.value)
 
@@ -1708,7 +1699,7 @@
 						'<tr class="' + rowClass + '" data-key="' + key + '">' +
 						'<td><input type="checkbox" class="cc-utxo-check" data-key="' + key + '"' +
 						(checked ? ' checked' : '') + (disabled ? ' disabled' : '') + (!mature ? ' title="' + escHtml(getText('coin-control-immature-title')) + '"' : '') + '></td>' +
-						'<td class="text-monospace">' + escHtml(String(amt)) + '</td>' +
+						'<td class="font-monospace">' + escHtml(String(amt)) + '</td>' +
 						'<td>' + (height > 0 && u.height > 0 ? escHtml(String(height - u.height + 1)) : '—') + '</td>' +
 						'<td>' + typeLabel + '</td>' +
 						'<td>' + status + '</td>' +
@@ -2248,7 +2239,7 @@
 						'<div class="send-additional-output send-outputs-item input-group mb-2">' +
 						'<input name="send-address" class="form-control" placeholder="' + getText('enter-address') + '" type="text">' +
 						'<input name="send-ammount" class="form-control" placeholder="' + getText('amount') + '" type="text">' +
-						'<div class="input-group-append"><button class="btn btn-outline-danger remove-additional-output" type="submit"><span class="fa fa-minus"></span></button></div>' +
+						'<button class="btn btn-outline-danger remove-additional-output" type="button"><span class="fa-solid fa-minus"></span></button>' +
 						'</div>'
 					)
 					$('.remove-additional-output').click(function(e) { $(this).closest('.send-additional-output').remove(); e.preventDefault() })
