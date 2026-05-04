@@ -56,6 +56,11 @@
 
 		<script src="multilang.js"></script>
 
+		<!-- Self build see BUILD4_bip39.md -->
+		<script src="js/bip39-bundle.min.js"
+				integrity="sha512-9qS0/lQ8HZTImQ/TbprR/xgDSdMkW1aPHsts+AN1SDQ/l7aVWMcEYfeYKWZpOiZkW7K7OWmyqXi0zKo4SUFgpw=="
+				crossorigin="anonymous"></script>
+
 		<!-- Self build see https://github.com/bitweb-project/bitcoin-bundle-v7 -->
 		<script src="js/bitcoin-bundle-v7.min.js"
                 integrity="sha512-mUri5zVIyWAlxMgapxp3iWXDVt4zLH0Lq2hnKtE0NsD132msKfOxM3ktH7qV5rTwocurwpvTfuaseKiXSDIctA==" 
@@ -192,7 +197,10 @@
 						<div class="card-header">
 							<ul class="nav nav-tabs card-header-tabs">
 								<li class="nav-item me-2">
-									<a class="nav-link tab-link active" data-tab-name="open-regular" data-tab-family="open-block" href="#" tkey="open-regular"></a>
+									<a class="nav-link tab-link active" data-tab-name="open-seed" data-tab-family="open-block" href="#">🌱 Seed Phrase</a>
+								</li>
+								<li class="nav-item me-2">
+									<a class="nav-link tab-link" data-tab-name="open-regular" data-tab-family="open-block" href="#" tkey="open-regular"></a>
 								</li>
 								<li class="nav-item">
 									<a class="nav-link tab-link" data-tab-name="open-key" data-tab-family="open-block" href="#" tkey="open-key"></a>
@@ -200,25 +208,135 @@
 							</ul>
 						</div>
 						<div class="card-body">
-							<form id="open-regular-form" class="open-form tab-item" data-tab="open-regular">
+
+							<!-- ══════════════ SEED TAB ══════════════ -->
+							<div class="tab-item" data-tab="open-seed" id="seed-tab-root">
+
+								<!-- Entry: Create / Restore choice -->
+								<div id="seed-entry">
+									<div class="d-grid gap-2">
+										<button class="btn btn-primary" id="seed-btn-create" type="button">
+											✨ Create New Wallet
+										</button>
+										<button class="btn btn-outline-secondary" id="seed-btn-restore" type="button">
+											🔑 Restore from Seed Phrase
+										</button>
+									</div>
+								</div>
+
+								<!-- ─── CREATE FLOW ─── -->
+								<div id="seed-create" class="d-none">
+									<!-- Step 1: Generate -->
+									<div id="seed-create-step1">
+										<div class="d-flex align-items-center justify-content-between mb-2">
+											<small class="text-muted fw-semibold">Step 1 of 2 — Your Seed Phrase</small>
+											<div class="btn-group btn-group-sm">
+												<button class="btn btn-outline-secondary seed-wlen-btn active" data-len="256" type="button">24 words</button>
+												<button class="btn btn-outline-secondary seed-wlen-btn" data-len="128" type="button">12 words</button>
+											</div>
+										</div>
+										<div id="seed-word-grid" class="mb-2 p-2 border rounded bg-body-secondary" style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;font-size:13px"></div>
+										<div class="alert alert-warning small py-2 mb-2">
+											⚠️ Write these words down in order and store them safely. Anyone with these words controls your funds.
+										</div>
+										<div class="d-flex gap-2 mb-2">
+											<button class="btn btn-sm btn-outline-secondary" id="seed-btn-print" type="button">🖨 Print</button>
+											<button class="btn btn-sm btn-outline-secondary" id="seed-btn-copy" type="button">📋 Copy</button>
+											<button class="btn btn-primary ms-auto" id="seed-btn-to-verify" type="button">Next →</button>
+										</div>
+										<div class="text-end">
+											<a href="#" id="seed-create-cancel1" class="text-muted small">Cancel</a>
+										</div>
+									</div>
+
+									<!-- Step 2: Verify 3 words -->
+									<div id="seed-create-step2" class="d-none">
+										<small class="text-muted fw-semibold d-block mb-2">Step 2 of 2 — Verify Seed Phrase</small>
+										<p class="small">Enter the words at these positions to confirm you saved them correctly:</p>
+										<div id="seed-verify-fields" class="mb-3"></div>
+										<div id="seed-verify-error" class="text-danger small mb-2 d-none">Incorrect words. Please check your phrase.</div>
+										<div class="d-flex gap-2">
+											<button class="btn btn-outline-secondary btn-sm" id="seed-verify-back" type="button">← Back</button>
+											<button class="btn btn-primary ms-auto" id="seed-verify-confirm" type="button">Confirm &amp; Set PIN</button>
+										</div>
+									</div>
+								</div>
+
+								<!-- ─── RESTORE FLOW ─── -->
+								<div id="seed-restore" class="d-none">
+									<small class="text-muted fw-semibold d-block mb-2">Restore from Seed Phrase</small>
+									<div class="d-flex align-items-center gap-2 mb-2">
+										<label class="small text-nowrap mb-0">Word count:</label>
+										<select id="restore-wordcount" class="form-select form-select-sm" style="max-width:100px">
+											<option value="24">24 words</option>
+											<option value="12">12 words</option>
+										</select>
+									</div>
+									<textarea id="restore-input" class="form-control font-monospace mb-2" rows="4"
+										placeholder="Enter your seed phrase words separated by spaces…"
+										autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+									<div id="restore-word-error" class="text-danger small mb-2 d-none"></div>
+
+									<!-- Advanced options -->
+									<div class="mb-2">
+										<a class="small text-muted" data-bs-toggle="collapse" href="#restore-advanced" role="button">Advanced ▼</a>
+										<div class="collapse" id="restore-advanced">
+											<div class="border rounded p-2 mt-1 small">
+												<div class="mb-2">
+													<label class="form-label mb-1">Derivation path</label>
+													<input id="restore-path" type="text" class="form-control form-control-sm font-monospace" value="m/84'/0'/0'/0/0" placeholder="m/84'/0'/0'/0/0">
+													<div class="form-text">Default: BIP84 native SegWit. Change for Electrum/Ledger compatibility.</div>
+												</div>
+												<div>
+													<label class="form-label mb-1">Passphrase (25th word) <span class="text-muted">— optional</span></label>
+													<input id="restore-passphrase" type="password" class="form-control form-control-sm" placeholder="Leave blank if none">
+													<div class="form-text text-warning">⚠ If set, it will be saved encrypted alongside the seed.</div>
+												</div>
+											</div>
+										</div>
+									</div>
+
+									<div class="d-flex gap-2">
+										<a href="#" id="seed-restore-cancel" class="btn btn-outline-secondary btn-sm">Cancel</a>
+										<button class="btn btn-primary ms-auto" id="seed-restore-btn" type="button">Restore &amp; Set PIN</button>
+									</div>
+								</div>
+
+							</div>
+							<!-- ══════════════ END SEED TAB ══════════════ -->
+
+							<!-- LEGACY: Password tab -->
+							<form id="open-regular-form" class="open-form tab-item d-none" data-tab="open-regular">
+								<div class="alert alert-warning small py-2 mb-2" role="alert">
+									⚠️ <strong>Not recommended.</strong> This method derives a key from a password hash and is kept for backward compatibility only. Please migrate your funds to a Seed Phrase wallet.
+								</div>
 								<div class="input-group pb-2">
 									<input id="open-email" name="open-email" class="form-control" type="text" tkey="email-address">
 								</div>
 								<div class="input-group">
 									<input id="open-password" name="open-password" class="form-control" type="password" tkey="password">
 									<input id="open-password-confirm" name="open-password-confirm" class="form-control" type="password" tkey="password-confirm">
-																			<button class="btn btn-primary b-width" type="submit" id="open-regular-wallet" tkey="open"></button>
+									<button class="btn btn-primary b-width" type="submit" id="open-regular-wallet" tkey="open"></button>
 								</div>
 							</form>
+
+							<!-- LEGACY: WIF key tab -->
 							<form id="open-key-form" class="open-form tab-item d-none" data-tab="open-key">
+								<div class="alert alert-warning small py-2 mb-2" role="alert">
+									⚠️ <strong>Not recommended.</strong> Raw private key import is provided for compatibility only. Use a Seed Phrase wallet for better security and recoverability.
+								</div>
 								<div class="input-group">
 									<input id="passphrase" name="passphrase" class="form-control" type="password" tkey="wif-key">
-																			<button class="btn btn-primary b-width" type="submit" id="open-key-wallet" tkey="open"></button>
+									<button class="btn btn-primary b-width" type="submit" id="open-key-wallet" tkey="open"></button>
 								</div>
 							</form>
+
 						</div>
 						<div class="card-footer">
-							<div class="footer-item tab-item" data-tab="open-regular" tkey="open-reminder"></div>
+							<div class="footer-item tab-item" data-tab="open-seed">
+								<small class="text-muted">BIP39 / BIP84 · m/84'/0'/0'/0/0 · Entropy: OS CSPRNG (crypto.getRandomValues)</small>
+							</div>
+							<div class="footer-item tab-item d-none" data-tab="open-regular" tkey="open-reminder"></div>
 						</div>
 					</div>
 				</div>
@@ -364,6 +482,24 @@
 										<label tkey="redeem-script">Redeem Script <i>(SegWit)</i></label>
 										<div class="input-group pb-2">
 											<input class="form-control" readonly type="text">
+										</div>
+									</div>
+									<!-- Seed phrase backup section (only shown for bip39 wallets) -->
+									<div id="wallet-keys-seed" class="d-none">
+										<label>Seed Phrase Backup</label>
+										<div id="wallet-seed-hidden">
+											<button id="btn-show-seed" class="btn btn-outline-warning btn-sm w-100" type="button">🌱 Show Seed Phrase (requires PIN)</button>
+										</div>
+										<div id="wallet-seed-revealed" class="d-none">
+											<div id="wallet-seed-grid" class="p-2 border rounded bg-body-secondary mb-2" style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;font-size:13px"></div>
+											<div id="wallet-seed-passphrase-row" class="d-none mb-2">
+												<small class="text-muted">Passphrase (25th word): </small>
+												<code id="wallet-seed-passphrase-val" class="small"></code>
+											</div>
+											<div class="d-flex gap-2">
+												<button id="btn-copy-seed" class="btn btn-sm btn-outline-secondary" type="button">📋 Copy</button>
+												<button id="btn-hide-seed" class="btn btn-sm btn-outline-secondary ms-auto" type="button">🔒 Hide</button>
+											</div>
 										</div>
 									</div>
 								</div>
@@ -764,6 +900,22 @@
 				}))
 			}
 
+			// Save BIP39 mnemonic (+ optional passphrase) encrypted by PIN.
+			// Also stores the WIF of the derived key for fast PIN-login open.
+			async function saveBip39(mnemonic, passphrase, wif, pin) {
+				var enc     = new TextEncoder()
+				var salt    = crypto.getRandomValues(new Uint8Array(16))
+				var iv      = crypto.getRandomValues(new Uint8Array(12))
+				var key     = await deriveKey(pin, salt)
+				var payload = JSON.stringify({ type: 'bip39', mnemonic: mnemonic, passphrase: passphrase || '', wif: wif })
+				var ct      = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, enc.encode(payload))
+				localStorage.setItem(STORAGE_KEY, JSON.stringify({
+					salt: Array.from(salt),
+					iv:   Array.from(iv),
+					data: Array.from(new Uint8Array(ct))
+				}))
+			}
+
 			// Load credentials by PIN — returns {type, identity, password} or null
 			async function loadCredentials(pin) {
 				var raw = localStorage.getItem(STORAGE_KEY)
@@ -783,13 +935,18 @@
 			}
 
 			// Reconstruct key from saved blob and open wallet (no PIN save re-offer)
-			// Handles both new format {type:'wif'} and legacy {type:'credentials'}
+			// Handles new formats {type:'bip39'} and {type:'wif'} and legacy {type:'credentials'}
 			function openFromCredentials(creds) {
 				if (!creds) return false
 				try {
-					if (creds.type === 'wif') {
+					if (creds.type === 'bip39') {
+						// Fast path: WIF already stored alongside mnemonic
+						globalData.keys = bitcoin.ECPair.fromWIF(creds.wif, getConfig()['network'])
+						globalData.isBip39 = true
+					} else if (creds.type === 'wif') {
 						// New format: WIF stored directly — fast path, no re-derivation
 						globalData.keys = bitcoin.ECPair.fromWIF(creds.wif, getConfig()['network'])
+						globalData.isBip39 = false
 					} else if (creds.type === 'credentials') {
 						// Legacy format: re-derive key from identity+password hash chain
 						var identity = creds.identity
@@ -1642,6 +1799,14 @@ function getAddressType() {
 				$('#toggle-wallet-privkey').text(getText('show'))
 				$('#wallet-keys-script input').val(redeem)
 
+				// Show seed phrase section only for BIP39 wallets
+				if (globalData.isBip39) {
+					$('#wallet-keys-seed').removeClass('d-none')
+				} else {
+					$('#wallet-keys-seed').addClass('d-none')
+				}
+				_hideSeedReveal()
+
 				$('#wallet-address').text(globalData.address)
 				$('#pin-login-block').addClass('d-none')
 				$('#open-block').addClass('d-none')
@@ -1657,15 +1822,21 @@ function getAddressType() {
 			}
 
 			// Open wallet: if offerPin && no saved wallet -> collect PIN first, then show UI.
-			async function openWallet(keys, offerPin) {
+			async function openWallet(keys, offerPin, bip39Data) {
+				// bip39Data = { mnemonic, passphrase } when called from seed flow
 				if (offerPin && !hasSavedWallet()) {
 					var pin = await askPinSetup()
 					if (pin === null) {
-						// User cancelled — wipe key from memory, stay on open form
+						// User cancelled — wipe key from memory, reset seed UI
 						globalData.keys = undefined
+						seedReset()
 						return
 					}
-					await saveWif(keys.toWIF(), pin)
+					if (bip39Data && bip39Data.mnemonic) {
+						await saveBip39(bip39Data.mnemonic, bip39Data.passphrase || '', keys.toWIF(), pin)
+					} else {
+						await saveWif(keys.toWIF(), pin)
+					}
 					showMessage(getText('wallet-saved'))
 					updateSavedWalletUI()
 				}
@@ -2420,6 +2591,258 @@ function getAddressType() {
 				$('#copy-address-btn').click(function() {
 					if (globalData.address) copyToClipboard(globalData.address, $(this))
 				})
+
+				// ══════════════════════════════════════════════════════════════
+				//  BIP39 SEED PHRASE LOGIC
+				// ══════════════════════════════════════════════════════════════
+
+				// Runtime state for the create flow
+				var _seedState = { mnemonic: '', strength: 256, verifyPositions: [] }
+
+				// Reset entire seed UI back to entry screen
+				function seedReset() {
+					$('#seed-entry').removeClass('d-none')
+					$('#seed-create').addClass('d-none')
+					$('#seed-restore').addClass('d-none')
+					$('#seed-create-step1').removeClass('d-none')
+					$('#seed-create-step2').addClass('d-none')
+					$('#seed-word-grid').empty()
+					$('#seed-generate-warning, #seed-verify-error').addClass('d-none')
+					$('#seed-verify-fields').empty()
+					$('#restore-input').val('')
+					$('#restore-word-error').addClass('d-none')
+					$('#restore-passphrase').val('')
+					$('#restore-path').val("m/84'/0'/0'/0/0")
+					$('#restore-advanced').removeClass('show')
+					_seedState = { mnemonic: '', strength: 256, verifyPositions: [] }
+				}
+
+				// Render numbered word grid (read-only)
+				function seedRenderGrid(words, containerId) {
+					var $g = $(containerId).empty()
+					words.forEach(function(w, i) {
+						$g.append(
+							'<div class="border rounded px-1 py-1 text-center">' +
+							'<span class="text-muted d-block" style="font-size:10px;line-height:1">' + (i + 1) + '</span>' +
+							'<strong style="font-size:12px">' + w + '</strong></div>'
+						)
+					})
+				}
+
+				// ── Entry buttons ──
+				$('#seed-btn-create').click(function() {
+					$('#seed-entry').addClass('d-none')
+					$('#seed-create').removeClass('d-none')
+					_seedDoGenerate()
+				})
+
+				$('#seed-btn-restore').click(function() {
+					$('#seed-entry').addClass('d-none')
+					$('#seed-restore').removeClass('d-none')
+				})
+
+				$('#seed-create-cancel1, #seed-restore-cancel').click(function(e) {
+					e.preventDefault()
+					seedReset()
+				})
+
+				// ── Create Step 1: Generate ──
+
+				// Word length toggle buttons
+				$(document).on('click', '.seed-wlen-btn', function() {
+					$('.seed-wlen-btn').removeClass('active')
+					$(this).addClass('active')
+					_seedState.strength = parseInt($(this).data('len'), 10)
+					_seedDoGenerate()
+				})
+
+				function _seedDoGenerate() {
+					if (typeof bip39Bundle === 'undefined') { alert('bip39-bundle.min.js not loaded'); return }
+					_seedState.mnemonic = bip39Bundle.generateMnemonic(_seedState.strength)
+					seedRenderGrid(_seedState.mnemonic.split(' '), '#seed-word-grid')
+				}
+
+				$('#seed-btn-print').click(function() {
+					if (!_seedState.mnemonic) return
+					var words = _seedState.mnemonic.split(' ')
+					var rows = ''
+					words.forEach(function(w, i) { rows += (i+1) + '. ' + w + (i % 2 === 1 ? '\n' : '\t\t') })
+					var w = window.open('', '_blank', 'width=500,height=400')
+					w.document.write('<pre style="font-size:16px;padding:20px">' +
+						'<b>Your Seed Phrase — Keep Secret!</b>\n\n' + rows + '\n\n' +
+						'Path: m/84\'/0\'/0\'/0/0 (BIP84 native SegWit)</pre>')
+					w.print()
+				})
+
+				$('#seed-btn-copy').click(function() {
+					if (_seedState.mnemonic) copyToClipboard(_seedState.mnemonic, $(this))
+				})
+
+				// Next: build verify step
+				$('#seed-btn-to-verify').click(function() {
+					if (!_seedState.mnemonic) return
+					var words = _seedState.mnemonic.split(' ')
+					var len = words.length
+					// Pick 3 positions from different thirds
+					function rnd(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)) }
+					var third = Math.floor(len / 3)
+					var pos = [rnd(0, third - 1), rnd(third, third * 2 - 1), rnd(third * 2, len - 1)]
+					_seedState.verifyPositions = pos
+
+					var $fields = $('#seed-verify-fields').empty()
+					pos.forEach(function(p) {
+						$fields.append(
+							'<div class="input-group input-group-sm mb-2">' +
+							'<span class="input-group-text" style="min-width:3rem">Word ' + (p + 1) + '</span>' +
+							'<input type="text" class="form-control font-monospace seed-verify-word" data-pos="' + p + '" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">' +
+							'</div>'
+						)
+					})
+					$('#seed-verify-error').addClass('d-none')
+					$('#seed-create-step1').addClass('d-none')
+					$('#seed-create-step2').removeClass('d-none')
+					setTimeout(function() { $('.seed-verify-word').first().focus() }, 100)
+				})
+
+				// ── Create Step 2: Verify ──
+
+				$('#seed-verify-back').click(function() {
+					$('#seed-create-step2').addClass('d-none')
+					$('#seed-create-step1').removeClass('d-none')
+				})
+
+				$('#seed-verify-confirm').click(function() {
+					var words = _seedState.mnemonic.split(' ')
+					var ok = true
+					$('.seed-verify-word').each(function() {
+						var pos = parseInt($(this).data('pos'), 10)
+						var entered = $(this).val().trim().toLowerCase()
+						if (entered !== words[pos]) ok = false
+					})
+					if (!ok) {
+						$('#seed-verify-error').removeClass('d-none')
+						return
+					}
+					$('#seed-verify-error').addClass('d-none')
+					// Derive key and open wallet — PIN dialog is inside openWallet
+					try {
+						var privBytes = bip39Bundle.mnemonicToPrivKey(_seedState.mnemonic, "m/84'/0'/0'/0/0")
+						var keys = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes))
+						globalData.isBip39 = true
+						openWallet(keys, true, { mnemonic: _seedState.mnemonic, passphrase: '' })
+					} catch(err) {
+						alert('Key derivation error: ' + err.message)
+					}
+				})
+
+				// ── Restore flow ──
+
+				$('#restore-wordcount').change(function() {
+					var cnt = parseInt($(this).val(), 10)
+					var words = $('#restore-input').val().trim().split(/\s+/).filter(Boolean)
+					// If user wants 12 and has more, trim; if wants 24, don't truncate input
+					if (cnt === 12 && words.length > 12) {
+						$('#restore-input').val(words.slice(0, 12).join(' '))
+					}
+				})
+
+				$('#seed-restore-btn').click(function() {
+					if (typeof bip39Bundle === 'undefined') { alert('bip39-bundle.min.js not loaded'); return }
+					$('#restore-word-error').addClass('d-none')
+
+					var raw = $('#restore-input').val().trim().toLowerCase().replace(/\s+/g, ' ')
+					var words = raw.split(' ')
+					var expectedLen = parseInt($('#restore-wordcount').val(), 10)
+
+					if (words.length !== expectedLen) {
+						$('#restore-word-error').text('Expected ' + expectedLen + ' words, got ' + words.length + '.').removeClass('d-none')
+						return
+					}
+					if (!bip39Bundle.validateMnemonic(raw)) {
+						$('#restore-word-error').text('Invalid seed phrase. Check spelling and word order.').removeClass('d-none')
+						return
+					}
+
+					var path = ($('#restore-path').val().trim() || "m/84'/0'/0'/0/0")
+					var passphrase = $('#restore-passphrase').val()
+
+					try {
+						var privBytes = bip39Bundle.mnemonicToPrivKey(raw, path, passphrase)
+						var keys = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes))
+						globalData.isBip39 = true
+						openWallet(keys, true, { mnemonic: raw, passphrase: passphrase })
+					} catch(err) {
+						$('#restore-word-error').text('Derivation error: ' + err.message).removeClass('d-none')
+					}
+				})
+
+				// ── Wallet Keys tab: Show/hide seed ──
+
+				function _hideSeedReveal() {
+					$('#wallet-seed-hidden').removeClass('d-none')
+					$('#wallet-seed-revealed').addClass('d-none')
+					$('#wallet-seed-grid').empty()
+					$('#wallet-seed-passphrase-row').addClass('d-none')
+					$('#wallet-seed-passphrase-val').text('')
+				}
+
+				$('#btn-show-seed').click(async function() {
+					var raw = localStorage.getItem(STORAGE_KEY)
+					if (!raw) return
+					// Reuse the askPin (confirm) modal flow — re-enter PIN to decrypt
+					var pin = await new Promise(function(resolve) {
+						$('#pin-modal-title').text('Enter PIN to view seed phrase')
+						$('#pin-modal-desc').text('Your seed phrase will be shown briefly.')
+						$('#pin-input').val('')
+						$('#pin-error').addClass('d-none')
+						var modal = new bootstrap.Modal(document.getElementById('pin-modal'), { keyboard: false })
+						modal.show()
+						$('#pin-confirm').off('click').on('click', async function() {
+							var p = $('#pin-input').val()
+							var creds = await loadCredentials(p)
+							if (!creds || creds.type !== 'bip39') {
+								$('#pin-error').removeClass('d-none')
+								return
+							}
+							modal.hide()
+							resolve({ mnemonic: creds.mnemonic, passphrase: creds.passphrase })
+						})
+						$('#pin-cancel').off('click').on('click', function() {
+							modal.hide()
+							resolve(null)
+						})
+					})
+					if (!pin) return
+
+					// Render seed grid
+					seedRenderGrid(pin.mnemonic.split(' '), '#wallet-seed-grid')
+					if (pin.passphrase) {
+						$('#wallet-seed-passphrase-val').text(pin.passphrase)
+						$('#wallet-seed-passphrase-row').removeClass('d-none')
+					}
+					$('#wallet-seed-hidden').addClass('d-none')
+					$('#wallet-seed-revealed').removeClass('d-none')
+
+					// Auto-hide after 60 seconds
+					setTimeout(_hideSeedReveal, 60000)
+				})
+
+				$('#btn-hide-seed').click(_hideSeedReveal)
+
+				$('#btn-copy-seed').click(function() {
+					var mnemonic = []
+					$('#wallet-seed-grid strong').each(function() { mnemonic.push($(this).text()) })
+					if (mnemonic.length) copyToClipboard(mnemonic.join(' '), $(this))
+				})
+
+				// Hide seed when leaving keys tab
+				$('.tab-link').on('click', function() {
+					if ($(this).data('tab-family') === 'wallet-block' && $(this).data('tab-name') !== 'wallet-keys') {
+						_hideSeedReveal()
+					}
+				})
+
+				// ══════════════════════════════════════════════════════════════
 			})
 		</script>
 	</body>
