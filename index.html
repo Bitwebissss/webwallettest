@@ -149,10 +149,10 @@
 						<li class="nav-item dropdown ms-2">
 							<a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" id="theme-label">🔄 AUTO</a>
 							<ul class="dropdown-menu dropdown-menu-end">
-								<li><a class="dropdown-item" href="#" onclick="setTheme('light');return false;">☀️ Light</a></li>
-								<li><a class="dropdown-item" href="#" onclick="setTheme('dark');return false;">🌙 Dark</a></li>
+								<li><a class="dropdown-item" href="#" onclick="setTheme('light');return false;" tkey="theme-light"></a></li>
+								<li><a class="dropdown-item" href="#" onclick="setTheme('dark');return false;" tkey="theme-dark"></a></li>
 								<li><hr class="dropdown-divider"></li>
-								<li><a class="dropdown-item" href="#" onclick="setTheme('auto');return false;">🔄 Auto</a></li>
+								<li><a class="dropdown-item" href="#" onclick="setTheme('auto');return false;" tkey="theme-auto"></a></li>
 							</ul>
 						</li>
 					</ul>
@@ -531,8 +531,8 @@
 					? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
 					: mode;
 				document.documentElement.setAttribute('data-bs-theme', resolved);
-				var labels = { light: '☀️ LIGHT', dark: '🌙 DARK', auto: '🔄 AUTO' };
-				$('#theme-label').text(labels[mode] || '🔄 AUTO');
+				var labels = { light: getText('theme-light'), dark: getText('theme-dark'), auto: getText('theme-auto') };
+				$('#theme-label').text(labels[mode] || getText('theme-auto'));
 			}
 
 			function setTheme(mode) {
@@ -2387,6 +2387,8 @@
 				$('#wallet-language-select select').on('change', function() {
 					try { localStorage.setItem('bte_cfg_language', $('#wallet-language-select select').val()) } catch(e) {}
 					initLang()
+					var _ct; try { _ct = localStorage.getItem('bte_cfg_theme') } catch(e) {}
+					applyTheme(_ct || 'auto')
 					// Re-render dynamic content that uses getText but is NOT covered by [tkey] scan:
 					//   - Coin control panel rows (use getText for status labels)
 					//   - Wallet history rows (use getText for direction/badge labels)

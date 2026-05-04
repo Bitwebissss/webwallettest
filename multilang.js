@@ -120,6 +120,9 @@ var walletLanguages = {
 		'wallet-corrupted': 'Saved wallet is corrupted. Please re-open manually.',
 		'identity-too-short': 'Identity must be at least 3 characters.',
 		'auto-locked': 'Wallet locked due to inactivity.',
+		'theme-light': '☀️ Light',
+		'theme-dark': '🌙 Dark',
+		'theme-auto': '🔄 Auto',
 		'redeem-script': 'Redeem Script (SegWit)'
 	},
 	'uk': {
@@ -243,6 +246,9 @@ var walletLanguages = {
 		'wallet-corrupted': 'Збережений гаманець пошкоджено. Будь ласка, відкрийте вручну.',
 		'identity-too-short': 'Ідентифікатор має містити щонайменше 3 символи.',
 		'auto-locked': 'Гаманець заблоковано через неактивність.',
+		'theme-light': '☀️ Світла',
+		'theme-dark': '🌙 Темна',
+		'theme-auto': '🔄 Авто',
 		'redeem-script': 'Скрипт погашення (SegWit)'
 	},
 	'id': {
@@ -366,6 +372,9 @@ var walletLanguages = {
 		'wallet-corrupted': 'Dompet tersimpan rusak. Silakan buka secara manual.',
 		'identity-too-short': 'Identitas harus minimal 3 karakter.',
 		'auto-locked': 'Dompet terkunci karena tidak aktif.',
+		'theme-light': '☀️ Terang',
+		'theme-dark': '🌙 Gelap',
+		'theme-auto': '🔄 Otomatis',
 		'redeem-script': 'Redeem Script (SegWit)'
 	},
 	'ja': {
@@ -489,6 +498,9 @@ var walletLanguages = {
 		'wallet-corrupted': '保存されたウォレットが破損しています。手動で開いてください。',
 		'identity-too-short': 'IDは3文字以上必要です。',
 		'auto-locked': 'ウォレットが非アクティブのためロックされました。',
+		'theme-light': '☀️ ライト',
+		'theme-dark': '🌙 ダーク',
+		'theme-auto': '🔄 自動',
 		'redeem-script': 'リデームスクリプト (SegWit)'
 	},
 	'zh': {
@@ -612,6 +624,9 @@ var walletLanguages = {
 		'wallet-corrupted': '已保存的钱包已损坏，请手动重新打开。',
 		'identity-too-short': '身份标识至少需要3个字符。',
 		'auto-locked': '钱包因长时间未活动已锁定。',
+		'theme-light': '☀️ 浅色',
+		'theme-dark': '🌙 深色',
+		'theme-auto': '🔄 自动',
 		'redeem-script': '赎回脚本 (SegWit)'
 	},
 	'es': {
@@ -735,6 +750,9 @@ var walletLanguages = {
 		'wallet-corrupted': 'La cartera guardada está corrupta. Por favor, ábrela manualmente.',
 		'identity-too-short': 'La identidad debe tener al menos 3 caracteres.',
 		'auto-locked': 'Cartera bloqueada por inactividad.',
+		'theme-light': '☀️ Claro',
+		'theme-dark': '🌙 Oscuro',
+		'theme-auto': '🔄 Auto',
 		'redeem-script': 'Redeem Script (SegWit)'
 	},
 	'ru': {
@@ -858,6 +876,9 @@ var walletLanguages = {
 		'wallet-corrupted': 'Сохранённый кошелёк повреждён. Пожалуйста, откройте вручную.',
 		'identity-too-short': 'Идентификатор должен содержать не менее 3 символов.',
 		'auto-locked': 'Кошелёк заблокирован из-за неактивности.',
+		'theme-light': '☀️ Светлая',
+		'theme-dark': '🌙 Тёмная',
+		'theme-auto': '🔄 Авто',
 		'redeem-script': 'Скрипт погашения (SegWit)'
 	},
 	'kr': {
@@ -981,6 +1002,9 @@ var walletLanguages = {
 		'wallet-corrupted': '저장된 지갑이 손상되었습니다. 수동으로 다시 열어주세요.',
 		'identity-too-short': '신원은 최소 3자 이상이어야 합니다.',
 		'auto-locked': '비활동으로 인해 지갑이 잠겼습니다.',
+		'theme-light': '☀️ 밝게',
+		'theme-dark': '🌙 어둡게',
+		'theme-auto': '🔄 자동',
 		'redeem-script': '리딤 스크립트 (SegWit)'
 	},
 	'de': {
@@ -1104,6 +1128,9 @@ var walletLanguages = {
 		'wallet-corrupted': 'Gespeicherte Wallet ist beschädigt. Bitte manuell öffnen.',
 		'identity-too-short': 'Die Identität muss mindestens 3 Zeichen lang sein.',
 		'auto-locked': 'Wallet wegen Inaktivität gesperrt.',
+		'theme-light': '☀️ Hell',
+		'theme-dark': '🌙 Dunkel',
+		'theme-auto': '🔄 Auto',
 		'redeem-script': 'Einlöseskript (SegWit)'
 	}
 }
