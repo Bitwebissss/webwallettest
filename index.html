@@ -111,6 +111,17 @@
 		</style>
 		<title>Wallet</title>
 		<meta name="description" content="Bitweb Web Wallet">
+		<!-- Early theme: читаем localStorage до рендера body, предотвращаем вспышку белого -->
+		<script>
+			(function(){
+				var t;
+				try { t = localStorage.getItem('bte_cfg_theme') } catch(e) { t = null }
+				var resolved = (!t || t === 'auto')
+					? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+					: t;
+				document.documentElement.setAttribute('data-bs-theme', resolved);
+			})();
+		</script>
 	</head>
 	<body>
 		<!-- Navbar -->
@@ -134,6 +145,15 @@
 						<li class="nav-item dropdown" id="network-list">
 							<a class="nav-item nav-link dropdown-toggle" href="#" id="network-versions" data-bs-toggle="dropdown">NETWORK</a>
 							<div class="dropdown-menu dropdown-menu-end" aria-labelledby="network-versions"></div>
+						</li>
+						<li class="nav-item dropdown ms-2">
+							<a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" id="theme-label">🔄 AUTO</a>
+							<ul class="dropdown-menu dropdown-menu-end">
+								<li><a class="dropdown-item" href="#" onclick="setTheme('light');return false;">☀️ Light</a></li>
+								<li><a class="dropdown-item" href="#" onclick="setTheme('dark');return false;">🌙 Dark</a></li>
+								<li><hr class="dropdown-divider"></li>
+								<li><a class="dropdown-item" href="#" onclick="setTheme('auto');return false;">🔄 Auto</a></li>
+							</ul>
 						</li>
 					</ul>
 				</div>
@@ -200,10 +220,6 @@
 						</div>
 						<div class="card-footer">
 							<div class="footer-item tab-item" data-tab="open-regular" tkey="open-reminder"></div>
-							<div class="footer-item tab-item d-none" data-tab="open-key">
-								<span tkey="generate-question"></span> <span tkey="generate-it"></span>
-							</div>
-
 						</div>
 					</div>
 				</div>
@@ -512,6 +528,29 @@
 			// Keys: bte_cfg_{name}  — isolated from wallet data keys (bte_wallet_*, bte_utxo_*, bte_history_*)
 			// ================================================================
 			var CFG_PREFIX = 'bte_cfg_'
+
+			// ================================================================
+			// Theme
+			// ================================================================
+			function applyTheme(mode) {
+				var resolved = mode === 'auto'
+					? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+					: mode;
+				document.documentElement.setAttribute('data-bs-theme', resolved);
+				var labels = { light: '☀️ LIGHT', dark: '🌙 DARK', auto: '🔄 AUTO' };
+				$('#theme-label').text(labels[mode] || '🔄 AUTO');
+			}
+
+			function setTheme(mode) {
+				setCookie('theme', mode, 365);  // setCookie → _cfgSet → localStorage bte_cfg_theme
+				applyTheme(mode);
+			}
+
+			// Следим за системной темой — меняется только если mode === 'auto'
+			window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+				var saved = readCookie('theme') || 'auto';
+				if (saved === 'auto') applyTheme('auto');
+			});
 
 			// Validate backend URL before storing:
 			//   - must be absolute http(s) URL
@@ -2045,6 +2084,7 @@
 			// ================================================================
 			$(document).ready(function() {
 				initLang()
+				applyTheme(readCookie('theme') || 'auto')
 
 				// Reset auto-lock timer on any user interaction (only effective when wallet is open)
 				;['click', 'keydown', 'touchstart', 'mousemove'].forEach(function(evt) {
