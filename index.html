@@ -107,7 +107,6 @@
 			.balance-small { font-size: 15px; }
 			.send-balance-fix { padding: 0px 0px 8px 0px; display: inline-block; }
 			.break-word { word-wrap: break-word; }
-			.wallet-unconfirmed { font-size: 13px; display: block; margin-top: 2px; }
 			.history-item { font-size: 13px; padding: 6px 0; }
 			.history-item:last-child { border-bottom: none !important; }
 			#history-list { max-height: 320px; overflow-y: auto; padding-right: 20px; }
@@ -293,11 +292,6 @@
 													<input id="restore-path" type="text" class="form-control form-control-sm font-monospace" value="m/84'/0'/0'/0/0" placeholder="m/84'/0'/0'/0/0">
 													<div class="form-text" tkey="seed-deriv-hint">Default: BIP84 native SegWit. Change for Electrum/Ledger compatibility.</div>
 												</div>
-												<div>
-													<label class="form-label mb-1" tkey="seed-passphrase-label">Passphrase (25th word) <span class="text-muted">— optional</span></label>
-													<input id="restore-passphrase" type="password" class="form-control form-control-sm" tkey="seed-passphrase-ph" placeholder="Leave blank if none">
-													<div class="form-text text-warning" tkey="seed-passphrase-warn">⚠ If set, it will be saved encrypted alongside the seed.</div>
-												</div>
 											</div>
 										</div>
 									</div>
@@ -379,7 +373,6 @@
 										<span class="font-monospace amount"></span>
 										<span class="ticker" tkey="loading"></span>
 									</div>
-									<small class="wallet-unconfirmed text-warning d-none"></small>
 									<!-- Immature coinbase balance (shown only when > 0) -->
 									<div id="immature-balance-row-main" class="d-none mt-1">
 										<small class="text-warning">
@@ -498,10 +491,6 @@
 										</div>
 										<div id="wallet-seed-revealed" class="d-none">
 											<div id="wallet-seed-grid" class="p-2 border rounded bg-body-secondary mb-2" style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;font-size:13px"></div>
-											<div id="wallet-seed-passphrase-row" class="d-none mb-2">
-												<small class="text-muted" tkey="seed-passphrase-display">Passphrase (25th word): </small>
-												<code id="wallet-seed-passphrase-val" class="small"></code>
-											</div>
 											<div class="d-flex gap-2">
 												<button id="btn-copy-seed" class="btn btn-sm btn-outline-secondary" type="button"><span class="fa-solid fa-clipboard"></span> <span tkey="seed-copy">Copy</span></button>
 												<button id="btn-hide-seed" class="btn btn-sm btn-outline-secondary ms-auto" type="button" tkey="seed-hide-btn">🔒 Hide</button>
@@ -901,14 +890,14 @@
 				}))
 			}
 
-			// Save BIP39 mnemonic (+ optional passphrase) encrypted by PIN.
+			// Save BIP39 mnemonic encrypted by PIN.
 			// Also stores the WIF of the derived key for fast PIN-login open.
-			async function saveBip39(mnemonic, passphrase, wif, pin) {
+			async function saveBip39(mnemonic, wif, pin) {
 				var enc     = new TextEncoder()
 				var salt    = crypto.getRandomValues(new Uint8Array(16))
 				var iv      = crypto.getRandomValues(new Uint8Array(12))
 				var key     = await deriveKey(pin, salt)
-				var payload = JSON.stringify({ type: 'bip39', mnemonic: mnemonic, passphrase: passphrase || '', wif: wif })
+				var payload = JSON.stringify({ type: 'bip39', mnemonic: mnemonic, wif: wif })
 				var ct      = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, enc.encode(payload))
 				localStorage.setItem(STORAGE_KEY, JSON.stringify({
 					salt: Array.from(salt),
@@ -944,8 +933,8 @@
 						// Fast path: WIF already stored alongside mnemonic
 						globalData.keys = bitcoin.ECPair.fromWIF(creds.wif, getConfig()['network'])
 						globalData.isBip39 = true
-						// Wipe mnemonic & passphrase immediately — only WIF is needed at runtime
-						creds.mnemonic = ''; creds.passphrase = ''
+						// Wipe mnemonic immediately — only WIF is needed at runtime
+						creds.mnemonic = ''
 					} else if (creds.type === 'wif') {
 						// New format: WIF stored directly — fast path, no re-derivation
 						globalData.keys = bitcoin.ECPair.fromWIF(creds.wif, getConfig()['network'])
@@ -970,7 +959,13 @@
 					} else {
 						return false
 					}
-				} catch(e) { return false }
+				} catch(e) { return false } finally {
+					// Wipe all sensitive credential fields regardless of success/failure
+					if (creds) {
+						creds.wif = ''; creds.mnemonic = ''
+						creds.identity = ''; creds.password = ''
+					}
+				}
 				openWallet(globalData.keys, false)  // don't offer PIN save — already saved
 				return true
 			}
@@ -1072,7 +1067,6 @@
 						'broadcast-failed':   getText('broadcast-failed'),
 						'pass-not-match':     getText('pass-not-match'),
 						'pass-too-short':     getText('pass-too-short'),
-						'bad-email':          getText('bad-email'),
 						'small-fee':          getText('small-fee') + ' ' + getConfig()['fee'] + ' ' + getConfig()['ticker'] + '!'
 					},
 					'tx': {
@@ -1795,9 +1789,7 @@ function getAddressType() {
 				$('#wallet-seed-hidden').removeClass('d-none')
 				$('#wallet-seed-revealed').addClass('d-none')
 				$('#wallet-seed-grid').empty()
-				$('#wallet-seed-passphrase-row').addClass('d-none')
-				$('#wallet-seed-passphrase-val').text('')
-			}
+							}
 
 			function seedReset() {
 				$('#seed-entry').removeClass('d-none')
@@ -1810,7 +1802,6 @@ function getAddressType() {
 				$('#seed-verify-fields').empty()
 				$('#restore-input').val('')
 				$('#restore-word-error').addClass('d-none')
-				$('#restore-passphrase').val('')
 				$('#restore-path').val("m/84'/0'/0'/0/0")
 				$('#restore-advanced').removeClass('show')
 				_seedState = { mnemonic: '', strength: 256, verifyPositions: [] }
@@ -1854,7 +1845,7 @@ function getAddressType() {
 
 			// Open wallet: if offerPin && no saved wallet -> collect PIN first, then show UI.
 			async function openWallet(keys, offerPin, bip39Data) {
-				// bip39Data = { mnemonic, passphrase } when called from seed flow
+				// bip39Data = { mnemonic } when called from seed flow
 				if (offerPin && !hasSavedWallet()) {
 					var pin = await askPinSetup()
 					if (pin === null) {
@@ -1866,10 +1857,9 @@ function getAddressType() {
 						return
 					}
 					if (bip39Data && bip39Data.mnemonic) {
-						await saveBip39(bip39Data.mnemonic, bip39Data.passphrase || '', keys.toWIF(), pin)
+						await saveBip39(bip39Data.mnemonic, keys.toWIF(), pin)
 						// Wipe plaintext mnemonic after encrypted save
 						bip39Data.mnemonic = ''
-						bip39Data.passphrase = ''
 						_seedState.mnemonic = ''
 						_seedState.verifyPositions = []
 					} else {
@@ -1904,7 +1894,6 @@ function getAddressType() {
 				$('#qr-code-addres').empty()
 				resetTxForm()
 				$('#wallet-block').addClass('d-none')
-				$('.wallet-unconfirmed').addClass('d-none')
 				globalData.clear()
 				updateSavedWalletUI()
 				setHomeTitle()
@@ -2638,7 +2627,7 @@ function getAddressType() {
 						$g.append(
 							'<div class="border rounded px-1 py-1 text-center">' +
 							'<span class="text-muted d-block" style="font-size:10px;line-height:1">' + (i + 1) + '</span>' +
-							'<strong style="font-size:12px">' + w + '</strong></div>'
+							'<strong style="font-size:12px">' + escHtml(w) + '</strong></div>'
 						)
 					})
 				}
@@ -2763,7 +2752,7 @@ function getAddressType() {
 						var keys = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes))
 						privBytes.fill(0)  // wipe raw key bytes
 						globalData.isBip39 = true
-						openWallet(keys, true, { mnemonic: _seedState.mnemonic, passphrase: '' })
+						openWallet(keys, true, { mnemonic: _seedState.mnemonic })
 					} catch(err) {
 						alert('Key derivation error: ' + err.message)
 					}
@@ -2798,19 +2787,16 @@ function getAddressType() {
 					}
 
 					var path = ($('#restore-path').val().trim() || "m/84'/0'/0'/0/0")
-					var passphrase = $('#restore-passphrase').val()
-
+					
 					try {
-						var privBytes = bip39Bundle.mnemonicToPrivKey(raw, path, passphrase)
+						var privBytes = bip39Bundle.mnemonicToPrivKey(raw, path)
 						var keys = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes))
 						privBytes.fill(0)  // wipe raw key bytes
 						globalData.isBip39 = true
-						await openWallet(keys, true, { mnemonic: raw, passphrase: passphrase })
+						await openWallet(keys, true, { mnemonic: raw })
 						// Wipe plaintext mnemonic from DOM inputs after wallet opens
 						$('#restore-input').val('')
-						$('#restore-passphrase').val('')
 						raw = ''
-						passphrase = ''
 					} catch(err) {
 						$('#restore-word-error').text(getText('seed-deriv-error') + ' ' + err.message).removeClass('d-none')
 					}
@@ -2840,9 +2826,8 @@ function getAddressType() {
 									return
 								}
 								// Extract only what's needed, wipe full creds immediately
-								var result = { mnemonic: creds.mnemonic, passphrase: creds.passphrase }
+								var result = { mnemonic: creds.mnemonic }
 								creds.mnemonic = ''
-								creds.passphrase = ''
 								creds = null
 								modal.hide()
 								// Detach listener before resolve so closure is released
@@ -2866,21 +2851,13 @@ function getAddressType() {
 
 					// Render grid then immediately wipe seedData strings
 					var words = seedData.mnemonic.split(' ')
-					var hasPassphrase = !!seedData.passphrase
-					var passphraseVal = seedData.passphrase
 					seedData.mnemonic = ''   // wipe before rendering
-					seedData.passphrase = ''
 					seedData = null
 
 					seedRenderGrid(words, '#wallet-seed-grid')
 					words.fill('')  // wipe word array
 					words = null
 
-					if (hasPassphrase) {
-						$('#wallet-seed-passphrase-val').text(passphraseVal)
-						$('#wallet-seed-passphrase-row').removeClass('d-none')
-						passphraseVal = ''
-					}
 					$('#wallet-seed-hidden').addClass('d-none')
 					$('#wallet-seed-revealed').removeClass('d-none')
 
@@ -2894,6 +2871,8 @@ function getAddressType() {
 					var mnemonic = []
 					$('#wallet-seed-grid strong').each(function() { mnemonic.push($(this).text()) })
 					if (mnemonic.length) copyToClipboard(mnemonic.join(' '), $(this))
+					mnemonic.fill('')  // wipe reconstructed plaintext from memory
+					mnemonic = null
 				})
 
 				// Hide seed when leaving keys tab
