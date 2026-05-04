@@ -64,7 +64,12 @@
 				-ms-hyphens: auto;
 				hyphens: auto;
 			}
-			.qr-code canvas { max-width: 100%; }
+			.qr-code {
+				display: flex;
+				justify-content: center;
+				margin-bottom: 8px;
+			}
+			.qr-code canvas, .qr-code img { max-width: 100%; display: block; }
 			.wallet-balance { font-size: 23px; }
 			.wallet-balance .font-monospace { font-size: 20px; }
 			@media (max-width: 991.98px) {
