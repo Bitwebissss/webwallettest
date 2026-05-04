@@ -2764,7 +2764,7 @@ function getAddressType() {
 					}
 				})
 
-				$('#seed-restore-btn').click(function() {
+				$('#seed-restore-btn').click(async function() {
 					if (typeof bip39Bundle === 'undefined') { alert('bip39-bundle.min.js not loaded'); return }
 					$('#restore-word-error').addClass('d-none')
 
