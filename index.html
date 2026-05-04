@@ -524,12 +524,6 @@
 
 		<script>
 			// ================================================================
-			// Settings storage — localStorage (replaces cookies for all settings)
-			// Keys: bte_cfg_{name}  — isolated from wallet data keys (bte_wallet_*, bte_utxo_*, bte_history_*)
-			// ================================================================
-			var CFG_PREFIX = 'bte_cfg_'
-
-			// ================================================================
 			// Theme
 			// ================================================================
 			function applyTheme(mode) {
@@ -542,17 +536,17 @@
 			}
 
 			function setTheme(mode) {
-				setCookie('theme', mode, 365);  // setCookie → _cfgSet → localStorage bte_cfg_theme
+				try { localStorage.setItem('bte_cfg_theme', mode) } catch(e) {}
 				applyTheme(mode);
 			}
 
 			// Следим за системной темой — меняется только если mode === 'auto'
 			window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
-				var saved = readCookie('theme') || 'auto';
-				if (saved === 'auto') applyTheme('auto');
+				var saved; try { saved = localStorage.getItem('bte_cfg_theme') } catch(e) {}
+				if ((saved || 'auto') === 'auto') applyTheme('auto');
 			});
 
-			// Validate backend URL before storing:
+			// Validate backend URL:
 			//   - must be absolute http(s) URL
 			//   - no embedded credentials (user:pass@host)
 			//   - rejects javascript:, data:, blob:, etc.
@@ -565,28 +559,6 @@
 					if (u.username || u.password) return false
 					return true
 				} catch(e) { return false }
-			}
-
-			function _cfgSet(key, value) {
-				try { localStorage.setItem(CFG_PREFIX + key, String(value)) } catch(e) {}
-			}
-			function _cfgGet(key) {
-				try { return localStorage.getItem(CFG_PREFIX + key) } catch(e) { return null }
-			}
-			function _cfgDel(key) {
-				try { localStorage.removeItem(CFG_PREFIX + key) } catch(e) {}
-			}
-
-			// Public API — same signatures as the old cookie helpers so nothing else needs to change
-			function setCookie(name, value, _days) {
-				if (name === 'backend' && !isValidBackendUrl(value)) return  // reject invalid backend URLs
-				_cfgSet(name, value)
-			}
-			function readCookie(name) {
-				return _cfgGet(name)
-			}
-			function deleteCookie(name) {
-				_cfgDel(name)
 			}
 
 			// ================================================================
@@ -718,7 +690,6 @@
 			// Encrypted storage (WebCrypto AES-GCM + PBKDF2)
 			// ================================================================
 			var STORAGE_KEY = 'bte_wallet_v2'
-			var EXIST_KEY   = 'bte_wallet_exist'  // static flag: wallet has ever been saved
 
 			// ================================================================
 			// Auto-lock: closes wallet after 20 min of inactivity.
@@ -772,7 +743,6 @@
 					iv:   Array.from(iv),
 					data: Array.from(new Uint8Array(ct))
 				}))
-				localStorage.setItem(EXIST_KEY, '1')
 			}
 
 			// Load credentials by PIN — returns {type, identity, password} or null
@@ -831,12 +801,10 @@
 			}
 
 			function forgetSavedWallet() {
-				// Wipe ALL wallet data: encrypted blob, exist flag, history, utxo cache
 				try {
 					Object.keys(localStorage).forEach(function(k) {
 						if (
 							k === STORAGE_KEY ||
-							k === EXIST_KEY   ||
 							k.indexOf('bte_history_') === 0 ||
 							k.indexOf('bte_utxo_')    === 0 ||
 							k.indexOf('bte_wallet_')  === 0
@@ -948,13 +916,13 @@
 			}
 
 			function initLang() {
-				var language = readCookie('language')
+				var language; try { language = localStorage.getItem('bte_cfg_language') } catch(e) {}
 				var set_lang = 'en'
 				if (language == null || walletLanguages[language] == undefined) {
 					var user_lang = navigator.language.substr(0, 2)
 					if (user_lang in walletLanguages) set_lang = user_lang
-					setCookie('language', set_lang, 60)
-					language = readCookie('language')
+					try { localStorage.setItem('bte_cfg_language', set_lang) } catch(e) {}
+					language = set_lang
 				}
 				$('#wallet-language-select select').empty()
 				for (var key in walletLanguages) {
@@ -978,7 +946,7 @@
 			}
 
 			function getText(token) {
-				var language = readCookie('language')
+				var language; try { language = localStorage.getItem('bte_cfg_language') } catch(e) {}
 				if (language == undefined) language = initLang()
 				if (token in walletLanguages[language]) return walletLanguages[language][token]
 				return walletLanguages['en'][token]
@@ -988,10 +956,10 @@
 			// Network / config helpers
 			// ================================================================
 			function getConfig() {
-				var network = readCookie('network')
+				var network; try { network = localStorage.getItem('bte_cfg_network') } catch(e) {}
 				if (network == null || networkConfigs[network] == undefined) {
-					setCookie('network', Object.keys(networkConfigs)[0], 60)
-					network = readCookie('network')
+					network = Object.keys(networkConfigs)[0]
+					try { localStorage.setItem('bte_cfg_network', network) } catch(e) {}
 				}
 				return networkConfigs[network]
 			}
@@ -1000,7 +968,7 @@
 				page = page || ''
 				network = network.toUpperCase()
 				if (networkConfigs[network] != undefined && networkConfigs[network] != getConfig()) {
-					setCookie('network', network, 60)
+					try { localStorage.setItem('bte_cfg_network', network) } catch(e) {}
 					closeWallet()
 					displayNetworks()
 					switchBackend(networkConfigs[network]['api'])
@@ -1021,39 +989,41 @@
 			}
 
 			function getAddressType() {
-				var type = readCookie('type')
+				var type; try { type = localStorage.getItem('bte_cfg_type') } catch(e) {}
 				if (type == null || !['bech32', 'segwit', 'legacy'].includes(type)) {
-					setCookie('type', 'bech32', 60)
-					type = readCookie('type')
+					type = 'bech32'
+					try { localStorage.setItem('bte_cfg_type', type) } catch(e) {}
 				}
 				return type
 			}
 
 			function switchAddressType(type) {
-				if (['bech32', 'segwit', 'legacy'].includes(type)) setCookie('type', type, 60)
+				if (['bech32', 'segwit', 'legacy'].includes(type)) try { localStorage.setItem('bte_cfg_type', type) } catch(e) {}
 			}
 
 			function getBackend() {
-				var backend = readCookie('backend')
+				var backend; try { backend = localStorage.getItem('bte_cfg_backend') } catch(e) {}
 				if (backend == null) {
-					setCookie('backend', getConfig()['api'], 60)
-					backend = readCookie('backend')
+					backend = getConfig()['api']
+					try { localStorage.setItem('bte_cfg_backend', backend) } catch(e) {}
 				}
 				return backend
 			}
 
 			function switchBackend(url) {
+				if (!isValidBackendUrl(url)) {
+					showMessage(messages.settings.backendNotWorking(url))
+					$('#wallet-backend input').val(getBackend())
+					return
+				}
 				Promise.resolve($.ajax({ 'url': url + '/info' })).then(function() {
-					setCookie('backend', url, 60)
+					try { localStorage.setItem('bte_cfg_backend', url) } catch(e) {}
 					showMessage(messages.settings.backendSwitched(url))
 				}).catch(function() {
 					showMessage(messages.settings.backendNotWorking(url))
 					$('#wallet-backend input').val(getBackend())
 				})
 			}
-
-
-
 
 			// ================================================================
 			// Copy to clipboard — works on HTTPS mobile + desktop
@@ -2084,7 +2054,8 @@
 			// ================================================================
 			$(document).ready(function() {
 				initLang()
-				applyTheme(readCookie('theme') || 'auto')
+				var _t; try { _t = localStorage.getItem('bte_cfg_theme') } catch(e) {}
+				applyTheme(_t || 'auto')
 
 				// Reset auto-lock timer on any user interaction (only effective when wallet is open)
 				;['click', 'keydown', 'touchstart', 'mousemove'].forEach(function(evt) {
@@ -2386,7 +2357,6 @@
 					globalData.selectedUtxos = null;
 					globalData.immatureBalance = 0;
 					globalData._lastRendered = { balance: -1, immature: -1, utxoFingerprint: '' };
-					globalData._lastUpdateAddress = null;
 					
 					// Compute new address and scripts for the selected type
 					globalData.address   = getAddress(globalData.keys);
@@ -2415,7 +2385,7 @@
 				})
 
 				$('#wallet-language-select select').on('change', function() {
-					setCookie('language', $('#wallet-language-select select').val(), 60)
+					try { localStorage.setItem('bte_cfg_language', $('#wallet-language-select select').val()) } catch(e) {}
 					initLang()
 					// Re-render dynamic content that uses getText but is NOT covered by [tkey] scan:
 					//   - Coin control panel rows (use getText for status labels)
