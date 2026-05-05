@@ -1246,7 +1246,6 @@
             }
             function closeWallet() {
                 _stopAutoLock()
-                clearTimeout(walletTimer)
                 wsDisconnect()
                 _privkeyClear('wallet-privkey-canvas')
                 _privkeyMask('wallet-privkey-canvas')
