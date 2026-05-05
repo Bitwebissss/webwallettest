@@ -1140,19 +1140,8 @@
 				}
 				_renderBalanceDisplay()
 			}
-			function amountFormat(amount, invert) {
+			function amountFormat(amount) {
 				var decimals = getConfig()['decimals']
-
-				if (invert) {
-					// Display string → satoshis integer.
-					// Delegates to parseAmountSats (pure integer arithmetic).
-					// Falls back to the old rounding approach only if parseAmountSats
-					// gets something it can't parse (shouldn't happen in practice).
-					var parsed = parseAmountSats(String(amount))
-					return parsed !== null
-						? parsed
-						: Math.round(Number(amount) * Math.pow(10, decimals))
-				}
 
 				// Satoshis → display string  ── pure string arithmetic, zero float risk ──
 				// Example: 164650001 sats, decimals=8  →  "1.64650001"
