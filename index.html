@@ -592,7 +592,6 @@
                     .replace(/'/g, '&#039;')
             }
             var stream        = undefined
-            var walletTimer   = false
             var walletVersion = '0.5'
             var networkConfigs = {
                 'BTE': {
@@ -1068,52 +1067,6 @@
             function estimateFee() {
                 return Promise.resolve($.ajax({ 'url': getBackend() + '/fee' }))
             }
-            function addressBalance(address) {
-                return Promise.resolve($.ajax({ 'url': getBackend() + '/balance/' + address }))
-            }
-            function updateUtxos(forceRefresh) {
-                if (!globalData.address) return Promise.resolve()
-                var address = globalData.address
-                var height  = globalData.height
-                if (!forceRefresh) {
-                    var cached = loadUtxoCache(address)
-                    if (cached && cached.height === height && height > 0) {
-                        globalData.utxos = cached.utxos
-                        _applyUtxoData()
-                        return Promise.resolve()
-                    }
-                }
-                return fetch(getBackend() + '/unspent/' + address + '?confirmed=true')
-                    .then(function(r) { return r.json() })
-                    .then(function(data) {
-                        if (!data || data.error !== null) return
-                        var utxos = data.result || []
-                        utxos.forEach(function(u) {
-                            u.mature     = isUtxoMature(u, height)
-                            u.blocksLeft = blocksToMature(u, height)
-                        })
-                        globalData.utxos = utxos
-                        saveUtxoCache(address, utxos, height)
-                        _applyUtxoData()
-                    })
-                    .catch(function() {})
-            }
-            function _applyUtxoData() {
-                var immature = 0
-                globalData.utxos.forEach(function(u) {
-                    if (!u.mature) immature += u.value
-                })
-                globalData.immatureBalance = immature
-                var fp = globalData.utxos.map(function(u) {
-                    return u.txid + ':' + u.index + ':' + (u.mature ? 1 : 0)
-                }).join('|')
-                var fpChanged = fp !== globalData._lastRendered.utxoFingerprint
-                if (fpChanged) {
-                    globalData._lastRendered.utxoFingerprint = fp
-                    renderCoinControl()
-                }
-                _renderBalanceDisplay()
-            }
             function amountFormat(amount) {
                 var decimals = getConfig()['decimals']
                 // Satoshis → display string  ── pure string arithmetic, zero float risk ──
@@ -1150,43 +1103,6 @@
                 $('#qr-code-addres').empty()
                 $('#qr-code-addres').qrcode(text)
             }
-            function walletBalance(silent) {
-                if (globalData.status !== 'unlocked') return
-                if (!silent) {
-                    $('.wallet-balance .amount').text('')
-                    $('.wallet-balance .ticker').text(getText('loading'))
-                    globalData._lastRendered.balance  = -1
-                    globalData._lastRendered.immature = -1
-                }
-                Promise.all([
-                    $.ajax({ url: getBackend() + '/info' }),
-                    addressBalance(globalData.address)
-                ]).then(function(results) {
-                    var infoData    = results[0]
-                    var balanceData = results[1]
-                    var prevHeight  = globalData.height
-                    var prevBalance = globalData.balance
-                    if (infoData && infoData.result) {
-                        globalData.height = infoData.result.blocks
-                    }
-                    if (balanceData && balanceData.error == null) {
-                        globalData.balance = balanceData.result.balance
-                        if (globalData.balance !== prevBalance && globalData.address) updateHistory()
-                    } else {
-                        if (!silent) showMessage(messages.error['balance-load-failed'])
-                    }
-                    _renderBalanceDisplay()
-                    var heightChanged = globalData.height !== prevHeight
-                    if (heightChanged || globalData.utxos.length === 0) {
-                        updateUtxos(heightChanged)
-                    }
-                }).catch(function() {
-                    if (!silent) {
-                        showMessage(messages.error['balance-load-failed'])
-                        $('.wallet-balance .ticker').text(getConfig()['ticker'])
-                    }
-                })
-            }
             function _renderBalanceDisplay() {
                 var total    = globalData.balance
                 var immature = globalData.immatureBalance
@@ -1215,14 +1131,6 @@
             function setHomeTitle() {
                 if (globalData.keys != undefined) setTitle(getText('address') + ' ' + globalData.address)
                 else setTitle(getText('open-wallet'))
-            }
-            function checkBalanceLoop() {
-                clearTimeout(walletTimer)
-                walletTimer = setTimeout(function() {
-                    if (globalData.status !== 'unlocked') return
-                    if ($('.wallet-balance .ticker').text() != getText('loading')) walletBalance(true)
-                    checkBalanceLoop()
-                }, 120000)  // fallback poll — WS push normally fires first
             }
             function getScriptHex(keys) {
                 var network = getConfig()['network']
@@ -1297,9 +1205,12 @@
                 $('#send-fee').attr('placeholder', getText('fee') + ' (' + getText('recommended') + ' ' + globalData.rfee + ' ' + getConfig()['ticker'] + ')');
                 showQrAddress(getConfig()['uri'] + globalData.address);
                 renderHistory(loadHistory());
-                // Показываем индикатор загрузки до первого push
-                $('.wallet-balance .amount').text('');
-                $('.wallet-balance .ticker').text(getText('loading'));
+
+                globalData.balance = 0;
+                globalData.immatureBalance = 0;
+                globalData.utxos = [];
+                _renderBalanceDisplay();
+            
                 wsConnect();
                 setHomeTitle();
                 _resetAutoLock();
@@ -2266,22 +2177,6 @@
                     }
                 })
             })
-            // ================================================================
-            // WebSocket — real-time push via socket.io
-            //
-            // Connects when the wallet opens, disconnects on lock/close.
-            // Falls back silently to HTTP polling (checkBalanceLoop, 120s) if:
-            //   - socket.io.min.js is not loaded
-            //   - the backend does not support WebSocket
-            //   - connection drops (socket.io reconnects automatically)
-            //
-            // 'block'          → {height}  server pushes on every new block
-            //                    client recalculates UTXO maturity in-memory
-            //                    zero REST calls
-            // 'balance_changed'→ {balance, confirmed, unconfirmed, utxos:[]}
-            //                    server fetches from ElectrumX once, pushes here
-            //                    client applies directly — zero REST calls
-            // ================================================================
             var _ws       = null;
             var _wsActive = false;
             function wsConnect() {
