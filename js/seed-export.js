@@ -55,7 +55,7 @@ function seedExportPNG(mnemonic, getText) {
     ctx.fillRect(0, padY + headerH, W, warnH)
     ctx.fillStyle = '#fff3f3'
     ctx.font      = '13px system-ui, sans-serif'
-    ctx.fillText('⚠  Never share this image. Store it offline only.', W / 2, padY + headerH + warnH / 2)
+    ctx.fillText(getText('seed-print-warning'), W / 2, padY + headerH + warnH / 2)
 
     // ── Word grid ────────────────────────────────────────────────────────────
     var gridTop = padY + headerH + warnH + 16
