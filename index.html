@@ -2377,48 +2377,30 @@
                 })
 
                 _ws.on('balance_changed', function(data) {
-                    if (globalData.status !== 'unlocked') return;
-                
-                    // ── диагностика (можно будет удалить) ──
-                    var dbg = document.getElementById('push-debug');
-                    if (!dbg) {
-                        dbg = document.createElement('div');
-                        dbg.id = 'push-debug';
-                        dbg.style.cssText = 'position:fixed;bottom:10px;right:10px;background:#222;color:#0f0;padding:8px 12px;font-size:12px;z-index:9999;border-radius:4px;';
-                        document.body.appendChild(dbg);
-                    }
-                    dbg.textContent = 'PUSH received: ' + new Date().toLocaleTimeString();
-                    // ────────────────────────────────────────
-                
-                    // Проверяем, что пришли и баланс, и UTXO
-                    if (data && typeof data.balance === 'number' && Array.isArray(data.utxos)) {
-                        console.log('Push data applied, no REST.');
-                        dbg.textContent += ' | APPLIED (no REST)';
-                
-                        var prevBalance = globalData.balance;
-                        globalData.balance = data.balance;
-                        var h = globalData.height;
-                
-                        // добавляем зрелость как в старом коде
+                    if (globalData.status !== 'unlocked') return
+                    if (data && data.balance !== undefined && Array.isArray(data.utxos)) {
+                        // Server pushed complete payload — apply directly, zero REST calls
+                        var prevBalance = globalData.balance
+                        globalData.balance = data.balance
+                        var h = globalData.height
                         globalData.utxos = data.utxos.map(function(u) {
                             return Object.assign({}, u, {
                                 mature:     isUtxoMature(u, h),
                                 blocksLeft: blocksToMature(u, h)
-                            });
-                        });
-                
-                        saveUtxoCache(globalData.address, globalData.utxos, h);
-                        _applyUtxoData();
-                
+                            })
+                        })
+                        saveUtxoCache(globalData.address, globalData.utxos, h)
+                        _applyUtxoData()
                         if (globalData.balance !== prevBalance && globalData.address) {
-                            updateHistory();   // история всё ещё REST, это нормально
+                            updateHistory()
                         }
                     } else {
-                        console.warn('Incomplete push data – fallback DISABLED for test. Data:', data);
-                        dbg.textContent += ' | FALLBACK DISABLED';
-                        // Раньше здесь был walletBalance(true) — мы его временно убрали для проверки
+                        // Server error / no data — fall back to REST
+                        if ($('.wallet-balance .ticker').text() !== getText('loading')) {
+                            walletBalance(true)
+                        }
                     }
-                });
+                })
 
                 _ws.on('disconnect', function() {
                     _wsActive = false
