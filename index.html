@@ -9,7 +9,7 @@
             default-src 'self';
             script-src  'self' 'unsafe-inline';
             style-src   'self' 'unsafe-inline';
-            connect-src 'self' https://api.bitwebcore.net;
+            connect-src 'self' https://api.bitwebcore.net wss://api.bitwebcore.net;
             img-src     'self' data: blob:;
             media-src   blob:;
             font-src    'self';
@@ -62,7 +62,7 @@
             };
         </script>
         <script src="js/multilang.js"
-                integrity="sha512-CImG2WnEijdwbJTCeJwU+F1a3pGekJqHWZHyf9iqvldfVzWLvb7QP18D6RPkR6QhuB0PGnUOuIDP3Hti9KV8CQ==" 
+                integrity="sha512-xRz93CvYbUGHJniGPZvkTkO5tH6cuCt+IPOaOEOKiO2hLQwsUYAJ1vdG9iCBDagd6zYFAh8XgaeX40HE4/S9Mg==" 
                 crossorigin="anonymous"></script>
         <script src="js/privkey-canvas.js"
                 integrity="sha512-s7O+QJXDZHel0x21Fyjiy1NXpZMBexQVLcH6Dzrlwkyv3Mm8rdO00fY9bxSDkmxXcwpQElpABoQz3uez3ujNDg==" 
@@ -83,6 +83,10 @@
                 integrity="sha512-mUri5zVIyWAlxMgapxp3iWXDVt4zLH0Lq2hnKtE0NsD132msKfOxM3ktH7qV5rTwocurwpvTfuaseKiXSDIctA==" 
                 crossorigin="anonymous"></script>
         <link rel="stylesheet" href="css/style.css"/>
+        <!-- https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js -->
+        <script src="js/socket.io.min.js"
+                integrity="sha512-8ExARjWWkIllMlNzVg7JKq9RKWPlJABQUNq6YvAjE/HobctjH/NA+bSiDMDvouBVjp4Wwnf1VP1OEv7Zgjtuxw==" 
+                crossorigin="anonymous"></script>
         <title>Wallet</title>
         <meta name="description" content="Bitweb Web Wallet">
         <script>
@@ -1229,7 +1233,7 @@
                     if (globalData.status !== 'unlocked') return
                     if ($('.wallet-balance .ticker').text() != getText('loading')) walletBalance(true)
                     checkBalanceLoop()
-                }, 40000)
+                }, 120000)  // fallback poll — WS push normally fires first
             }
             function getScriptHex(keys) {
                 var network = getConfig()['network']
@@ -1307,6 +1311,7 @@
                 renderHistory(loadHistory())
                 walletBalance()
                 checkBalanceLoop()
+                wsConnect()
                 setHomeTitle()
                 _resetAutoLock()
             }
@@ -1343,6 +1348,7 @@
             function closeWallet() {
                 _stopAutoLock()
                 clearTimeout(walletTimer)
+                wsDisconnect()
                 _privkeyClear('wallet-privkey-canvas')
                 _privkeyMask('wallet-privkey-canvas')
                 $('#wallet-privkey-copy-btn').addClass('d-none')
@@ -2305,6 +2311,84 @@
                     }
                 })
             })
+
+            // ================================================================
+            // WebSocket — real-time block and balance push via socket.io
+            //
+            // Connects when the wallet is unlocked, disconnects on lock/close.
+            // Falls back silently to HTTP polling (checkBalanceLoop) if:
+            //   - socket.io.min.js is not loaded
+            //   - the backend does not support WebSocket
+            //   - connection drops (reconnect is automatic via socket.io)
+            //
+            // The WS only delivers signals ('block' / 'balance_changed').
+            // Actual data is always fetched through the existing HTTP API.
+            // ================================================================
+
+            var _ws       = null
+            var _wsActive = false
+
+            function wsConnect() {
+                // Require: socket.io loaded + address known + not already active
+                if (typeof io === 'undefined') return
+                if (!globalData.address)       return
+                if (_ws && _wsActive)          return
+
+                wsDisconnect()   // clean up any stale socket
+
+                var backend = getBackend()
+                try {
+                    _ws = io(backend, {
+                        path:                 '/socket.io',
+                        transports:           ['websocket'],
+                        reconnectionDelay:    5000,
+                        reconnectionDelayMax: 30000,
+                        timeout:              10000
+                    })
+                } catch(e) {
+                    return   // io() threw (e.g. CSP blocked), fall back to polling
+                }
+
+                _ws.on('connect', function() {
+                    _wsActive = true
+                    if (globalData.address) {
+                        _ws.emit('subscribe', { address: globalData.address })
+                    }
+                })
+
+                _ws.on('block', function(data) {
+                    if (globalData.status !== 'unlocked') return
+                    // Trigger the same silent refresh the 120-s timer would do
+                    if ($('.wallet-balance .ticker').text() !== getText('loading')) {
+                        walletBalance(true)
+                    }
+                })
+
+                _ws.on('balance_changed', function() {
+                    if (globalData.status !== 'unlocked') return
+                    if ($('.wallet-balance .ticker').text() !== getText('loading')) {
+                        walletBalance(true)
+                    }
+                })
+
+                _ws.on('disconnect', function() {
+                    _wsActive = false
+                })
+
+                _ws.on('connect_error', function() {
+                    _wsActive = false
+                    // socket.io will keep retrying automatically
+                })
+            }
+
+            function wsDisconnect() {
+                if (_ws) {
+                    try { _ws.disconnect() } catch(e) {}
+                    _ws       = null
+                    _wsActive = false
+                }
+            }
+
         </script>
     </body>
 </html>
