@@ -1844,6 +1844,68 @@
 			}
 			// ─────────────────────────────────────────────────────────────────────
 
+			// ─── Real-time validation: send button state + visual feedback ─────────
+			// Declared globally so resetTxForm, _renderBalanceDisplay, and other
+			// top-level functions can call it without a scope error.
+			function validateSendForm() {
+				if (globalData.status !== 'unlocked') {
+					$('#send-tx').prop('disabled', true)
+					return
+				}
+				var feeStr     = $('#send-fee').val() !== '' ? $('#send-fee').val() : String(globalData.rfee)
+				var feeSats    = parseAmountSats(feeStr)
+				var minFeeSats = parseAmountSats(String(getConfig()['fee']))
+
+				var outputsSats = 0
+				var allFilled   = true
+				var allAmtOk    = true
+
+				$.each($('#send-outputs .send-outputs-item'), function(_, item) {
+					var address = $('[name="send-address"]', item).val().trim()
+					var amtStr  = $('[name="send-ammount"]', item).val().trim()
+					var amtSats = parseAmountSats(amtStr)
+					if (!address || !amtStr) allFilled = false
+					if (!amtSats || amtSats <= 0) allAmtOk = false
+					if (amtSats && amtSats > 0) outputsSats += amtSats
+				})
+
+				var feeOk     = feeSats !== null && feeSats > 0 && feeSats >= (minFeeSats || 0)
+				var totalSats = outputsSats + (feeSats || 0)
+
+				// Spendable (respects coin control selection)
+				var spendableSats
+				if (globalData.coinControl && globalData.selectedUtxos && globalData.selectedUtxos.size > 0) {
+					spendableSats = 0
+					globalData.utxos.forEach(function(u) {
+						if (globalData.selectedUtxos.has(u.txid + ':' + u.index) && u.mature)
+							spendableSats += u.value
+					})
+				} else {
+					spendableSats = globalData.balance - globalData.immatureBalance
+				}
+
+				var overLimit = totalSats > spendableSats && totalSats > 0
+				var canSend   = allFilled && allAmtOk && feeOk && !overLimit && totalSats > 0
+
+				// — Button —
+				$('#send-tx').prop('disabled', !canSend)
+
+				// — Balance label turns red when over limit —
+				$('#wallet-send .wallet-balance').toggleClass('text-danger', overLimit)
+
+				// — Fee field: red when typed but invalid —
+				var feeTyped = $('#send-fee').val() !== ''
+				$('#send-fee').toggleClass('is-invalid', feeTyped && (!feeOk || overLimit))
+
+				// — Amount fields: red when over limit or typed but invalid —
+				$('#send-outputs [name="send-ammount"]').each(function() {
+					var amtSats = parseAmountSats($(this).val())
+					var typed   = $(this).val() !== ''
+					$(this).toggleClass('is-invalid', typed && (!amtSats || amtSats <= 0 || overLimit))
+				})
+			}
+			// ─────────────────────────────────────────────────────────────────────
+
 			$(document).ready(function() {
 				initLang()
 				var _t; try { _t = localStorage.getItem('bte_cfg_theme') } catch(e) {}
@@ -1992,65 +2054,7 @@
 						}
 					}
 				})
-				// ─── Real-time validation: send button state + visual feedback ─────────
-				function validateSendForm() {
-					if (globalData.status !== 'unlocked') {
-						$('#send-tx').prop('disabled', true)
-						return
-					}
-					var feeStr     = $('#send-fee').val() !== '' ? $('#send-fee').val() : String(globalData.rfee)
-					var feeSats    = parseAmountSats(feeStr)
-					var minFeeSats = parseAmountSats(String(getConfig()['fee']))
-
-					var outputsSats = 0
-					var allFilled   = true
-					var allAmtOk    = true
-
-					$.each($('#send-outputs .send-outputs-item'), function(_, item) {
-						var address = $('[name="send-address"]', item).val().trim()
-						var amtStr  = $('[name="send-ammount"]', item).val().trim()
-						var amtSats = parseAmountSats(amtStr)
-						if (!address || !amtStr) allFilled = false
-						if (!amtSats || amtSats <= 0) allAmtOk = false
-						if (amtSats && amtSats > 0) outputsSats += amtSats
-					})
-
-					var feeOk     = feeSats !== null && feeSats > 0 && feeSats >= (minFeeSats || 0)
-					var totalSats = outputsSats + (feeSats || 0)
-
-					// Spendable (respects coin control selection)
-					var spendableSats
-					if (globalData.coinControl && globalData.selectedUtxos && globalData.selectedUtxos.size > 0) {
-						spendableSats = 0
-						globalData.utxos.forEach(function(u) {
-							if (globalData.selectedUtxos.has(u.txid + ':' + u.index) && u.mature)
-								spendableSats += u.value
-						})
-					} else {
-						spendableSats = globalData.balance - globalData.immatureBalance
-					}
-
-					var overLimit = totalSats > spendableSats && totalSats > 0
-					var canSend   = allFilled && allAmtOk && feeOk && !overLimit && totalSats > 0
-
-					// — Button —
-					$('#send-tx').prop('disabled', !canSend)
-
-					// — Balance label turns red when over limit —
-					$('#wallet-send .wallet-balance').toggleClass('text-danger', overLimit)
-
-					// — Fee field: red when typed but invalid —
-					var feeTyped = $('#send-fee').val() !== ''
-					$('#send-fee').toggleClass('is-invalid', feeTyped && (!feeOk || overLimit))
-
-					// — Amount fields: red when over limit or typed but invalid —
-					$('#send-outputs [name="send-ammount"]').each(function() {
-						var amtSats = parseAmountSats($(this).val())
-						var typed   = $(this).val() !== ''
-						$(this).toggleClass('is-invalid', typed && (!amtSats || amtSats <= 0 || overLimit))
-					})
-				}
-
+				// ─── Input filtering + validation event bindings (validateSendForm is global) ──
 				// Input filtering for fee field + trigger validation
 				$('#send-fee').on('input', function() {
 					var cur = filterAmountStr($(this).val(), getConfig()['decimals'])
