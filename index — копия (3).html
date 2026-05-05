@@ -1567,7 +1567,7 @@
 					count + ' ' + getText('coin-control-selected') + ' — ' + amountFormat(total) + ' ' + getConfig()['ticker']
 				)
 			}
-			function showConfirmation(amount, totalSats, feeSats, outputsSats) {
+			function showConfirmation(amount) {
 				$('#confirm-amount').text(amount + ' ' + getConfig()['ticker'])
 				$('#send-modal-error').addClass('d-none').html('')
 				$('#send-modal').modal('toggle')
@@ -1580,12 +1580,11 @@
 				$('#status-screen span').html('')
 				$.each($('#send-outputs .send-outputs-item'), function(key, item) {
 					var address = $('[name="send-address"]', item).val().trim()
-					var amtSats = parseAmountSats($('[name="send-ammount"]', item).val())
-					globalData.tx.outputs.push({ 'address': address, 'amount': amtSats })
+					var value   = $('[name="send-ammount"]', item).val() * 1
+					globalData.tx.outputs.push({ 'address': address, 'amount': amountFormat(value, true) })
 				})
-				// Store all monetary values as satoshi integers
-				globalData.tx.amount = totalSats
-				globalData.tx.fee    = feeSats
+				globalData.tx.amount = amountFormat(amount, true)
+				globalData.tx.fee    = amountFormat(($('#send-fee').val() != '') ? $('#send-fee').val() : globalData.rfee, true)
 			}
 			function getRawTx(txid) {
 				return fetch(getBackend() + '/rawtx/' + txid)
@@ -1800,45 +1799,6 @@
 				$('#wallet-send input').val('')
 				globalData.resetTx()
 			}
-			// ─── Integer-safe amount helpers ─────────────────────────────────────
-			// Convert a display-unit string (e.g. "1.50000001") to satoshis.
-			// Returns an integer, or null if the string is invalid / empty.
-			function parseAmountSats(str) {
-				var decimals = getConfig()['decimals']
-				str = String(str == null ? '' : str).trim()
-				if (str === '' || str === '.') return null
-				// Must be digits with an optional single decimal point
-				if (!/^\d+\.?\d*$/.test(str)) return null
-				var parts    = str.split('.')
-				var intPart  = parts[0] || '0'
-				var fracPart = (parts[1] || '').slice(0, decimals)
-				// Pad fractional part to exactly `decimals` digits
-				while (fracPart.length < decimals) fracPart += '0'
-				// Both parts are pure digit strings → no float precision risk here
-				var sats = parseInt(intPart, 10) * Math.pow(10, decimals) + parseInt(fracPart || '0', 10)
-				return Math.round(sats)   // Math.round eliminates any residual float dust
-			}
-
-			// Strip characters that are not valid in an amount field.
-			// Allows digits and at most one '.'; truncates fractional part to `decimals` digits.
-			function filterAmountStr(val, decimals) {
-				// Keep only digits and dots
-				val = val.replace(/[^\d.]/g, '')
-				// Collapse multiple dots: keep everything up to and including the first dot,
-				// then strip further dots and limit fractional length.
-				var dotIdx = val.indexOf('.')
-				if (decimals === 0) {
-					// No decimal part allowed at all
-					val = val.replace(/\./g, '')
-				} else if (dotIdx >= 0) {
-					var before = val.slice(0, dotIdx + 1)
-					var after  = val.slice(dotIdx + 1).replace(/\./g, '').slice(0, decimals)
-					val = before + after
-				}
-				return val
-			}
-			// ─────────────────────────────────────────────────────────────────────
-
 			$(document).ready(function() {
 				initLang()
 				var _t; try { _t = localStorage.getItem('bte_cfg_theme') } catch(e) {}
@@ -1935,84 +1895,29 @@
 				$(window).on('hashchange', routePage)
 				if (window.location.hash) $(window).trigger('hashchange')
 				$('#send-tx').click(function() {
-					var error      = false
-					var decimals   = getConfig()['decimals']
-					var feeStr     = $('#send-fee').val() !== '' ? $('#send-fee').val() : String(globalData.rfee)
-					var feeSats    = parseAmountSats(feeStr)
-					// Minimum fee in satoshis (config stores it in display units)
-					var minFeeSats = parseAmountSats(String(getConfig()['fee']))
+					var error = false
+					var txFee = ($('#send-fee').val() != '') ? $('#send-fee').val() : globalData.rfee
+					var total = 0
 
-					if (feeSats === null || feeSats <= 0) {
+					if (isNaN(txFee) || txFee <= 0) {
 						showSendError(messages.error['not-valid-fee']); error = true
-					} else if (feeSats < minFeeSats) {
+					} else if (txFee < getConfig()['fee']) {
 						showSendError(messages.error['small-fee']); error = true
 					}
-
-					var outputsSats = 0
 					$.each($('#send-outputs .send-outputs-item'), function(key, item) {
 						var address = $('[name="send-address"]', item).val().trim()
-						var amtStr  = $('[name="send-ammount"]', item).val()
-						var amtSats = parseAmountSats(amtStr)
-						if (amtSats === null || amtSats <= 0) {
-							showSendError(messages.error['not-valid-amount']); error = true
-						}
-						if (!validateAddress(address)) {
-							showSendError(messages.error['not-valid-address']); error = true
-						}
-						if (amtSats !== null) outputsSats += amtSats
+						var amount  = $('[name="send-ammount"]', item).val()
+						if (isNaN(amount) || amount <= 0) { showSendError(messages.error['not-valid-amount']); error = true }
+						if (!validateAddress(address))    { showSendError(messages.error['not-valid-address']); error = true }
+						total += amount * 1
 					})
-
-					// Total = outputs + fee, entirely in satoshis (integers)
-					var totalSats = outputsSats + (feeSats || 0)
-
-					// Spendable in satoshis: respect coin-control selection when active
-					var spendableSats
-					if (globalData.coinControl && globalData.selectedUtxos && globalData.selectedUtxos.size > 0) {
-						spendableSats = 0
-						globalData.utxos.forEach(function(u) {
-							if (globalData.selectedUtxos.has(u.txid + ':' + u.index) && u.mature) {
-								spendableSats += u.value
-							}
-						})
-					} else {
-						spendableSats = globalData.balance - globalData.immatureBalance
-					}
-
+					total = parseFloat((total + txFee * 1).toFixed(getConfig()['decimals']))
+					var spendable = amountFormat(globalData.balance - globalData.immatureBalance)
 					if (!error) {
-						if (totalSats <= spendableSats) {
-							// Pass display amount to showConfirmation for UI label only
-							showConfirmation(amountFormat(totalSats), totalSats, feeSats, outputsSats)
-						} else {
-							showSendError(messages.error['not-enough-funds'])
-						}
+						if (total <= spendable) showConfirmation(total)
+						else showSendError(messages.error['not-enough-funds'])
 					}
 				})
-				// ─── Real-time input filtering ────────────────────────────────────────
-				// Block any non-numeric characters as the user types in the fee field.
-				$('#send-fee').on('input', function() {
-					var decimals = getConfig()['decimals']
-					var cur      = $(this).val()
-					var filtered = filterAmountStr(cur, decimals)
-					if (filtered !== cur) $(this).val(filtered)
-				})
-				// Use event delegation so dynamically added amount rows are also covered.
-				$('#send-outputs').on('input', '[name="send-ammount"]', function() {
-					var decimals = getConfig()['decimals']
-					var cur      = $(this).val()
-					var filtered = filterAmountStr(cur, decimals)
-					if (filtered !== cur) $(this).val(filtered)
-				})
-				// Prevent paste of non-numeric content into fee / amount fields.
-				$(document).on('paste', '#send-fee, [name="send-ammount"]', function(e) {
-					var decimals = getConfig()['decimals']
-					var self     = this
-					setTimeout(function() {
-						var cur      = $(self).val()
-						var filtered = filterAmountStr(cur, decimals)
-						if (filtered !== cur) $(self).val(filtered)
-					}, 0)
-				})
-				// ─────────────────────────────────────────────────────────────────────
 				$('#open-key-form').submit(function(e) {
 					var wif = $('#passphrase').val().trim()
 					if ([51, 52].includes(wif.length)) {
