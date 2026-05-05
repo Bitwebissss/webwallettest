@@ -970,15 +970,16 @@
 			function isUtxoMature(utxo, currentHeight) {
 				if (!utxo.coinbase) return true
 				if (utxo.height === 0) return false
-				var depth    = currentHeight - utxo.height + 1
+				// Consensus rule (matches C++ node):
+				//   depth = nSpendHeight - coin.nHeight  (no +1)
+				//   mature when depth >= required
 				var required = getRequiredMaturity(utxo.height)
-				return depth >= required
+				return (currentHeight - utxo.height) >= required
 			}
 			function blocksToMature(utxo, currentHeight) {
 				if (!utxo.coinbase || utxo.height === 0) return 0
-				var depth    = currentHeight - utxo.height + 1
 				var required = getRequiredMaturity(utxo.height)
-				return Math.max(0, required - depth)
+				return Math.max(0, required - (currentHeight - utxo.height))
 			}
 			var UTXO_CACHE_TTL = 60000  // ms
 			function loadUtxoCache(address) {
