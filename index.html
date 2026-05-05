@@ -321,7 +321,7 @@
 								</div>
 								<div class="input-group">
 									<input id="send-fee" class="form-control" placeholder="Fee" type="text" value="">
-																			<button class="btn btn-primary b-width" type="submit" id="send-tx" tkey="send"></button>
+																			<button class="btn btn-primary b-width" type="submit" id="send-tx" tkey="send" disabled></button>
 								</div>
 								<div class="mt-2">
 									<a href="#" id="coin-control-toggle" class="text-muted small" style="text-decoration:none">
@@ -1369,6 +1369,8 @@
 						$(this).addClass('d-none')
 					}
 				})
+				// Re-validate send form when balance changes (e.g. after network fetch)
+				validateSendForm()
 			}
 			function setHomeTitle() {
 				if (globalData.keys != undefined) setTitle(getText('address') + ' ' + globalData.address)
@@ -1798,7 +1800,10 @@
 			function resetTxForm() {
 				$('.send-additional-output').remove()
 				$('#wallet-send input').val('')
+				$('#wallet-send .wallet-balance').removeClass('text-danger')
+				$('#send-fee, #send-outputs [name="send-ammount"]').removeClass('is-invalid')
 				globalData.resetTx()
+				validateSendForm()
 			}
 			// ─── Integer-safe amount helpers ─────────────────────────────────────
 			// Convert a display-unit string (e.g. "1.50000001") to satoshis.
@@ -1987,29 +1992,90 @@
 						}
 					}
 				})
-				// ─── Real-time input filtering ────────────────────────────────────────
-				// Block any non-numeric characters as the user types in the fee field.
+				// ─── Real-time validation: send button state + visual feedback ─────────
+				function validateSendForm() {
+					if (globalData.status !== 'unlocked') {
+						$('#send-tx').prop('disabled', true)
+						return
+					}
+					var feeStr     = $('#send-fee').val() !== '' ? $('#send-fee').val() : String(globalData.rfee)
+					var feeSats    = parseAmountSats(feeStr)
+					var minFeeSats = parseAmountSats(String(getConfig()['fee']))
+
+					var outputsSats = 0
+					var allFilled   = true
+					var allAmtOk    = true
+
+					$.each($('#send-outputs .send-outputs-item'), function(_, item) {
+						var address = $('[name="send-address"]', item).val().trim()
+						var amtStr  = $('[name="send-ammount"]', item).val().trim()
+						var amtSats = parseAmountSats(amtStr)
+						if (!address || !amtStr) allFilled = false
+						if (!amtSats || amtSats <= 0) allAmtOk = false
+						if (amtSats && amtSats > 0) outputsSats += amtSats
+					})
+
+					var feeOk     = feeSats !== null && feeSats > 0 && feeSats >= (minFeeSats || 0)
+					var totalSats = outputsSats + (feeSats || 0)
+
+					// Spendable (respects coin control selection)
+					var spendableSats
+					if (globalData.coinControl && globalData.selectedUtxos && globalData.selectedUtxos.size > 0) {
+						spendableSats = 0
+						globalData.utxos.forEach(function(u) {
+							if (globalData.selectedUtxos.has(u.txid + ':' + u.index) && u.mature)
+								spendableSats += u.value
+						})
+					} else {
+						spendableSats = globalData.balance - globalData.immatureBalance
+					}
+
+					var overLimit = totalSats > spendableSats && totalSats > 0
+					var canSend   = allFilled && allAmtOk && feeOk && !overLimit && totalSats > 0
+
+					// — Button —
+					$('#send-tx').prop('disabled', !canSend)
+
+					// — Balance label turns red when over limit —
+					$('#wallet-send .wallet-balance').toggleClass('text-danger', overLimit)
+
+					// — Fee field: red when typed but invalid —
+					var feeTyped = $('#send-fee').val() !== ''
+					$('#send-fee').toggleClass('is-invalid', feeTyped && (!feeOk || overLimit))
+
+					// — Amount fields: red when over limit or typed but invalid —
+					$('#send-outputs [name="send-ammount"]').each(function() {
+						var amtSats = parseAmountSats($(this).val())
+						var typed   = $(this).val() !== ''
+						$(this).toggleClass('is-invalid', typed && (!amtSats || amtSats <= 0 || overLimit))
+					})
+				}
+
+				// Input filtering for fee field + trigger validation
 				$('#send-fee').on('input', function() {
-					var decimals = getConfig()['decimals']
-					var cur      = $(this).val()
-					var filtered = filterAmountStr(cur, decimals)
-					if (filtered !== cur) $(this).val(filtered)
+					var cur = filterAmountStr($(this).val(), getConfig()['decimals'])
+					if (cur !== $(this).val()) $(this).val(cur)
+					validateSendForm()
 				})
-				// Use event delegation so dynamically added amount rows are also covered.
+
+				// Input filtering + validation for amount fields (event delegation covers dynamic rows)
 				$('#send-outputs').on('input', '[name="send-ammount"]', function() {
-					var decimals = getConfig()['decimals']
-					var cur      = $(this).val()
-					var filtered = filterAmountStr(cur, decimals)
-					if (filtered !== cur) $(this).val(filtered)
+					var cur = filterAmountStr($(this).val(), getConfig()['decimals'])
+					if (cur !== $(this).val()) $(this).val(cur)
+					validateSendForm()
 				})
-				// Prevent paste of non-numeric content into fee / amount fields.
-				$(document).on('paste', '#send-fee, [name="send-ammount"]', function(e) {
-					var decimals = getConfig()['decimals']
-					var self     = this
+				// Validate when address changes
+				$('#send-outputs').on('input', '[name="send-address"]', function() {
+					validateSendForm()
+				})
+
+				// Paste protection on fee and amount fields
+				$(document).on('paste', '#send-fee, [name="send-ammount"]', function() {
+					var self = this
 					setTimeout(function() {
-						var cur      = $(self).val()
-						var filtered = filterAmountStr(cur, decimals)
-						if (filtered !== cur) $(self).val(filtered)
+						var cur = filterAmountStr($(self).val(), getConfig()['decimals'])
+						if (cur !== $(self).val()) $(self).val(cur)
+						validateSendForm()
 					}, 0)
 				})
 				// ─────────────────────────────────────────────────────────────────────
@@ -2086,7 +2152,12 @@
 						'<button class="btn btn-outline-danger remove-additional-output" type="button"><span class="fa-solid fa-minus"></span></button>' +
 						'</div>'
 					)
-					$('.remove-additional-output').click(function(e) { $(this).closest('.send-additional-output').remove(); e.preventDefault() })
+					$('.remove-additional-output').off('click').on('click', function(e) {
+						$(this).closest('.send-additional-output').remove()
+						validateSendForm()
+						e.preventDefault()
+					})
+					validateSendForm()  // new empty row → button must disable
 					e.preventDefault()
 				})
 				$('#send-reset').click(function(e) { resetTxForm(); e.preventDefault() })
@@ -2110,6 +2181,7 @@
 						globalData.selectedUtxos = null
 					}
 					renderCoinControl()
+					validateSendForm()
 				})
 				$('#coin-control-select-all').click(function(e) {
 					if (!globalData.coinControl) return e.preventDefault()
@@ -2118,6 +2190,7 @@
 						if (u.mature) globalData.selectedUtxos.add(u.txid + ':' + u.index)
 					})
 					renderCoinControl()
+					validateSendForm()
 					e.preventDefault()
 				})
 				$(document).on('change', '.cc-utxo-check', function() {
@@ -2126,6 +2199,7 @@
 					if ($(this).is(':checked')) globalData.selectedUtxos.add(key)
 					else globalData.selectedUtxos.delete(key)
 					_updateCoinControlInfo()
+					validateSendForm()
 				})
 				$('#footer-broadcast').click(function() {
 					var rawtx = $('#transaction-broadcast-raw')
