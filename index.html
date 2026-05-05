@@ -1076,11 +1076,7 @@
             function addressBalance(address) {
                 return Promise.resolve($.ajax({ 'url': getBackend() + '/balance/' + address }))
             }
-            function getUnspent(address, amount, confirmedOnly) {
-                var url = getBackend() + '/unspent/' + address + '?amount=' + amount
-                if (confirmedOnly) url += '&confirmed=true'
-                return Promise.resolve($.ajax({ 'url': url }))
-            }
+
             function updateUtxos(forceRefresh) {
                 if (!globalData.address) return Promise.resolve()
                 var address = globalData.address
@@ -2084,6 +2080,10 @@
                     globalData.scriptHex = getScriptHex(globalData.keys);
                     globalData.allScriptHexes = getAllScriptHexes(globalData.keys);
                     globalData.allAddresses   = getAllAddresses(globalData.keys);
+                    // Re-subscribe WS to new address (old subscription pointed to wrong room)
+                    if (_ws && _wsActive) {
+                        _ws.emit('subscribe', { address: globalData.address });
+                    }
                     $('#wallet-address').text(globalData.address);
                     showQrAddress(getConfig()['uri'] + globalData.address);
                     $('#wallet-keys-pubkey input').val(globalData.pubKeyHex);
@@ -2313,16 +2313,20 @@
             })
 
             // ================================================================
-            // WebSocket — real-time block and balance push via socket.io
+            // WebSocket — real-time push via socket.io
             //
-            // Connects when the wallet is unlocked, disconnects on lock/close.
-            // Falls back silently to HTTP polling (checkBalanceLoop) if:
+            // Connects when the wallet opens, disconnects on lock/close.
+            // Falls back silently to HTTP polling (checkBalanceLoop, 120s) if:
             //   - socket.io.min.js is not loaded
             //   - the backend does not support WebSocket
-            //   - connection drops (reconnect is automatic via socket.io)
+            //   - connection drops (socket.io reconnects automatically)
             //
-            // The WS only delivers signals ('block' / 'balance_changed').
-            // Actual data is always fetched through the existing HTTP API.
+            // 'block'          → {height}  server pushes on every new block
+            //                    client recalculates UTXO maturity in-memory
+            //                    zero REST calls
+            // 'balance_changed'→ {balance, confirmed, unconfirmed, utxos:[]}
+            //                    server fetches from ElectrumX once, pushes here
+            //                    client applies directly — zero REST calls
             // ================================================================
 
             var _ws       = null
@@ -2358,16 +2362,43 @@
 
                 _ws.on('block', function(data) {
                     if (globalData.status !== 'unlocked') return
-                    // Trigger the same silent refresh the 120-s timer would do
-                    if ($('.wallet-balance .ticker').text() !== getText('loading')) {
-                        walletBalance(true)
+                    if (!data || !data.height) return
+                    // Update height in-memory, recalculate maturity client-side — zero REST calls
+                    var prevHeight = globalData.height
+                    globalData.height = data.height
+                    if (globalData.utxos.length > 0) {
+                        var h = globalData.height
+                        globalData.utxos.forEach(function(u) {
+                            u.mature     = isUtxoMature(u, h)
+                            u.blocksLeft = blocksToMature(u, h)
+                        })
+                        _applyUtxoData()
                     }
                 })
 
-                _ws.on('balance_changed', function() {
+                _ws.on('balance_changed', function(data) {
                     if (globalData.status !== 'unlocked') return
-                    if ($('.wallet-balance .ticker').text() !== getText('loading')) {
-                        walletBalance(true)
+                    if (data && data.balance !== undefined && Array.isArray(data.utxos)) {
+                        // Server pushed complete payload — apply directly, zero REST calls
+                        var prevBalance = globalData.balance
+                        globalData.balance = data.balance
+                        var h = globalData.height
+                        globalData.utxos = data.utxos.map(function(u) {
+                            return Object.assign({}, u, {
+                                mature:     isUtxoMature(u, h),
+                                blocksLeft: blocksToMature(u, h)
+                            })
+                        })
+                        saveUtxoCache(globalData.address, globalData.utxos, h)
+                        _applyUtxoData()
+                        if (globalData.balance !== prevBalance && globalData.address) {
+                            updateHistory()
+                        }
+                    } else {
+                        // Server error / no data — fall back to REST
+                        if ($('.wallet-balance .ticker').text() !== getText('loading')) {
+                            walletBalance(true)
+                        }
                     }
                 })
 
