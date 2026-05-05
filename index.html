@@ -77,7 +77,6 @@
         <script src="js/bip39-bundle.min.js"
                 integrity="sha512-9qS0/lQ8HZTImQ/TbprR/xgDSdMkW1aPHsts+AN1SDQ/l7aVWMcEYfeYKWZpOiZkW7K7OWmyqXi0zKo4SUFgpw=="
                 crossorigin="anonymous"></script>
-
         <!-- Self build see https://github.com/bitweb-project/bitcoin-bundle-v7 -->
         <script src="js/bitcoin-bundle-v7.min.js"
                 integrity="sha512-mUri5zVIyWAlxMgapxp3iWXDVt4zLH0Lq2hnKtE0NsD132msKfOxM3ktH7qV5rTwocurwpvTfuaseKiXSDIctA==" 
@@ -262,7 +261,6 @@
                                     <button class="btn btn-primary b-width" type="submit" id="open-key-wallet" tkey="open"></button>
                                 </div>
                             </form>
-
                         </div>
                         <div class="card-footer">
                             <div class="footer-item tab-item" data-tab="open-seed">
@@ -548,13 +546,11 @@
                 </div>
             </div>
         </div>
-
         <div class="disclaimer mb-3">
             <div class="container text-center">
                 <small class="text-muted" style="max-width: 1100px;" tkey="disclaimer"></small>
             </div>
         </div>
-
         <footer class="mb-3">
             <div class="container text-center">
                 <span class="fa-brands fa-github"></span> <a target="_blank" rel="noopener noreferrer" href="https://github.com/bitweb-project/web-wallet">Bitweb</a>
@@ -598,7 +594,6 @@
             var stream        = undefined
             var walletTimer   = false
             var walletVersion = '0.5'
-
             var networkConfigs = {
                 'BTE': {
                     'uri':     'bitweb:',
@@ -1076,7 +1071,6 @@
             function addressBalance(address) {
                 return Promise.resolve($.ajax({ 'url': getBackend() + '/balance/' + address }))
             }
-
             function updateUtxos(forceRefresh) {
                 if (!globalData.address) return Promise.resolve()
                 var address = globalData.address
@@ -1122,7 +1116,6 @@
             }
             function amountFormat(amount) {
                 var decimals = getConfig()['decimals']
-
                 // Satoshis → display string  ── pure string arithmetic, zero float risk ──
                 // Example: 164650001 sats, decimals=8  →  "1.64650001"
                 //          100000000 sats              →  "1"
@@ -1262,7 +1255,6 @@
                 return set
             }
             var _seedState = { mnemonic: '', strength: 256, verifyPositions: [] }
-
             function _hideSeedReveal() {
                 $('#wallet-seed-hidden').removeClass('d-none')
                 $('#wallet-seed-revealed').addClass('d-none')
@@ -1284,32 +1276,33 @@
                 _seedState = { mnemonic: '', strength: 256, verifyPositions: [] }
             }
             function _showWalletUI(keys) {
-                var pubkey = globalData.pubKeyHex
-                var redeem = '0014' + bitcoin.Buffer.from(getP2WPKHScript(keys.publicKey).hash).toString('hex')
-                $('#wallet-keys-pubkey input').val(pubkey)
-                _privkeyClear('wallet-privkey-canvas')
-                _privkeyMask('wallet-privkey-canvas')
-                $('#wallet-privkey-copy-btn').addClass('d-none')
-                $('#toggle-wallet-privkey').text(getText('show'))
-                $('#wallet-keys-script input').val(redeem)
+                var pubkey = globalData.pubKeyHex;
+                var redeem = '0014' + bitcoin.Buffer.from(getP2WPKHScript(keys.publicKey).hash).toString('hex');
+                $('#wallet-keys-pubkey input').val(pubkey);
+                _privkeyClear('wallet-privkey-canvas');
+                _privkeyMask('wallet-privkey-canvas');
+                $('#wallet-privkey-copy-btn').addClass('d-none');
+                $('#toggle-wallet-privkey').text(getText('show'));
+                $('#wallet-keys-script input').val(redeem);
                 if (globalData.isBip39) {
-                    $('#wallet-keys-seed').removeClass('d-none')
+                    $('#wallet-keys-seed').removeClass('d-none');
                 } else {
-                    $('#wallet-keys-seed').addClass('d-none')
+                    $('#wallet-keys-seed').addClass('d-none');
                 }
-                _hideSeedReveal()
-                $('#wallet-address').text(globalData.address)
-                $('#pin-login-block').addClass('d-none')
-                $('#open-block').addClass('d-none')
-                $('#wallet-block').removeClass('d-none')
-                $('#send-fee').attr('placeholder', getText('fee') + ' (' + getText('recommended') + ' ' + globalData.rfee + ' ' + getConfig()['ticker'] + ')')
-                showQrAddress(getConfig()['uri'] + globalData.address)
-                renderHistory(loadHistory())
-                walletBalance()
-                checkBalanceLoop()
-                wsConnect()
-                setHomeTitle()
-                _resetAutoLock()
+                _hideSeedReveal();
+                $('#wallet-address').text(globalData.address);
+                $('#pin-login-block').addClass('d-none');
+                $('#open-block').addClass('d-none');
+                $('#wallet-block').removeClass('d-none');
+                $('#send-fee').attr('placeholder', getText('fee') + ' (' + getText('recommended') + ' ' + globalData.rfee + ' ' + getConfig()['ticker'] + ')');
+                showQrAddress(getConfig()['uri'] + globalData.address);
+                renderHistory(loadHistory());
+                // Показываем индикатор загрузки до первого push
+                $('.wallet-balance .amount').text('');
+                $('.wallet-balance .ticker').text(getText('loading'));
+                wsConnect();
+                setHomeTitle();
+                _resetAutoLock();
             }
             async function openWallet(keys, offerPin, bip39Data) {
                 if (offerPin && !hasSavedWallet()) {
@@ -1338,7 +1331,6 @@
                 globalData.pubKeyHex      = bitcoin.Buffer.from(keys.publicKey).toString('hex')
                 globalData.allScriptHexes = getAllScriptHexes(keys)
                 globalData.allAddresses   = getAllAddresses(keys)
-
                 _showWalletUI(keys)
             }
             function closeWallet() {
@@ -1364,13 +1356,11 @@
                 var height = globalData.height
                 var tbody  = $('#coin-control-tbody')
                 tbody.empty()
-
                 if (utxos.length === 0) {
                     tbody.append('<tr><td colspan="5" class="text-muted text-center">' + escHtml(getText('coin-control-no-utxo')) + '</td></tr>')
                     _updateCoinControlInfo()
                     return
                 }
-
                 utxos.forEach(function(u, idx) {
                     var key      = escHtml(u.txid + ':' + u.index)
                     var checked  = !globalData.coinControl || (globalData.selectedUtxos && globalData.selectedUtxos.has(u.txid + ':' + u.index))
@@ -1390,7 +1380,6 @@
                         : '<span class="badge text-bg-secondary">' + escHtml(getText('coin-control-regular')) + '</span>'
                     var shortTx   = escHtml(u.txid.substr(0,6)) + '…' + escHtml(u.txid.substr(-4))
                     var amt       = amountFormat(u.value)
-
                     tbody.append(
                         '<tr class="' + rowClass + '" data-key="' + key + '">' +
                         '<td><input type="checkbox" class="cc-utxo-check" data-key="' + key + '"' +
@@ -1480,7 +1469,6 @@
                         var u      = spendable[i]
                         var script = bitcoin.Buffer.from(u.script, 'hex')
                         var type   = getScriptType(script)
-
                         if (type === 'bech32') {
                             var p2wpkh = getP2WPKHScript(keys.publicKey)
                             psbt.addInput({
@@ -1502,7 +1490,6 @@
                         } else if (type === 'legacy') {
                             psbt.addInput({ hash: u.txid, index: u.index })
                             inputMeta.push({ type: 'legacy', psbtIdx: inputMeta.length, txid: u.txid })
-
                         } else {
                             showSendError(messages.error['bad-utxo'])
                             return
@@ -1526,7 +1513,6 @@
                     Promise.all(legacyFetches).then(function() {
                         var change = value - amount
                         if (change > 0) psbt.addOutput({ address: address, value: BigInt(change) })
-
                         psbt.signAllInputs(keys)
                         psbt.finalizeAllInputs()
                         var tx = psbt.extractTransaction()
@@ -1549,7 +1535,6 @@
                         $('#send-cancel').addClass('d-none')
                         $('#send-confirm').addClass('d-none')
                         $('#send-close-footer').removeClass('d-none disabled')
-
                     }).catch(function() {
                         showSendError(messages.error['bad-utxo'])
                     })
@@ -1672,7 +1657,6 @@
                 var sats = parseInt(intPart, 10) * Math.pow(10, decimals) + parseInt(fracPart || '0', 10)
                 return Math.round(sats)   // Math.round eliminates any residual float dust
             }
-
             // Strip characters that are not valid in an amount field.
             // Allows digits and at most one '.'; truncates fractional part to `decimals` digits.
             function filterAmountStr(val, decimals) {
@@ -1692,7 +1676,6 @@
                 return val
             }
             // ─────────────────────────────────────────────────────────────────────
-
             // ─── Real-time validation: send button state + visual feedback ─────────
             // Declared globally so resetTxForm, _renderBalanceDisplay, and other
             // top-level functions can call it without a scope error.
@@ -1704,11 +1687,9 @@
                 var feeStr     = $('#send-fee').val() !== '' ? $('#send-fee').val() : String(globalData.rfee)
                 var feeSats    = parseAmountSats(feeStr)
                 var minFeeSats = parseAmountSats(String(getConfig()['fee']))
-
                 var outputsSats = 0
                 var allFilled   = true
                 var allAmtOk    = true
-
                 $.each($('#send-outputs .send-outputs-item'), function(_, item) {
                     var address = $('[name="send-address"]', item).val().trim()
                     var amtStr  = $('[name="send-ammount"]', item).val().trim()
@@ -1717,10 +1698,8 @@
                     if (!amtSats || amtSats <= 0) allAmtOk = false
                     if (amtSats && amtSats > 0) outputsSats += amtSats
                 })
-
                 var feeOk     = feeSats !== null && feeSats > 0 && feeSats >= (minFeeSats || 0)
                 var totalSats = outputsSats + (feeSats || 0)
-
                 // Spendable (respects coin control selection)
                 var spendableSats
                 if (globalData.coinControl && globalData.selectedUtxos && globalData.selectedUtxos.size > 0) {
@@ -1732,20 +1711,15 @@
                 } else {
                     spendableSats = globalData.balance - globalData.immatureBalance
                 }
-
                 var overLimit = totalSats > spendableSats && totalSats > 0
                 var canSend   = allFilled && allAmtOk && feeOk && !overLimit && totalSats > 0
-
                 // — Button —
                 $('#send-tx').prop('disabled', !canSend)
-
                 // — Balance label turns red when over limit —
                 $('#wallet-send .wallet-balance').toggleClass('text-danger', overLimit)
-
                 // — Fee field: red when typed but invalid —
                 var feeTyped = $('#send-fee').val() !== ''
                 $('#send-fee').toggleClass('is-invalid', feeTyped && (!feeOk || overLimit))
-
                 // — Amount fields: red when over limit or typed but invalid —
                 $('#send-outputs [name="send-ammount"]').each(function() {
                     var amtSats = parseAmountSats($(this).val())
@@ -1754,7 +1728,6 @@
                 })
             }
             // ─────────────────────────────────────────────────────────────────────
-
             $(document).ready(function() {
                 initLang()
                 var _t; try { _t = localStorage.getItem('bte_cfg_theme') } catch(e) {}
@@ -1822,7 +1795,6 @@
                 }
                 $('#pin-login-btn').click(doPinLogin)
                 $('#pin-login-input').on('keydown', function(e) { if (e.key === 'Enter') doPinLogin() })
-
                 $('#pin-login-forget').click(function(e) {
                     e.preventDefault()
                     forgetSavedWallet()
@@ -1857,13 +1829,11 @@
                     var feeSats    = parseAmountSats(feeStr)
                     // Minimum fee in satoshis (config stores it in display units)
                     var minFeeSats = parseAmountSats(String(getConfig()['fee']))
-
                     if (feeSats === null || feeSats <= 0) {
                         showSendError(messages.error['not-valid-fee']); error = true
                     } else if (feeSats < minFeeSats) {
                         showSendError(messages.error['small-fee']); error = true
                     }
-
                     var outputsSats = 0
                     $.each($('#send-outputs .send-outputs-item'), function(key, item) {
                         var address = $('[name="send-address"]', item).val().trim()
@@ -1877,10 +1847,8 @@
                         }
                         if (amtSats !== null) outputsSats += amtSats
                     })
-
                     // Total = outputs + fee, entirely in satoshis (integers)
                     var totalSats = outputsSats + (feeSats || 0)
-
                     // Spendable in satoshis: respect coin-control selection when active
                     var spendableSats
                     if (globalData.coinControl && globalData.selectedUtxos && globalData.selectedUtxos.size > 0) {
@@ -1893,7 +1861,6 @@
                     } else {
                         spendableSats = globalData.balance - globalData.immatureBalance
                     }
-
                     if (!error) {
                         if (totalSats <= spendableSats) {
                             // Pass display amount to showConfirmation for UI label only
@@ -1910,7 +1877,6 @@
                     if (cur !== $(this).val()) $(this).val(cur)
                     validateSendForm()
                 })
-
                 // Input filtering + validation for amount fields (event delegation covers dynamic rows)
                 $('#send-outputs').on('input', '[name="send-ammount"]', function() {
                     var cur = filterAmountStr($(this).val(), getConfig()['decimals'])
@@ -1921,7 +1887,6 @@
                 $('#send-outputs').on('input', '[name="send-address"]', function() {
                     validateSendForm()
                 })
-
                 // Paste protection on fee and amount fields
                 $(document).on('paste', '#send-fee, [name="send-ammount"]', function() {
                     var self = this
@@ -1976,7 +1941,6 @@
                     } else { showMessage(getText('identity-too-short')) }
                     e.preventDefault()
                 })
-                $('.wallet-balance').click(function(e) { walletBalance(); e.preventDefault() })
                 $('#send-confirm').click(function(e) { sendTransaction(); e.preventDefault() })
                 $('#toggle-wallet-privkey').click(function() {
                     if ($(this).text() == getText('show')) {
@@ -2092,14 +2056,11 @@
                     $('#wallet-privkey-copy-btn').addClass('d-none');
                     $('#toggle-wallet-privkey').text(getText('show'));
                     $('#wallet-keys-script input').val('0014' + bitcoin.Buffer.from(getP2WPKHScript(globalData.keys.publicKey).hash).toString('hex'));
-                    walletBalance();
                     setHomeTitle();
                 });
-
                 $('#wallet-backend button').click(function() {
                     switchBackend($('#wallet-backend input').val())
                 })
-
                 $('#wallet-language-select select').on('change', function() {
                     try { localStorage.setItem('bte_cfg_language', $('#wallet-language-select select').val()) } catch(e) {}
                     initLang()
@@ -2255,7 +2216,6 @@
                         $('#pin-error').addClass('d-none')
                         var modal = new bootstrap.Modal(document.getElementById('pin-modal'), { keyboard: false })
                         modal.show()
-
                         function onConfirm() {
                             var p = $('#pin-input').val()
                             loadCredentials(p).then(function(creds) {
@@ -2272,27 +2232,22 @@
                                 resolve(result)
                             })
                         }
-
                         function onCancel() {
                             $('#pin-confirm').off('click', onConfirm)
                             $('#pin-cancel').off('click', onCancel)
                             modal.hide()
                             resolve(null)
                         }
-
                         $('#pin-confirm').off('click').on('click', onConfirm)
                         $('#pin-cancel').off('click').on('click', onCancel)
                     })
-
                     if (!seedData) return
                     var words = seedData.mnemonic.split(' ')
                     seedData.mnemonic = ''
                     seedData = null
-
                     seedRenderGrid(words, '#wallet-seed-grid')
                     words.fill('')
                     words = null
-
                     $('#wallet-seed-hidden').addClass('d-none')
                     $('#wallet-seed-revealed').removeClass('d-none')
                     setTimeout(_hideSeedReveal, 60000)
@@ -2311,7 +2266,6 @@
                     }
                 })
             })
-
             // ================================================================
             // WebSocket — real-time push via socket.io
             //
@@ -2328,19 +2282,14 @@
             //                    server fetches from ElectrumX once, pushes here
             //                    client applies directly — zero REST calls
             // ================================================================
-
-            var _ws       = null
-            var _wsActive = false
-
+            var _ws       = null;
+            var _wsActive = false;
             function wsConnect() {
-                // Require: socket.io loaded + address known + not already active
-                if (typeof io === 'undefined') return
-                if (!globalData.address)       return
-                if (_ws && _wsActive)          return
-
-                wsDisconnect()   // clean up any stale socket
-
-                var backend = getBackend()
+                if (typeof io === 'undefined') return;
+                if (!globalData.address)       return;
+                if (_ws && _wsActive)          return;
+                wsDisconnect();
+                var backend = getBackend();
                 try {
                     _ws = io(backend, {
                         path:                 '/socket.io',
@@ -2348,78 +2297,69 @@
                         reconnectionDelay:    5000,
                         reconnectionDelayMax: 30000,
                         timeout:              10000
-                    })
+                    });
                 } catch(e) {
-                    return   // io() threw (e.g. CSP blocked), fall back to polling
+                    return;
                 }
-
                 _ws.on('connect', function() {
-                    _wsActive = true
+                    _wsActive = true;
                     if (globalData.address) {
-                        _ws.emit('subscribe', { address: globalData.address })
+                        _ws.emit('subscribe', { address: globalData.address });
                     }
-                })
-
+                });
                 _ws.on('block', function(data) {
-                    if (globalData.status !== 'unlocked') return
-                    if (!data || !data.height) return
-                    // Update height in-memory, recalculate maturity client-side — zero REST calls
-                    var prevHeight = globalData.height
-                    globalData.height = data.height
+                    if (globalData.status !== 'unlocked') return;
+                    if (!data || typeof data.height !== 'number') return;
+                    var prevHeight = globalData.height;
+                    globalData.height = data.height;
                     if (globalData.utxos.length > 0) {
-                        var h = globalData.height
+                        var h = globalData.height;
                         globalData.utxos.forEach(function(u) {
-                            u.mature     = isUtxoMature(u, h)
-                            u.blocksLeft = blocksToMature(u, h)
-                        })
-                        _applyUtxoData()
+                            u.mature     = isUtxoMature(u, h);
+                            u.blocksLeft = blocksToMature(u, h);
+                        });
+                        _applyUtxoData();
                     }
-                })
-
+                    if (globalData.height !== prevHeight && globalData.address) {
+                        updateHistory();
+                    }
+                });
                 _ws.on('balance_changed', function(data) {
-                    if (globalData.status !== 'unlocked') return
-                    if (data && data.balance !== undefined && Array.isArray(data.utxos)) {
-                        // Server pushed complete payload — apply directly, zero REST calls
-                        var prevBalance = globalData.balance
-                        globalData.balance = data.balance
-                        var h = globalData.height
+                    if (globalData.status !== 'unlocked') return;
+                    if (data && typeof data.balance === 'number' && Array.isArray(data.utxos)) {
+                        var prevBalance = globalData.balance;
+                        globalData.balance = data.balance;
+                        if (typeof data.height === 'number') {
+                            globalData.height = data.height;
+                        }
+                        var h = globalData.height;
                         globalData.utxos = data.utxos.map(function(u) {
                             return Object.assign({}, u, {
                                 mature:     isUtxoMature(u, h),
                                 blocksLeft: blocksToMature(u, h)
-                            })
-                        })
-                        saveUtxoCache(globalData.address, globalData.utxos, h)
-                        _applyUtxoData()
+                            });
+                        });
+                        saveUtxoCache(globalData.address, globalData.utxos, h);
+                        _applyUtxoData();
                         if (globalData.balance !== prevBalance && globalData.address) {
-                            updateHistory()
-                        }
-                    } else {
-                        // Server error / no data — fall back to REST
-                        if ($('.wallet-balance .ticker').text() !== getText('loading')) {
-                            walletBalance(true)
+                            updateHistory();
                         }
                     }
-                })
-
+                });
                 _ws.on('disconnect', function() {
-                    _wsActive = false
-                })
-
+                    _wsActive = false;
+                });
                 _ws.on('connect_error', function() {
-                    _wsActive = false
-                    // socket.io will keep retrying automatically
-                })
+                    _wsActive = false;
+                });
             }
-
             function wsDisconnect() {
                 if (_ws) {
-                    try { _ws.disconnect() } catch(e) {}
-                    _ws       = null
-                    _wsActive = false
+                    try { _ws.disconnect(); } catch(e) {}
+                    _ws       = null;
+                    _wsActive = false;
                 }
             }
-
         </script>
     </body>
 </html>
