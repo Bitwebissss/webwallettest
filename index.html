@@ -1142,8 +1142,30 @@
 			}
 			function amountFormat(amount, invert) {
 				var decimals = getConfig()['decimals']
-				if (!invert) return parseFloat((amount / Math.pow(10, decimals)).toFixed(decimals))
-				return parseInt(amount * Math.pow(10, decimals))
+
+				if (invert) {
+					// Display string → satoshis integer.
+					// Delegates to parseAmountSats (pure integer arithmetic).
+					// Falls back to the old rounding approach only if parseAmountSats
+					// gets something it can't parse (shouldn't happen in practice).
+					var parsed = parseAmountSats(String(amount))
+					return parsed !== null
+						? parsed
+						: Math.round(Number(amount) * Math.pow(10, decimals))
+				}
+
+				// Satoshis → display string  ── pure string arithmetic, zero float risk ──
+				// Example: 164650001 sats, decimals=8  →  "1.64650001"
+				//          100000000 sats              →  "1"
+				//          150000000 sats              →  "1.5"
+				var sats = String(Math.round(Math.abs(Number(amount))))
+				// Pad with leading zeros until we have at least decimals+1 digits
+				while (sats.length <= decimals) sats = '0' + sats
+				var intPart  = sats.slice(0, sats.length - decimals) || '0'
+				var fracPart = sats.slice(sats.length - decimals)
+				// Strip trailing zeros ("1.50000000" → "1.5", "1.00000000" → "1")
+				fracPart = fracPart.replace(/0+$/, '')
+				return fracPart.length > 0 ? intPart + '.' + fracPart : intPart
 			}
 			function showMessage(message) {
 				$('#error-message').html(message)
