@@ -3,6 +3,21 @@
 	<head>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta http-equiv="X-Frame-Options" content="DENY">
+		<meta name="referrer" content="no-referrer">
+		<meta http-equiv="Content-Security-Policy" content="
+			default-src 'self';
+			script-src  'self' 'unsafe-inline';
+			style-src   'self' 'unsafe-inline';
+			connect-src 'self' https://api.bitwebcore.net;
+			img-src     'self' data: blob:;
+			media-src   blob:;
+			font-src    'self';
+			frame-src   'none';
+			object-src  'none';
+			base-uri    'self';
+			form-action 'self'
+		">
 		<!-- https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css -->
 		<link rel="stylesheet" href="css/all.min.css"
 			integrity="sha384-rWj9FmWWt3OMqd9vBkWRhFavvVUYalYqGPoMdL1brs/qvvqz88gvLShYa4hKNyqb"
