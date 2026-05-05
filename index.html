@@ -1067,6 +1067,22 @@
             function estimateFee() {
                 return Promise.resolve($.ajax({ 'url': getBackend() + '/fee' }))
             }
+            function _applyUtxoData() {
+                var immature = 0
+                globalData.utxos.forEach(function(u) {
+                    if (!u.mature) immature += u.value
+                })
+                globalData.immatureBalance = immature
+                var fp = globalData.utxos.map(function(u) {
+                    return u.txid + ':' + u.index + ':' + (u.mature ? 1 : 0)
+                }).join('|')
+                var fpChanged = fp !== globalData._lastRendered.utxoFingerprint
+                if (fpChanged) {
+                    globalData._lastRendered.utxoFingerprint = fp
+                    renderCoinControl()
+                }
+                _renderBalanceDisplay()
+            }
             function amountFormat(amount) {
                 var decimals = getConfig()['decimals']
                 // Satoshis → display string  ── pure string arithmetic, zero float risk ──
