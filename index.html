@@ -547,6 +547,9 @@
             </div>
         </footer>
         <script>
+        (function() {
+            'use strict';
+
             function applyTheme(mode) {
                 var resolved = mode === 'auto'
                     ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
@@ -614,37 +617,69 @@
                 'address': function(address) { return 'https://explorer.bitwebcore.net/address/' + address + '/' },
                 'tx':      function(tx)      { return 'https://explorer.bitwebcore.net/tx/' + tx + '/' }
             }
-            var globalData = {
-                'status':          'locked',
-                'balance':         0,
-                'immatureBalance': 0,
-                'height':          0,
-                'keys':            undefined,
-                'address':         undefined,
-                'scriptHex':       undefined,
-                'pubKeyHex':       undefined,
-                'rfee':            getConfig()['fee'],
-                'utxos':           [],
-                'coinControl':     false,
-                'selectedUtxos':   null,
-                'tx':              { 'amount': 0, 'outputs': [], 'fee': 0 },
-                '_lastRendered':   { balance: -1, immature: -1, utxoFingerprint: '' },
-                'resetTx':         function() { this.tx = { 'amount': 0, 'outputs': [], 'fee': 0 } },
-                'clear':           function() {
-                    // Явно зануляем буфер приватного ключа до того как убрать ссылку.
-                    // keys.privateKey — Uint8Array (Buffer), .fill(0) перезаписывает байты
-                    // в памяти не дожидаясь GC.
-                    if (this.keys && this.keys.privateKey) {
-                        try { this.keys.privateKey.fill(0) } catch(e) {}
+
+            function destroyKeyMaterial(keyPair) {
+                if (!keyPair) return;
+                try {
+                    if (keyPair.privateKey && keyPair.privateKey instanceof Uint8Array) {
+                        keyPair.privateKey.fill(0);
                     }
-                    this.status = 'locked'; this.keys = undefined; this.address = ''; this.scriptHex = undefined; this.pubKeyHex = undefined
-                    this.allScriptHexes = null; this.allAddresses = null
-                    this.balance = 0; this.immatureBalance = 0; this.height = 0
-                    this.utxos = []; this.coinControl = false; this.selectedUtxos = null
-                    this._lastRendered = { balance: -1, immature: -1, utxoFingerprint: '' }
-                    this.resetTx()
-                }
+                } catch (ignore) { /* not critical */ }
+                try {
+                    // ecpair stores an internal copy in __D (version 3+)
+                    if (keyPair.__D && keyPair.__D instanceof Uint8Array) {
+                        keyPair.__D.fill(0);
+                    }
+                } catch (ignore) { /* not critical */ }
             }
+
+            var globalData = {
+                status:          'locked',
+                balance:         0,
+                immatureBalance: 0,
+                height:          0,
+                keys:            undefined,
+                address:         undefined,
+                scriptHex:       undefined,
+                pubKeyHex:       undefined,
+                rfee:            getConfig()['fee'],
+                utxos:           [],
+                coinControl:     false,
+                selectedUtxos:   null,
+                tx:              { amount: 0, outputs: [], fee: 0 },
+                _lastRendered:   { balance: -1, immature: -1, utxoFingerprint: '' },
+                resetTx: function() {
+                    this.tx = { amount: 0, outputs: [], fee: 0 };
+                },
+                clear: function() {
+                    // Zero out private key material in heap
+                    if (this.keys) {
+                        destroyKeyMaterial(this.keys);
+                    }
+                    // In case a raw private copy was kept separately
+                    if (this._privKeyCopy) {
+                        this._privKeyCopy.fill(0);
+                        this._privKeyCopy = null;
+                    }
+            
+                    this.status          = 'locked';
+                    this.keys            = undefined;
+                    this.address         = '';
+                    this.scriptHex       = undefined;
+                    this.pubKeyHex       = undefined;
+                    this.allScriptHexes  = null;
+                    this.allAddresses    = null;
+                    this.balance         = 0;
+                    this.immatureBalance = 0;
+                    this.height          = 0;
+                    this.utxos           = [];
+                    this.coinControl     = false;
+                    this.selectedUtxos   = null;
+                    this._lastRendered   = { balance: -1, immature: -1, utxoFingerprint: '' };
+                    this.resetTx();
+                }
+            };
+
             var messages = initMessages()
             var STORAGE_KEY = 'bte_wallet_v2'
             var AUTO_LOCK_MS   = 20 * 60 * 1000
@@ -725,49 +760,62 @@
                 }
             }
             function openFromCredentials(creds) {
-                if (!creds) return false
+                if (!creds) return false;
+                var success = false;
                 try {
                     if (creds.type === 'bip39') {
-                        globalData.keys = bitcoin.ECPair.fromWIF(creds.wif, getConfig()['network'])
-                        globalData.isBip39 = true
-                        creds.mnemonic = ''
+                        globalData.keys = bitcoin.ECPair.fromWIF(creds.wif, getConfig()['network']);
+                        globalData.isBip39 = true;
+                        creds.mnemonic = '';   // clear the mnemonic string immediately
                     } else if (creds.type === 'wif') {
-                        globalData.keys = bitcoin.ECPair.fromWIF(creds.wif, getConfig()['network'])
-                        globalData.isBip39 = false
+                        globalData.keys = bitcoin.ECPair.fromWIF(creds.wif, getConfig()['network']);
+                        globalData.isBip39 = false;
                     } else if (creds.type === 'credentials') {
-                        var identity = creds.identity
-                        var pass     = creds.password
-                        var s = identity
-                        s += '|' + pass + '|'
-                        s += s.length + '|!@' + ((pass.length * 7) + identity.length) * 7
-                        var regchars   = (pass.match(/[a-z]+/g)) ? pass.match(/[a-z]+/g).length   : 1
-                        var regupchars = (pass.match(/[A-Z]+/g)) ? pass.match(/[A-Z]+/g).length   : 1
-                        var regnums    = (pass.match(/[0-9]+/g)) ? pass.match(/[0-9]+/g).length   : 1
-                        s += ((regnums + regchars) + regupchars) * pass.length + '3571'
-                        s += (s + '' + s)
-                        for (var i = 0; i <= 51; i++) s = sha256.update(s).hex()
+                        var identity = creds.identity;
+                        var pass     = creds.password;
+                        var s = identity;
+                        s += '|' + pass + '|';
+                        s += s.length + '|!@' + ((pass.length * 7) + identity.length) * 7;
+                        var regchars   = (pass.match(/[a-z]+/g)) ? pass.match(/[a-z]+/g).length   : 1;
+                        var regupchars = (pass.match(/[A-Z]+/g)) ? pass.match(/[A-Z]+/g).length   : 1;
+                        var regnums    = (pass.match(/[0-9]+/g)) ? pass.match(/[0-9]+/g).length   : 1;
+                        s += ((regnums + regchars) + regupchars) * pass.length + '3571';
+                        s += (s + '' + s);
+                        for (var i = 0; i <= 51; i++) s = sha256.update(s).hex();
                         globalData.keys = bitcoin.ECPair.fromPrivateKey(
                             bitcoin.Buffer.from(s, 'hex'),
-                            { 'network': getConfig()['network'] }
-                        )
+                            { network: getConfig()['network'] }
+                        );
                     } else {
-                        return false
+                        return false;
                     }
-                } catch(e) { return false } finally {
+                    success = true;
+                } catch(e) {
+                    // If key assignment fails, clean up any partial key
+                    if (globalData.keys) destroyKeyMaterial(globalData.keys);
+                    globalData.keys = undefined;
+                } finally {
+                    // Always erase sensitive strings from the creds object
                     if (creds) {
-                        creds.wif = ''; creds.mnemonic = ''
-                        creds.identity = ''; creds.password = ''
+                        creds.wif = '';
+                        creds.mnemonic = '';
+                        creds.identity = '';
+                        creds.password = '';
                     }
                 }
-                openWallet(globalData.keys, false)
-                return true
+                if (!success) return false;
+            
+                // Proceed to open wallet (derived key, no need to offer PIN again from storage)
+                openWallet(globalData.keys, false);
+                return true;
             }
             function hasSavedWallet() {
                 return localStorage.getItem(STORAGE_KEY) !== null
             }
             function forgetSavedWallet() {
-                _stopAutoLock()
-                wsDisconnect()
+                _stopAutoLock();
+                wsDisconnect();
+            
                 try {
                     Object.keys(localStorage).forEach(function(k) {
                         if (
@@ -775,26 +823,33 @@
                             k.indexOf('bte_history_') === 0 ||
                             k.indexOf('bte_utxo_')    === 0 ||
                             k.indexOf('bte_wallet_')  === 0
-                        ) localStorage.removeItem(k)
-                    })
+                        ) localStorage.removeItem(k);
+                    });
                 } catch(e) {}
-                // Зануляем мнемонику в памяти до вызова clear()
-                _seedState.mnemonic = ''
-                _seedState.verifyPositions = []
-                globalData.clear()   // внутри: keys.privateKey.fill(0)
-                _privkeyClear('wallet-privkey-canvas')
-                _privkeyMask('wallet-privkey-canvas')
-                $('#wallet-privkey-copy-btn').addClass('d-none')
-                $('#toggle-wallet-privkey').text(getText('show'))
-                $('#wallet-keys-pubkey input').val('')
-                $('#wallet-keys-script input').val('')
-                $('#wallet-address').text('')
-                $('#qr-code-addres').empty()
-                resetTxForm()
-                _hideSeedReveal()
-                $('#wallet-block').addClass('d-none')
-                updateSavedWalletUI()
-                setHomeTitle()
+            
+                // Overwrite seed state in memory
+                _seedState.mnemonic = '';
+                _seedState.verifyPositions = [];
+            
+                // Zero private key and reset all state
+                globalData.clear();
+            
+                // Reset UI elements that still hold key references
+                _privkeyClear('wallet-privkey-canvas');
+                _privkeyMask('wallet-privkey-canvas');
+                $('#wallet-privkey-copy-btn').addClass('d-none');
+                $('#toggle-wallet-privkey').text(getText('show'));
+                $('#wallet-keys-pubkey input').val('');
+                $('#wallet-keys-script input').val('');
+                $('#wallet-address').text('');
+                $('#qr-code-addres').empty();
+            
+                resetTxForm();
+                _hideSeedReveal();
+            
+                $('#wallet-block').addClass('d-none');
+                updateSavedWalletUI();
+                setHomeTitle();
             }
             function updateSavedWalletUI() {
                 if (hasSavedWallet()) {
@@ -1260,54 +1315,73 @@
             }
             async function openWallet(keys, offerPin, bip39Data) {
                 if (offerPin && !hasSavedWallet()) {
-                    var pin = await askPinSetup()
+                    var pin = await askPinSetup();
                     if (pin === null) {
-                        globalData.keys = undefined
-                        _seedState.mnemonic = ''
-                        _seedState.verifyPositions = []
-                        seedReset()
-                        return
+                        // User cancelled – destroy the in-memory key immediately
+                        if (keys) destroyKeyMaterial(keys);
+                        globalData.keys = undefined;
+                        _seedState.mnemonic = '';
+                        _seedState.verifyPositions = [];
+                        seedReset();
+                        return;
                     }
+            
+                    // Save encrypted wallet to localStorage
                     if (bip39Data && bip39Data.mnemonic) {
-                        await saveBip39(bip39Data.mnemonic, keys.toWIF(), pin)
-                        bip39Data.mnemonic = ''
-                        _seedState.mnemonic = ''
-                        _seedState.verifyPositions = []
+                        await saveBip39(bip39Data.mnemonic, keys.toWIF(), pin);
+                        bip39Data.mnemonic = '';        // clear string
+                        _seedState.mnemonic = '';
+                        _seedState.verifyPositions = [];
                     } else {
-                        await saveWif(keys.toWIF(), pin)
+                        await saveWif(keys.toWIF(), pin);
                     }
-                    showMessage(getText('wallet-saved'))
-                    updateSavedWalletUI()
+                    showMessage(getText('wallet-saved'));
+                    updateSavedWalletUI();
                 }
-                globalData.status         = 'unlocked'
-                globalData.address        = getAddress(keys)
-                globalData.scriptHex      = getScriptHex(keys)
-                globalData.pubKeyHex      = bitcoin.Buffer.from(keys.publicKey).toString('hex')
-                globalData.allScriptHexes = getAllScriptHexes(keys)
-                globalData.allAddresses   = getAllAddresses(keys)
-                _showWalletUI(keys)
+            
+                // Fill public data
+                globalData.status         = 'unlocked';
+                globalData.address        = getAddress(keys);
+                globalData.scriptHex      = getScriptHex(keys);
+                globalData.pubKeyHex      = bitcoin.Buffer.from(keys.publicKey).toString('hex');
+                globalData.allScriptHexes = getAllScriptHexes(keys);
+                globalData.allAddresses   = getAllAddresses(keys);
+            
+                _showWalletUI(keys);
             }
+
             function closeWallet() {
-                _stopAutoLock()
-                wsDisconnect()
-                _privkeyClear('wallet-privkey-canvas')
-                _privkeyMask('wallet-privkey-canvas')
-                $('#wallet-privkey-copy-btn').addClass('d-none')
-                $('#toggle-wallet-privkey').text(getText('show'))
-                $('#wallet-keys-pubkey input').val('')
-                $('#wallet-keys-script input').val('')
-                $('#wallet-address').text('')
-                $('#qr-code-addres').empty()
-                resetTxForm()
-                // Скрываем DOM-грид сид-фразы и зануляем строку мнемоники
-                _hideSeedReveal()
-                _seedState.mnemonic = ''
-                _seedState.verifyPositions = []
-                $('#wallet-block').addClass('d-none')
-                globalData.clear()
-                updateSavedWalletUI()
-                setHomeTitle()
+                _stopAutoLock();
+                wsDisconnect();
+            
+                // Clear UI private key canvas
+                _privkeyClear('wallet-privkey-canvas');
+                _privkeyMask('wallet-privkey-canvas');
+                $('#wallet-privkey-copy-btn').addClass('d-none');
+                $('#toggle-wallet-privkey').text(getText('show'));
+            
+                // Empty all visible fields
+                $('#wallet-keys-pubkey input').val('');
+                $('#wallet-keys-script input').val('');
+                $('#wallet-address').text('');
+                $('#qr-code-addres').empty();
+            
+                resetTxForm();
+            
+                // Hide and overwrite seed phrase in DOM + JS
+                _hideSeedReveal();
+                _seedState.mnemonic = '';               // overwrite the mnemonic string
+                _seedState.verifyPositions = [];
+            
+                $('#wallet-block').addClass('d-none');
+            
+                // Central clear: zeros private key, clears all state
+                globalData.clear();
+            
+                updateSavedWalletUI();
+                setHomeTitle();
             }
+
             function renderCoinControl() {
                 var utxos  = globalData.utxos
                 var height = globalData.height
@@ -2312,6 +2386,8 @@
                     _wsActive = false;
                 }
             }
+			window.setTheme = setTheme;
+		    })();
         </script>
     </body>
 </html>
