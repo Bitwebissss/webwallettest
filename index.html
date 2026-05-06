@@ -753,6 +753,8 @@
                 return localStorage.getItem(STORAGE_KEY) !== null
             }
             function forgetSavedWallet() {
+                _stopAutoLock()
+                wsDisconnect()
                 try {
                     Object.keys(localStorage).forEach(function(k) {
                         if (
@@ -763,17 +765,29 @@
                         ) localStorage.removeItem(k)
                     })
                 } catch(e) {}
+                globalData.clear()
+                _privkeyClear('wallet-privkey-canvas')
+                _privkeyMask('wallet-privkey-canvas')
+                $('#wallet-privkey-copy-btn').addClass('d-none')
+                $('#toggle-wallet-privkey').text(getText('show'))
+                $('#wallet-keys-pubkey input').val('')
+                $('#wallet-keys-script input').val('')
+                $('#wallet-address').text('')
+                $('#qr-code-addres').empty()
+                resetTxForm()
+                _hideSeedReveal()
+                $('#wallet-block').addClass('d-none')
                 updateSavedWalletUI()
+                setHomeTitle()
             }
             function updateSavedWalletUI() {
-                var walletOpen = (globalData.status === 'unlocked')
                 if (hasSavedWallet()) {
-                    if (!walletOpen) $('#pin-login-block').removeClass('d-none')
-                    if (!walletOpen) $('#open-block').addClass('d-none')
+                    $('#pin-login-block').removeClass('d-none')
+                    $('#open-block').addClass('d-none')
                     $('#forget-wallet-section').removeClass('d-none')
                 } else {
-                    if (!walletOpen) $('#pin-login-block').addClass('d-none')
-                    if (!walletOpen) $('#open-block').removeClass('d-none')
+                    $('#pin-login-block').addClass('d-none')
+                    $('#open-block').removeClass('d-none')
                     $('#forget-wallet-section').addClass('d-none')
                 }
             }
