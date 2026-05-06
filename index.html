@@ -766,13 +766,14 @@
                 updateSavedWalletUI()
             }
             function updateSavedWalletUI() {
+                var walletOpen = (globalData.status === 'unlocked')
                 if (hasSavedWallet()) {
-                    $('#pin-login-block').removeClass('d-none')
-                    $('#open-block').addClass('d-none')
+                    if (!walletOpen) $('#pin-login-block').removeClass('d-none')
+                    if (!walletOpen) $('#open-block').addClass('d-none')
                     $('#forget-wallet-section').removeClass('d-none')
                 } else {
-                    $('#pin-login-block').addClass('d-none')
-                    $('#open-block').removeClass('d-none')
+                    if (!walletOpen) $('#pin-login-block').addClass('d-none')
+                    if (!walletOpen) $('#open-block').removeClass('d-none')
                     $('#forget-wallet-section').addClass('d-none')
                 }
             }
