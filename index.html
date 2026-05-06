@@ -631,6 +631,12 @@
                 '_lastRendered':   { balance: -1, immature: -1, utxoFingerprint: '' },
                 'resetTx':         function() { this.tx = { 'amount': 0, 'outputs': [], 'fee': 0 } },
                 'clear':           function() {
+                    // Явно зануляем буфер приватного ключа до того как убрать ссылку.
+                    // keys.privateKey — это Uint8Array (Buffer), .fill(0) перезаписывает
+                    // байты в памяти, не дожидаясь GC.
+                    if (this.keys && this.keys.privateKey) {
+                        try { this.keys.privateKey.fill(0) } catch(e) {}
+                    }
                     this.status = 'locked'; this.keys = undefined; this.address = ''; this.scriptHex = undefined; this.pubKeyHex = undefined
                     this.allScriptHexes = null; this.allAddresses = null
                     this.balance = 0; this.immatureBalance = 0; this.height = 0
@@ -765,7 +771,10 @@
                         ) localStorage.removeItem(k)
                     })
                 } catch(e) {}
-                globalData.clear()
+                // Зануляем мнемонику в памяти до вызова clear()
+                _seedState.mnemonic = ''
+                _seedState.verifyPositions = []
+                globalData.clear()   // внутри зануляет keys.privateKey.fill(0)
                 _privkeyClear('wallet-privkey-canvas')
                 _privkeyMask('wallet-privkey-canvas')
                 $('#wallet-privkey-copy-btn').addClass('d-none')
@@ -1283,6 +1292,13 @@
                 $('#wallet-address').text('')
                 $('#qr-code-addres').empty()
                 resetTxForm()
+                // Скрываем и очищаем DOM-грид сид-фразы (если был открыт)
+                _hideSeedReveal()
+                // Зануляем строку мнемоники в оперативной памяти.
+                // JS-строки иммутабельны, но убираем ссылку немедленно —
+                // не ждём, пока _seedState перезапишется позже.
+                _seedState.mnemonic = ''
+                _seedState.verifyPositions = []
                 $('#wallet-block').addClass('d-none')
                 globalData.clear()
                 updateSavedWalletUI()
