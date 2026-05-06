@@ -117,10 +117,12 @@
                         <li class="nav-item">
                             <a href="#/broadcast" class="nav-link router-link me-md-2" data-route="broadcast" tkey="broadcast"></a>
                         </li>
-                        <li class="nav-item">
-                            <a href="#/settings" class="nav-link router-link me-md-2" data-route="settings" tkey="settings"></a>
+                        <li class="nav-item dropdown ms-2">
+                            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" id="lang-label">🌐</a>
+                            <ul class="dropdown-menu dropdown-menu-end" id="lang-dropdown-menu">
+                            </ul>
                         </li>
-                            <li class="nav-item dropdown ms-2">
+                        <li class="nav-item dropdown ms-2">
                             <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" id="theme-label">🔄 AUTO</a>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li><a class="dropdown-item" href="#" onclick="setTheme('light');return false;" tkey="theme-light"></a></li>
@@ -283,6 +285,9 @@
                                 <li class="nav-item me-2">
                                     <a id="history-tab-link" class="nav-link tab-link" data-tab-name="wallet-history" data-tab-family="wallet-block" href="#" tkey="history"></a>
                                 </li>
+                                <li class="nav-item me-2">
+                                    <a class="nav-link tab-link" data-tab-name="wallet-settings" data-tab-family="wallet-block" href="#" tkey="settings"></a>
+                                </li>
                                 <li class="nav-item">
                                     <a class="nav-link tab-link" data-tab-name="wallet-keys" data-tab-family="wallet-block" href="#" tkey="keys"></a>
                                 </li>
@@ -419,6 +424,31 @@
                                     </div>
                                 </div>
                             </div>
+                            <div class="tab-item d-none" data-tab="wallet-settings">
+                                    <div id="address-type-select" class="mb-3">
+                                        <label tkey="address-type"></label>
+                                        <div class="input-group pb-2">
+                                            <select class="form-select">
+                                                <option>bech32</option>
+                                                <option>segwit</option>
+                                                <option>legacy</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div id="wallet-backend" class="mb-3">
+                                        <label tkey="wallet-backend"></label>
+                                        <div class="input-group pb-2">
+                                            <input class="form-control" type="text" tkey="wallet-api">
+                                            <button class="btn btn-outline-secondary b-width" type="button" tkey="update"></button>
+                                        </div>
+                                    </div>
+                                    <div id="forget-wallet-section" class="d-none text-center mt-2">
+                                        <button id="settings-forget-wallet" class="btn btn-danger" type="button" tkey="settings-forget-wallet">Forget saved wallet</button>
+                                    </div>
+                                    <div class="text-muted small text-center mt-3">
+                                        <span tkey="version"></span> <b id="wallet-version"></b>
+                                    </div>
+                                </div>
                             <div class="tab-item d-none" data-tab="wallet-history">
                                 <div style="overflow:hidden">
                                     <div id="history-list">
@@ -445,46 +475,6 @@
                     </div>
                     <div class="card-footer">
                         <button id="footer-broadcast" type="button" class="btn btn-primary w-100 footer-item" tkey="broadcast"></button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div id="settings" class="router-page">
-            <div class="container">
-                <div class="card mb-3">
-                    <div class="card-header">
-                        <b tkey="wallet-settings"></b>
-                    </div>
-                    <div class="card-body">
-                        <div id="address-type-select">
-                            <label tkey="address-type"></label>
-                            <div class="input-group pb-2">
-                                <select class="form-select">
-                                    <option>bech32</option>
-                                    <option>segwit</option>
-                                    <option>legacy</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div id="wallet-backend">
-                            <label tkey="wallet-backend"></label>
-                            <div class="input-group pb-2">
-                                <input class="form-control" type="text" tkey="wallet-api">
-                                                                    <button class="btn btn-outline-secondary b-width" type="button" tkey="update"></button>
-                            </div>
-                        </div>
-                        <div id="wallet-language-select">
-                            <label tkey="wallet-language"></label>
-                            <div class="input-group pb-2">
-                                <select class="form-select"></select>
-                            </div>
-                        </div>
-                        <div id="forget-wallet-section" class="d-none text-center mt-2">
-                            <button id="settings-forget-wallet" class="btn btn-danger" type="button" tkey="settings-forget-wallet">Forget saved wallet</button>
-                        </div>
-                    </div>
-                    <div class="card-footer">
-                        <span tkey="version"></span> <b id="wallet-version"></b>
                     </div>
                 </div>
             </div>
@@ -870,11 +860,18 @@
                     try { localStorage.setItem('bte_cfg_language', set_lang) } catch(e) {}
                     language = set_lang
                 }
-                $('#wallet-language-select select').empty()
+                // Populate navbar language dropdown
+                var $menu = $('#lang-dropdown-menu')
+                $menu.empty()
                 for (var key in walletLanguages) {
-                    $('#wallet-language-select select').append($('<option>', { 'value': key, 'text': walletLanguages[key]['lang-alias'] }))
+                    var isActive = (key === language) ? ' active' : ''
+                    $menu.append(
+                        '<li><a class="dropdown-item lang-switch-item' + isActive + '" href="#" data-lang="' + key + '">' +
+                        walletLanguages[key]['lang-alias'] + '</a></li>'
+                    )
                 }
-                $('#wallet-language-select select').val(language)
+                // Update label
+                $('#lang-label').text('🌐 ' + (walletLanguages[language] ? walletLanguages[language]['lang-alias'] : language))
                 $('[tkey]').each(function() {
                     if (['INPUT', 'TEXTAREA'].indexOf($(this).prop('tagName')) >= 0) {
                         $(this).attr('placeholder', getText($(this).attr('tkey')))
@@ -1040,7 +1037,6 @@
                     switch(pageName) {
                         case 'homepage':  setHomeTitle(); break
                             case 'broadcast': setTitle(getText('broadcast-transaction')); break
-                        case 'settings':  setTitle(getText('wallet-settings')); break
                         case 'network':
                             var network = urlParams[2]
                             if (network != undefined) switchConfig(network)
@@ -1744,6 +1740,11 @@
                     $('#' + tabFamily + ' [data-tab=' + tabName + ']').removeClass('d-none')
                     $(this).addClass('active')
                     if (tabName === 'wallet-history') updateHistory()
+                    if (tabName === 'wallet-settings') {
+                        $('#address-type-select select').val(getAddressType())
+                        $('#wallet-backend input').val(getBackend())
+                        updateSavedWalletUI()
+                    }
                     e.preventDefault()
                 })
                 $(window).on('hashchange', routePage)
@@ -1987,8 +1988,10 @@
                 $('#wallet-backend button').click(function() {
                     switchBackend($('#wallet-backend input').val())
                 })
-                $('#wallet-language-select select').on('change', function() {
-                    try { localStorage.setItem('bte_cfg_language', $('#wallet-language-select select').val()) } catch(e) {}
+                $(document).on('click', '.lang-switch-item', function(e) {
+                    e.preventDefault()
+                    var lang = $(this).data('lang')
+                    try { localStorage.setItem('bte_cfg_language', lang) } catch(e) {}
                     initLang()
                     var _ct; try { _ct = localStorage.getItem('bte_cfg_theme') } catch(e) {}
                     applyTheme(_ct || 'auto')
