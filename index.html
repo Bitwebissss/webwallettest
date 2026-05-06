@@ -866,8 +866,8 @@
                 for (var key in walletLanguages) {
                     var isActive = (key === language) ? ' active' : ''
                     $menu.append(
-                        '<li><a class="dropdown-item lang-switch-item' + isActive + '" href="#" data-lang="' + key + '">' +
-                        walletLanguages[key]['lang-alias'] + '</a></li>'
+                        '<li><a class="dropdown-item lang-switch-item' + isActive + '" href="#" data-lang="' + escHtml(key) + '">' +
+                        escHtml(walletLanguages[key]['lang-alias']) + '</a></li>'
                     )
                 }
                 // Update label
@@ -883,7 +883,7 @@
                     $(this).attr('title', getText($(this).attr('data-tkey-title')))
                 })
                 messages = initMessages()
-                setTitle(getText('wallet-settings'))
+                setHomeTitle()
                 return language
             }
             function getText(token) {
@@ -1743,7 +1743,11 @@
                     if (tabName === 'wallet-settings') {
                         $('#address-type-select select').val(getAddressType())
                         $('#wallet-backend input').val(getBackend())
-                        updateSavedWalletUI()
+                        if (hasSavedWallet()) {
+                            $('#forget-wallet-section').removeClass('d-none')
+                        } else {
+                            $('#forget-wallet-section').addClass('d-none')
+                        }
                     }
                     e.preventDefault()
                 })
