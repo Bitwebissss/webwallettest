@@ -75,7 +75,7 @@
                 crossorigin="anonymous"></script>
         <!-- Self build see BUILD4_bip39.md -->
         <script src="js/bip39-bundle.min.js"
-                integrity="sha512-9qS0/lQ8HZTImQ/TbprR/xgDSdMkW1aPHsts+AN1SDQ/l7aVWMcEYfeYKWZpOiZkW7K7OWmyqXi0zKo4SUFgpw=="
+                integrity="sha512-IeJ7MwXOMdc1yPkh2Y59ZWt3AvglVEeW2UpsZpdOdbnMrOPMjJy+hd182l8l6F6Tj1cYerF6h1GwLqnX3J9xtg=="
                 crossorigin="anonymous"></script>
         <!-- Self build see https://github.com/bitweb-project/bitcoin-bundle-v7 -->
         <script src="js/bitcoin-bundle-v7.min.js"
@@ -632,8 +632,8 @@
                 'resetTx':         function() { this.tx = { 'amount': 0, 'outputs': [], 'fee': 0 } },
                 'clear':           function() {
                     // Явно зануляем буфер приватного ключа до того как убрать ссылку.
-                    // keys.privateKey — это Uint8Array (Buffer), .fill(0) перезаписывает
-                    // байты в памяти, не дожидаясь GC.
+                    // keys.privateKey — Uint8Array (Buffer), .fill(0) перезаписывает байты
+                    // в памяти не дожидаясь GC.
                     if (this.keys && this.keys.privateKey) {
                         try { this.keys.privateKey.fill(0) } catch(e) {}
                     }
@@ -712,7 +712,14 @@
                         key,
                         new Uint8Array(blob.data)
                     )
-                    return JSON.parse(new TextDecoder().decode(pt))
+                    // pt — это ArrayBuffer с расшифрованным JSON (содержит wif + mnemonic).
+                    // Парсим через view, потом зануляем байты до того как отдать управление.
+                    // TextDecoder.decode() создаёт иммутабельную JS-строку — её занулить нельзя,
+                    // но сырые байты в ArrayBuffer можно перетереть нулями.
+                    var ptView  = new Uint8Array(pt)
+                    var decoded = new TextDecoder().decode(pt)
+                    ptView.fill(0)
+                    return JSON.parse(decoded)
                 } catch(e) {
                     return null
                 }
@@ -774,7 +781,7 @@
                 // Зануляем мнемонику в памяти до вызова clear()
                 _seedState.mnemonic = ''
                 _seedState.verifyPositions = []
-                globalData.clear()   // внутри зануляет keys.privateKey.fill(0)
+                globalData.clear()   // внутри: keys.privateKey.fill(0)
                 _privkeyClear('wallet-privkey-canvas')
                 _privkeyMask('wallet-privkey-canvas')
                 $('#wallet-privkey-copy-btn').addClass('d-none')
@@ -1292,11 +1299,8 @@
                 $('#wallet-address').text('')
                 $('#qr-code-addres').empty()
                 resetTxForm()
-                // Скрываем и очищаем DOM-грид сид-фразы (если был открыт)
+                // Скрываем DOM-грид сид-фразы и зануляем строку мнемоники
                 _hideSeedReveal()
-                // Зануляем строку мнемоники в оперативной памяти.
-                // JS-строки иммутабельны, но убираем ссылку немедленно —
-                // не ждём, пока _seedState перезапишется позже.
                 _seedState.mnemonic = ''
                 _seedState.verifyPositions = []
                 $('#wallet-block').addClass('d-none')
