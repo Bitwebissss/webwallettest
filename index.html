@@ -389,7 +389,7 @@
                                     <div id="wallet-keys-privkey">
                                         <label tkey="private-key"></label>
                                         <div class="d-flex align-items-center pb-2" style="gap:4px">
-                                            <canvas id="wallet-privkey-canvas" class="form-control p-1" style="height:38px;cursor:default;flex:1 1 auto" height="38"></canvas>
+                                            <input id="wallet-privkey-input" type="password" readonly autocomplete="off" class="form-control font-monospace" style="flex:1 1 auto">
                                             <button id="wallet-privkey-copy-btn" class="btn btn-outline-secondary flex-shrink-0 d-none" type="button" title="Copy"><span class="fa-solid fa-copy"></span></button>
                                             <button id="toggle-wallet-privkey" class="btn btn-primary flex-shrink-0 b-width" type="button" tkey="show"></button>
                                         </div>
@@ -607,56 +607,6 @@
                 'address': function(address) { return 'https://explorer.bitwebcore.net/address/' + address + '/' },
                 'tx':      function(tx)      { return 'https://explorer.bitwebcore.net/tx/' + tx + '/' }
             }
-            function _canvasSetup(canvasId) {
-                var canvas = document.getElementById(canvasId)
-                if (!canvas) return null
-                var dpr = window.devicePixelRatio || 1
-                var lw  = canvas.parentElement ? canvas.parentElement.offsetWidth - 120 : 300
-                if (lw < 100) lw = 300
-                var lh = 38
-                canvas.width  = Math.round(lw * dpr)
-                canvas.height = Math.round(lh * dpr)
-                canvas.style.width  = lw + 'px'
-                canvas.style.height = lh + 'px'
-                var ctx = canvas.getContext('2d')
-                ctx.setTransform(1, 0, 0, 1, 0, 0)
-                ctx.scale(dpr, dpr)
-                ctx.clearRect(0, 0, lw, lh)
-                return { ctx: ctx, w: lw, h: lh }
-            }
-            function _privkeyMask(canvasId) {
-                var d = _canvasSetup(canvasId)
-                if (!d) return
-                var isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark'
-                d.ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)'
-                d.ctx.lineWidth   = 2
-                d.ctx.lineCap     = 'round'
-                var y = d.h / 2, x = 8, len = 16, gap = 8
-                var step  = len + gap
-                var count = Math.floor((d.w - x * 2) / step)
-                for (var i = 0; i < count; i++) {
-                    d.ctx.beginPath()
-                    d.ctx.moveTo(x + i * step, y)
-                    d.ctx.lineTo(x + i * step + len, y)
-                    d.ctx.stroke()
-                }
-            }
-            function _privkeyReveal(canvasId, wif) {
-                var d = _canvasSetup(canvasId)
-                if (!d) return
-                var isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark'
-                d.ctx.fillStyle    = isDark ? '#e9ecef' : '#212529'
-                d.ctx.font         = '13px monospace'
-                d.ctx.textBaseline = 'middle'
-                d.ctx.fillText(wif, 6, d.h / 2)
-            }
-            function _privkeyClear(canvasId) {
-                var canvas = document.getElementById(canvasId)
-                if (!canvas) return
-                var ctx = canvas.getContext('2d')
-                ctx.clearRect(0, 0, canvas.width, canvas.height)
-                canvas.width = 1
-            }
             function seedExportPNG(mnemonic, getText) {
                 if (!mnemonic) return
                 var words = mnemonic.split(' ')
@@ -766,6 +716,17 @@
                     }
                 } catch (ignore) { /* not critical */ }
             }
+
+            function clearPrivKeyInput() {
+                var pi = document.getElementById('wallet-privkey-input');
+                if (pi) { pi.value = ''; pi.type = 'password'; }
+            }
+            
+            function revealPrivKeyInput(wif) {
+                var pi = document.getElementById('wallet-privkey-input');
+                if (pi) { pi.value = wif; pi.type = 'text'; }
+            }
+
             var globalData = {
                 status:          'locked',
                 balance:         0,
@@ -953,8 +914,7 @@
                 _seedState.mnemonic = '';
                 _seedState.verifyPositions = [];
                 globalData.clear();
-                _privkeyClear('wallet-privkey-canvas');
-                _privkeyMask('wallet-privkey-canvas');
+                clearPrivKeyInput();
                 $('#wallet-privkey-copy-btn').addClass('d-none');
                 $('#toggle-wallet-privkey').text(getText('show'));
                 $('#wallet-keys-pubkey input').val('');
@@ -1552,8 +1512,7 @@
                 var pubkey = globalData.pubKeyHex;
                 var redeem = '0014' + bitcoin.Buffer.from(getP2WPKHScript(keys.publicKey).hash).toString('hex');
                 $('#wallet-keys-pubkey input').val(pubkey);
-                _privkeyClear('wallet-privkey-canvas');
-                _privkeyMask('wallet-privkey-canvas');
+                clearPrivKeyInput();
                 $('#wallet-privkey-copy-btn').addClass('d-none');
                 $('#toggle-wallet-privkey').text(getText('show'));
                 $('#wallet-keys-script input').val(redeem);
@@ -1611,8 +1570,7 @@
             function closeWallet() {
                 _stopAutoLock();
                 wsDisconnect();
-                _privkeyClear('wallet-privkey-canvas');
-                _privkeyMask('wallet-privkey-canvas');
+                clearPrivKeyInput();
                 $('#wallet-privkey-copy-btn').addClass('d-none');
                 $('#toggle-wallet-privkey').text(getText('show'));
                 $('#wallet-keys-pubkey input').val('');
@@ -2063,8 +2021,7 @@
                     var tabFamily = $(this).data('tab-family')
                     var tabName   = $(this).data('tab-name')
                     if (tabFamily === 'wallet-block' && tabName !== 'wallet-keys') {
-                        _privkeyClear('wallet-privkey-canvas')
-                        _privkeyMask('wallet-privkey-canvas')
+                        clearPrivKeyInput();
                         $('#wallet-privkey-copy-btn').addClass('d-none')
                         $('#toggle-wallet-privkey').text(getText('show'))
                     }
@@ -2205,8 +2162,7 @@
                             $(this).text(getText('hide'))
                         }
                     } else {
-                        _privkeyClear('wallet-privkey-canvas')
-                        _privkeyMask('wallet-privkey-canvas')
+                        clearPrivKeyInput();
                         $('#wallet-privkey-copy-btn').addClass('d-none')
                         $(this).text(getText('show'))
                     }
@@ -2306,8 +2262,7 @@
                     $('#wallet-address').text(globalData.address);
                     showQrAddress(getConfig()['uri'] + globalData.address);
                     $('#wallet-keys-pubkey input').val(globalData.pubKeyHex);
-                    _privkeyClear('wallet-privkey-canvas');
-                    _privkeyMask('wallet-privkey-canvas');
+                    clearPrivKeyInput();
                     $('#wallet-privkey-copy-btn').addClass('d-none');
                     $('#toggle-wallet-privkey').text(getText('show'));
                     $('#wallet-keys-script input').val('0014' + bitcoin.Buffer.from(getP2WPKHScript(globalData.keys.publicKey).hash).toString('hex'));
