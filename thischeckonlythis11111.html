@@ -1241,16 +1241,13 @@
                         if ($(templateName).length) $(templateName).show()
                     }
                     switch(pageName) {
-                        case 'homepage':  setHomeTitle(); 
-                            break
-                            case 'broadcast': setTitle(getText('broadcast-transaction')); 
-                                break
+                        case 'homepage':  setHomeTitle(); break
+                            case 'broadcast': setTitle(getText('broadcast-transaction')); break
                         case 'network':
                             var network = urlParams[2]
                             if (network != undefined) switchConfig(network)
                             break
-                        default: switchPage(); 
-                            break
+                        default: switchPage(); break
                     }
                 }
             }
