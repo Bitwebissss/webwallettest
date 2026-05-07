@@ -540,7 +540,6 @@
         <script>
         (function() {
             'use strict';
-
             function applyTheme(mode) {
                 var resolved = mode === 'auto'
                     ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
@@ -608,7 +607,6 @@
                 'address': function(address) { return 'https://explorer.bitwebcore.net/address/' + address + '/' },
                 'tx':      function(tx)      { return 'https://explorer.bitwebcore.net/tx/' + tx + '/' }
             }
-
             function _canvasSetup(canvasId) {
                 var canvas = document.getElementById(canvasId)
                 if (!canvas) return null
@@ -626,7 +624,6 @@
                 ctx.clearRect(0, 0, lw, lh)
                 return { ctx: ctx, w: lw, h: lh }
             }
-            
             function _privkeyMask(canvasId) {
                 var d = _canvasSetup(canvasId)
                 if (!d) return
@@ -644,7 +641,6 @@
                     d.ctx.stroke()
                 }
             }
-            
             function _privkeyReveal(canvasId, wif) {
                 var d = _canvasSetup(canvasId)
                 if (!d) return
@@ -654,47 +650,37 @@
                 d.ctx.textBaseline = 'middle'
                 d.ctx.fillText(wif, 6, d.h / 2)
             }
-            
             function _privkeyClear(canvasId) {
                 var canvas = document.getElementById(canvasId)
                 if (!canvas) return
                 var ctx = canvas.getContext('2d')
                 ctx.clearRect(0, 0, canvas.width, canvas.height)
-                canvas.width = 1   // release GPU texture memory
+                canvas.width = 1
             }
-
             function seedExportPNG(mnemonic, getText) {
                 if (!mnemonic) return
-            
                 var words = mnemonic.split(' ')
                 var cols  = 4
                 var rows  = Math.ceil(words.length / cols)
-            
-                // ── Canvas dimensions ────────────────────────────────────────────────────
                 var W       = 800
                 var padX    = 44
                 var padY    = 36
-                var headerH = 72      // red warning bar
-                var warnH   = 46      // "Keep Secret" sub-line
+                var headerH = 72
+                var warnH   = 46
                 var cellW   = Math.floor((W - padX * 2) / cols)
                 var cellH   = 40
                 var gridH   = rows * cellH
                 var pathH   = 36
                 var footerH = 38
                 var H       = padY + headerH + warnH + 16 + gridH + 16 + pathH + footerH + padY
-            
                 var canvas = document.createElement('canvas')
                 var dpr    = Math.min(window.devicePixelRatio || 1, 2)
                 canvas.width  = W * dpr
                 canvas.height = H * dpr
                 var ctx = canvas.getContext('2d')
                 ctx.scale(dpr, dpr)
-            
-                // ── Background ───────────────────────────────────────────────────────────
                 ctx.fillStyle = '#ffffff'
                 ctx.fillRect(0, 0, W, H)
-            
-                // ── Red header bar ───────────────────────────────────────────────────────
                 ctx.fillStyle    = '#c0392b'
                 ctx.fillRect(0, padY, W, headerH)
                 ctx.fillStyle    = '#ffffff'
@@ -702,15 +688,11 @@
                 ctx.textAlign    = 'center'
                 ctx.textBaseline = 'middle'
                 ctx.fillText(getText('seed-print-secret'), W / 2, padY + headerH / 2)
-            
-                // ── Warning sub-line ─────────────────────────────────────────────────────
                 ctx.fillStyle = '#7b1a12'
                 ctx.fillRect(0, padY + headerH, W, warnH)
                 ctx.fillStyle = '#fff3f3'
                 ctx.font      = '13px system-ui, sans-serif'
                 ctx.fillText(getText('seed-print-warning'), W / 2, padY + headerH + warnH / 2)
-            
-                // ── Word grid ────────────────────────────────────────────────────────────
                 var gridTop = padY + headerH + warnH + 16
                 ctx.textBaseline = 'middle'
                 words.forEach(function(word, i) {
@@ -720,16 +702,12 @@
                     var y   = gridTop + row * cellH
                     var cx  = x + cellW / 2
                     var cy  = y + cellH / 2
-            
-                    // alternating cell background
                     ctx.fillStyle = (row + col) % 2 === 0 ? '#f7f8fa' : '#eef0f4'
                     if (ctx.roundRect) {
                         ctx.beginPath(); ctx.roundRect(x + 2, y + 2, cellW - 4, cellH - 4, 6); ctx.fill()
                     } else {
                         ctx.fillRect(x + 2, y + 2, cellW - 4, cellH - 4)
                     }
-            
-                    // cell border
                     ctx.strokeStyle = '#d0d4dc'
                     ctx.lineWidth   = 1
                     if (ctx.roundRect) {
@@ -737,21 +715,15 @@
                     } else {
                         ctx.strokeRect(x + 2, y + 2, cellW - 4, cellH - 4)
                     }
-            
-                    // index number
                     ctx.fillStyle = '#9ca3af'
                     ctx.font      = '11px system-ui, sans-serif'
                     ctx.textAlign = 'left'
                     ctx.fillText(i + 1, x + 10, cy)
-            
-                    // word
                     ctx.fillStyle = '#1a1a2e'
                     ctx.font      = 'bold 15px system-ui, monospace'
                     ctx.textAlign = 'center'
                     ctx.fillText(word, cx + 8, cy)
                 })
-            
-                // ── Derivation path ──────────────────────────────────────────────────────
                 var pathY = gridTop + gridH + 16
                 ctx.fillStyle    = '#f0f2f5'
                 ctx.fillRect(padX, pathY, W - padX * 2, pathH)
@@ -760,8 +732,6 @@
                 ctx.textAlign    = 'left'
                 ctx.textBaseline = 'middle'
                 ctx.fillText(getText('seed-path-label') + "  m/84'/0'/0'/0/0  (BIP84 native SegWit)", padX + 12, pathY + pathH / 2)
-            
-                // ── Footer: date ─────────────────────────────────────────────────────────
                 var footerY = pathY + pathH
                 var now     = new Date()
                 var dateStr = now.getFullYear() + '-' +
@@ -772,8 +742,6 @@
                 ctx.textAlign    = 'right'
                 ctx.textBaseline = 'middle'
                 ctx.fillText('Generated ' + dateStr, W - padX, footerY + footerH / 2)
-            
-                // ── Download ─────────────────────────────────────────────────────────────
                 try {
                     var link      = document.createElement('a')
                     link.href     = canvas.toDataURL('image/png')
@@ -782,12 +750,9 @@
                     link.click()
                     document.body.removeChild(link)
                 } catch (e) {
-                    // iOS Safari: open in new tab → long-press → Save to Photos
                     window.open(canvas.toDataURL('image/png'), '_blank')
                 }
             }
-
-
             function destroyKeyMaterial(keyPair) {
                 if (!keyPair) return;
                 try {
@@ -796,13 +761,11 @@
                     }
                 } catch (ignore) { /* not critical */ }
                 try {
-                    // ecpair stores an internal copy in __D (version 3+)
                     if (keyPair.__D && keyPair.__D instanceof Uint8Array) {
                         keyPair.__D.fill(0);
                     }
                 } catch (ignore) { /* not critical */ }
             }
-
             var globalData = {
                 status:          'locked',
                 balance:         0,
@@ -822,16 +785,13 @@
                     this.tx = { amount: 0, outputs: [], fee: 0 };
                 },
                 clear: function() {
-                    // Zero out private key material in heap
                     if (this.keys) {
                         destroyKeyMaterial(this.keys);
                     }
-                    // In case a raw private copy was kept separately
                     if (this._privKeyCopy) {
                         this._privKeyCopy.fill(0);
                         this._privKeyCopy = null;
                     }
-            
                     this.status          = 'locked';
                     this.keys            = undefined;
                     this.address         = '';
@@ -849,7 +809,6 @@
                     this.resetTx();
                 }
             };
-
             var messages = initMessages()
             var STORAGE_KEY = 'bte_wallet_v2'
             var AUTO_LOCK_MS   = 20 * 60 * 1000
@@ -886,6 +845,7 @@
                 var iv      = crypto.getRandomValues(new Uint8Array(12))
                 var key     = await deriveKey(pin, salt)
                 var payload = JSON.stringify({ type: 'wif', wif: wif })
+                wif = ''
                 var ct      = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, enc.encode(payload))
                 localStorage.setItem(STORAGE_KEY, JSON.stringify({
                     salt: Array.from(salt),
@@ -893,12 +853,15 @@
                     data: Array.from(new Uint8Array(ct))
                 }))
             }
+            
             async function saveBip39(mnemonic, wif, pin) {
                 var enc     = new TextEncoder()
                 var salt    = crypto.getRandomValues(new Uint8Array(16))
                 var iv      = crypto.getRandomValues(new Uint8Array(12))
                 var key     = await deriveKey(pin, salt)
                 var payload = JSON.stringify({ type: 'bip39', mnemonic: mnemonic, wif: wif })
+                mnemonic = ''
+                wif = ''
                 var ct      = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, enc.encode(payload))
                 localStorage.setItem(STORAGE_KEY, JSON.stringify({
                     salt: Array.from(salt),
@@ -917,10 +880,6 @@
                         key,
                         new Uint8Array(blob.data)
                     )
-                    // pt — это ArrayBuffer с расшифрованным JSON (содержит wif + mnemonic).
-                    // Парсим через view, потом зануляем байты до того как отдать управление.
-                    // TextDecoder.decode() создаёт иммутабельную JS-строку — её занулить нельзя,
-                    // но сырые байты в ArrayBuffer можно перетереть нулями.
                     var ptView  = new Uint8Array(pt)
                     var decoded = new TextDecoder().decode(pt)
                     ptView.fill(0)
@@ -936,7 +895,7 @@
                     if (creds.type === 'bip39') {
                         globalData.keys = bitcoin.ECPair.fromWIF(creds.wif, getConfig()['network']);
                         globalData.isBip39 = true;
-                        creds.mnemonic = '';   // clear the mnemonic string immediately
+                        creds.mnemonic = '';
                     } else if (creds.type === 'wif') {
                         globalData.keys = bitcoin.ECPair.fromWIF(creds.wif, getConfig()['network']);
                         globalData.isBip39 = false;
@@ -961,11 +920,9 @@
                     }
                     success = true;
                 } catch(e) {
-                    // If key assignment fails, clean up any partial key
                     if (globalData.keys) destroyKeyMaterial(globalData.keys);
                     globalData.keys = undefined;
                 } finally {
-                    // Always erase sensitive strings from the creds object
                     if (creds) {
                         creds.wif = '';
                         creds.mnemonic = '';
@@ -974,8 +931,6 @@
                     }
                 }
                 if (!success) return false;
-            
-                // Proceed to open wallet (derived key, no need to offer PIN again from storage)
                 openWallet(globalData.keys, false);
                 return true;
             }
@@ -985,7 +940,6 @@
             function forgetSavedWallet() {
                 _stopAutoLock();
                 wsDisconnect();
-            
                 try {
                     Object.keys(localStorage).forEach(function(k) {
                         if (
@@ -996,15 +950,9 @@
                         ) localStorage.removeItem(k);
                     });
                 } catch(e) {}
-            
-                // Overwrite seed state in memory
                 _seedState.mnemonic = '';
                 _seedState.verifyPositions = [];
-            
-                // Zero private key and reset all state
                 globalData.clear();
-            
-                // Reset UI elements that still hold key references
                 _privkeyClear('wallet-privkey-canvas');
                 _privkeyMask('wallet-privkey-canvas');
                 $('#wallet-privkey-copy-btn').addClass('d-none');
@@ -1013,10 +961,8 @@
                 $('#wallet-keys-script input').val('');
                 $('#wallet-address').text('');
                 $('#qr-code-addres').empty();
-            
                 resetTxForm();
                 _hideSeedReveal();
-            
                 $('#wallet-block').addClass('d-none');
                 updateSavedWalletUI();
                 setHomeTitle();
@@ -1116,7 +1062,6 @@
                     try { localStorage.setItem('bte_cfg_language', set_lang) } catch(e) {}
                     language = set_lang
                 }
-                // Populate navbar language dropdown
                 var $menu = $('#lang-dropdown-menu')
                 $menu.empty()
                 for (var key in walletLanguages) {
@@ -1126,7 +1071,6 @@
                         escHtml(walletLanguages[key]['lang-alias']) + '</a></li>'
                     )
                 }
-                // Update label
                 $('#lang-label').text('🌐 ' + (walletLanguages[language] ? walletLanguages[language]['lang-alias'] : language))
                 $('[tkey]').each(function() {
                     if (['INPUT', 'TEXTAREA'].indexOf($(this).prop('tagName')) >= 0) {
@@ -1247,9 +1191,6 @@
             function isUtxoMature(utxo, currentHeight) {
                 if (!utxo.coinbase) return true
                 if (utxo.height === 0) return false
-                // Consensus rule (matches C++ node):
-                //   depth = nSpendHeight - coin.nHeight  (no +1)
-                //   mature when depth >= required
                 var required = getRequiredMaturity(utxo.height)
                 return (currentHeight - utxo.height) >= required
             }
@@ -1337,16 +1278,10 @@
             }
             function amountFormat(amount) {
                 var decimals = getConfig()['decimals']
-                // Satoshis → display string  ── pure string arithmetic, zero float risk ──
-                // Example: 164650001 sats, decimals=8  →  "1.64650001"
-                //          100000000 sats              →  "1"
-                //          150000000 sats              →  "1.5"
                 var sats = String(Math.round(Math.abs(Number(amount))))
-                // Pad with leading zeros until we have at least decimals+1 digits
                 while (sats.length <= decimals) sats = '0' + sats
                 var intPart  = sats.slice(0, sats.length - decimals) || '0'
                 var fracPart = sats.slice(sats.length - decimals)
-                // Strip trailing zeros ("1.50000000" → "1.5", "1.00000000" → "1")
                 fracPart = fracPart.replace(/0+$/, '')
                 return fracPart.length > 0 ? intPart + '.' + fracPart : intPart
             }
@@ -1393,7 +1328,6 @@
                         $(this).addClass('d-none')
                     }
                 })
-                // Re-validate send form when balance changes (e.g. after network fetch)
                 validateSendForm()
             }
             function setHomeTitle() {
@@ -1431,85 +1365,39 @@
                 return set
             }
             var _seedState = { mnemonic: '', strength: 256, verifyPositions: [] }
-
             var HISTORY_LIMIT = 10
-            
-            // ---------------------------------------------------------------------------
-            // localStorage cache  (per-address key, never mixes wallets)
-            // ---------------------------------------------------------------------------
-            
             function loadHistory() {
                 var key = 'bte_history_' + globalData.address
                 try { return JSON.parse(localStorage.getItem(key) || '[]') } catch (e) { return [] }
             }
-            
             function saveHistory(txs) {
                 if (!globalData.address) return
                 try { localStorage.setItem('bte_history_' + globalData.address, JSON.stringify(txs)) } catch (e) {}
             }
-            
-            // ---------------------------------------------------------------------------
-            // annotateTx — classify direction and net amount for one transaction
-            //
-            // REST API contract (from /tx/<txid>):
-            //   txDetail.vin[]  — each input may have:
-            //     .txinwitness[]        P2WPKH witness: [<sig_hex>, <pubkey_hex>]
-            //     .scriptSig.hex        Legacy P2PKH: <sig_push> <pubkey_push>
-            //   txDetail.vout[] — each output has:
-            //     .value_sat  (int, added by server)   ← preferred, avoids float math
-            //     .value      (float BTE, fallback)
-            //     .scriptPubKey.hex / .address / .addresses[]
-            //
-            // Detection logic:
-            //   weAreSender  → our pubkey appears in any input witness or scriptSig
-            //   isOurs(vout) → output scriptPubKey matches our script hex or address
-            //
-            //   direction:
-            //     'in'   — we did not send; amount = sum of outputs to us
-            //     'out'  — we sent to at least one external output; amount = sum sent out
-            //     'self' — we sent but ALL outputs came back to us (consolidation / self-transfer);
-            //              amount = sum of outputs received (= sent − fee)
-            // ---------------------------------------------------------------------------
-            
             function annotateTx(txMeta, txDetail) {
                 var vin   = txDetail.vin  || []
                 var vout  = txDetail.vout || []
                 var myPub = (globalData.pubKeyHex || '').toLowerCase()
-            
-                // ── Sender detection ────────────────────────────────────────────────────
                 var weAreSender = vin.some(function(input) {
-                    // P2WPKH native segwit — witness stack: [sig, pubkey]
                     var wit = input.txinwitness || []
                     if (wit[1] && wit[1].toLowerCase() === myPub) return true
-            
-                    // Legacy P2PKH — scriptSig ends with OP_DATA(33) + compressed_pubkey
-                    // hex: last 68 chars = "21" + 66-char pubkey hex
                     var sig = (input.scriptSig && input.scriptSig.hex)
                         ? input.scriptSig.hex.toLowerCase() : ''
                     if (sig.length >= 68 && sig.slice(-68) === '21' + myPub) return true
-            
                     return false
                 })
-            
-                // ── Output classification ────────────────────────────────────────────────
                 var received = 0, sentToOthers = 0
-            
                 vout.forEach(function(o) {
                     var sat = (o.value_sat != null)
                         ? o.value_sat
                         : Math.round((o.value || 0) * 1e8)
-            
                     var hex = (o.scriptPubKey && o.scriptPubKey.hex)
                         ? o.scriptPubKey.hex.toLowerCase() : ''
-            
-                    // Primary: match by scriptPubKey hex (most reliable)
                     var isOurs = hex
                         ? (globalData.allScriptHexes
                             ? globalData.allScriptHexes.has(hex)
                             : hex === (globalData.scriptHex || '').toLowerCase())
                         : false
-            
-                    // Fallback: match by address string (covers exotic/OP_RETURN edge cases)
                     if (!isOurs && o.scriptPubKey) {
                         var outAddr = o.scriptPubKey.address
                             || (o.scriptPubKey.addresses && o.scriptPubKey.addresses[0])
@@ -1520,15 +1408,12 @@
                                 : outAddr === (globalData.address || '')
                         }
                     }
-            
                     if (isOurs) {
                         received += sat
                     } else {
                         sentToOthers += sat
                     }
                 })
-            
-                // ── Direction + net amount ───────────────────────────────────────────────
                 var direction, amount
                 if (weAreSender) {
                     var isSelfSend = (sentToOthers === 0)
@@ -1538,7 +1423,6 @@
                     direction = 'in'
                     amount    = received
                 }
-            
                 return {
                     tx_hash:   txMeta.tx_hash,
                     height:    txMeta.height,
@@ -1546,34 +1430,16 @@
                     amount:    amount
                 }
             }
-            
-            // ---------------------------------------------------------------------------
-            // updateHistory — fetch /history then /tx for each recent entry
-            //
-            // FIX 1: data.error != null  (loose, catches both null and undefined)
-            //         The strict  !== null  would treat a proxy-stripped JSON (no error
-            //         field → undefined) as an error response.
-            //
-            // FIX 2: capture requestedAddress before the async chain and verify it
-            //         matches globalData.address when results arrive — prevents a
-            //         logout+quick-login race from rendering the previous wallet's history.
-            // ---------------------------------------------------------------------------
-            
             function updateHistory() {
                 if (globalData.status !== 'unlocked') return
-            
-                // Capture address at request time (FIX 2)
                 var requestedAddress = globalData.address
-            
                 $('#history-list').html(
                     '<div class="text-muted text-center py-3 small">' +
                     escHtml(getText('history-loading')) + '</div>'
                 )
-            
                 fetch(getBackend() + '/history/' + requestedAddress)
                 .then(function(r) { return r.json() })
                 .then(function(data) {
-                    // FIX 1: loose != catches both null and undefined
                     if (!data || data.error != null) {
                         $('#history-list').html(
                             '<div class="text-danger text-center py-3 small">' +
@@ -1581,14 +1447,10 @@
                         )
                         return
                     }
-            
                     var all    = data.result || []
                     var total  = all.length
-                    // ElectrumX returns history oldest-first → take last N → reverse for newest-first
                     var recent = all.slice(-HISTORY_LIMIT).reverse()
-            
                     if (recent.length === 0) { renderHistory([], total); return }
-            
                     var fetches = recent.map(function(txMeta) {
                         return fetch(getBackend() + '/tx/' + txMeta.tx_hash)
                         .then(function(r) { return r.json() })
@@ -1600,9 +1462,7 @@
                             return { tx_hash: txMeta.tx_hash, height: txMeta.height, direction: 'unknown', amount: null }
                         })
                     })
-            
                     Promise.all(fetches).then(function(annotated) {
-                        // FIX 2: discard if wallet changed during fetch
                         if (!globalData.address || globalData.address !== requestedAddress) return
                         saveHistory(annotated)
                         renderHistory(annotated, total)
@@ -1615,11 +1475,6 @@
                     )
                 })
             }
-            
-            // ---------------------------------------------------------------------------
-            // renderHistory — paint #history-list DOM
-            // ---------------------------------------------------------------------------
-            
             function renderHistory(txs, total) {
                 if (!txs || txs.length === 0) {
                     $('#history-list').html(
@@ -1628,10 +1483,8 @@
                     )
                     return
                 }
-            
                 var html   = ''
                 var ticker = getConfig()['ticker']
-            
                 txs.forEach(function(tx) {
                     var confirmed = tx.height !== 0
                     var confs = confirmed
@@ -1639,14 +1492,11 @@
                             ? (globalData.height - tx.height + 1) + ' ' + getText('history-conf')
                             : getText('history-confirmed'))
                         : getText('history-pending')
-            
                     var confBadge = confirmed
                         ? '<span class="badge text-bg-success ms-1">' + escHtml(confs) + '</span>'
                         : '<span class="badge text-bg-warning ms-1">' + escHtml(getText('history-pending')) + '</span>'
-            
                     var dir = tx.direction || 'unknown'
                     var amt = (tx.amount != null) ? amountFormat(tx.amount) : '?'
-            
                     var dirLabel
                     if (dir === 'in') {
                         dirLabel = '<span class="font-weight-bold text-success" style="min-width:110px;display:inline-block">&#x2193; +' + escHtml(String(amt)) + ' ' + escHtml(ticker) + '</span>'
@@ -1657,11 +1507,9 @@
                     } else {
                         dirLabel = '<span class="text-muted"                    style="min-width:110px;display:inline-block">— ? '       + escHtml(ticker) + '</span>'
                     }
-            
                     var safeHash  = escHtml(tx.tx_hash || '')
                     var txUrl     = escHtml(blockExplorer.tx(tx.tx_hash || ''))
                     var shortHash = safeHash.substr(0, 10) + '…' + safeHash.substr(-6)
-            
                     html += '<div class="history-item d-flex align-items-center border-bottom" style="gap:6px">' +
                         dirLabel +
                         '<div class="font-monospace text-truncate flex-grow-1" style="font-size:11px">' +
@@ -1670,7 +1518,6 @@
                         '<div class="flex-shrink-0">' + confBadge + '</div>' +
                     '</div>'
                 })
-            
                 if (total && total > HISTORY_LIMIT) {
                     var explorerUrl = escHtml(blockExplorer.address(globalData.address))
                     html += '<div class="text-center py-2"><small>' +
@@ -1679,10 +1526,8 @@
                         escHtml(getText('history-on-explorer')) + ' &#x2197;' +
                         '</a></small></div>'
                 }
-            
                 $('#history-list').html(html)
             }
-
             function _hideSeedReveal() {
                 $('#wallet-seed-hidden').removeClass('d-none')
                 $('#wallet-seed-revealed').addClass('d-none')
@@ -1725,12 +1570,10 @@
                 $('#send-fee').attr('placeholder', getText('fee') + ' (' + getText('recommended') + ' ' + globalData.rfee + ' ' + getConfig()['ticker'] + ')');
                 showQrAddress(getConfig()['uri'] + globalData.address);
                 renderHistory(loadHistory());
-
                 globalData.balance = 0;
                 globalData.immatureBalance = 0;
                 globalData.utxos = [];
                 _renderBalanceDisplay();
-            
                 wsConnect();
                 setHomeTitle();
                 _resetAutoLock();
@@ -1739,7 +1582,6 @@
                 if (offerPin && !hasSavedWallet()) {
                     var pin = await askPinSetup();
                     if (pin === null) {
-                        // User cancelled – destroy the in-memory key immediately
                         if (keys) destroyKeyMaterial(keys);
                         globalData.keys = undefined;
                         _seedState.mnemonic = '';
@@ -1747,11 +1589,9 @@
                         seedReset();
                         return;
                     }
-            
-                    // Save encrypted wallet to localStorage
                     if (bip39Data && bip39Data.mnemonic) {
                         await saveBip39(bip39Data.mnemonic, keys.toWIF(), pin);
-                        bip39Data.mnemonic = '';        // clear string
+                        bip39Data.mnemonic = '';
                         _seedState.mnemonic = '';
                         _seedState.verifyPositions = [];
                     } else {
@@ -1760,50 +1600,34 @@
                     showMessage(getText('wallet-saved'));
                     updateSavedWalletUI();
                 }
-            
-                // Fill public data
                 globalData.status         = 'unlocked';
                 globalData.address        = getAddress(keys);
                 globalData.scriptHex      = getScriptHex(keys);
                 globalData.pubKeyHex      = bitcoin.Buffer.from(keys.publicKey).toString('hex');
                 globalData.allScriptHexes = getAllScriptHexes(keys);
                 globalData.allAddresses   = getAllAddresses(keys);
-            
                 _showWalletUI(keys);
             }
-
             function closeWallet() {
                 _stopAutoLock();
                 wsDisconnect();
-            
-                // Clear UI private key canvas
                 _privkeyClear('wallet-privkey-canvas');
                 _privkeyMask('wallet-privkey-canvas');
                 $('#wallet-privkey-copy-btn').addClass('d-none');
                 $('#toggle-wallet-privkey').text(getText('show'));
-            
-                // Empty all visible fields
                 $('#wallet-keys-pubkey input').val('');
                 $('#wallet-keys-script input').val('');
                 $('#wallet-address').text('');
                 $('#qr-code-addres').empty();
-            
                 resetTxForm();
-            
-                // Hide and overwrite seed phrase in DOM + JS
                 _hideSeedReveal();
-                _seedState.mnemonic = '';               // overwrite the mnemonic string
+                _seedState.mnemonic = '';
                 _seedState.verifyPositions = [];
-            
                 $('#wallet-block').addClass('d-none');
-            
-                // Central clear: zeros private key, clears all state
                 globalData.clear();
-            
                 updateSavedWalletUI();
                 setHomeTitle();
             }
-
             function renderCoinControl() {
                 var utxos  = globalData.utxos
                 var height = globalData.height
@@ -1876,7 +1700,6 @@
                     var amtSats = parseAmountSats($('[name="send-ammount"]', item).val())
                     globalData.tx.outputs.push({ 'address': address, 'amount': amtSats })
                 })
-                // Store all monetary values as satoshi integers
                 globalData.tx.amount = totalSats
                 globalData.tx.fee    = feeSats
             }
@@ -1971,7 +1794,7 @@
                         var tx = psbt.extractTransaction()
                         transactionBroadcast(tx.toHex()).then(function(data) {
                             if (data.error == null) {
-                                clearUtxoCache(address)  // invalidate UTXO cache after spend
+                                clearUtxoCache(address)
                                 $('#status-screen span').html(
                                     '<a href="' + escHtml(blockExplorer.tx(data.result)) + '" target="_blank" rel="noopener noreferrer">' + escHtml(data.result) + '</a>'
                                 )
@@ -2092,34 +1915,22 @@
                 globalData.resetTx()
                 validateSendForm()
             }
-            // ─── Integer-safe amount helpers ─────────────────────────────────────
-            // Convert a display-unit string (e.g. "1.50000001") to satoshis.
-            // Returns an integer, or null if the string is invalid / empty.
             function parseAmountSats(str) {
                 var decimals = getConfig()['decimals']
                 str = String(str == null ? '' : str).trim()
                 if (str === '' || str === '.') return null
-                // Must be digits with an optional single decimal point
                 if (!/^\d+\.?\d*$/.test(str)) return null
                 var parts    = str.split('.')
                 var intPart  = parts[0] || '0'
                 var fracPart = (parts[1] || '').slice(0, decimals)
-                // Pad fractional part to exactly `decimals` digits
                 while (fracPart.length < decimals) fracPart += '0'
-                // Both parts are pure digit strings → no float precision risk here
                 var sats = parseInt(intPart, 10) * Math.pow(10, decimals) + parseInt(fracPart || '0', 10)
-                return Math.round(sats)   // Math.round eliminates any residual float dust
+                return Math.round(sats)
             }
-            // Strip characters that are not valid in an amount field.
-            // Allows digits and at most one '.'; truncates fractional part to `decimals` digits.
             function filterAmountStr(val, decimals) {
-                // Keep only digits and dots
                 val = val.replace(/[^\d.]/g, '')
-                // Collapse multiple dots: keep everything up to and including the first dot,
-                // then strip further dots and limit fractional length.
                 var dotIdx = val.indexOf('.')
                 if (decimals === 0) {
-                    // No decimal part allowed at all
                     val = val.replace(/\./g, '')
                 } else if (dotIdx >= 0) {
                     var before = val.slice(0, dotIdx + 1)
@@ -2128,10 +1939,6 @@
                 }
                 return val
             }
-            // ─────────────────────────────────────────────────────────────────────
-            // ─── Real-time validation: send button state + visual feedback ─────────
-            // Declared globally so resetTxForm, _renderBalanceDisplay, and other
-            // top-level functions can call it without a scope error.
             function validateSendForm() {
                 if (globalData.status !== 'unlocked') {
                     $('#send-tx').prop('disabled', true)
@@ -2153,7 +1960,6 @@
                 })
                 var feeOk     = feeSats !== null && feeSats > 0 && feeSats >= (minFeeSats || 0)
                 var totalSats = outputsSats + (feeSats || 0)
-                // Spendable (respects coin control selection)
                 var spendableSats
                 if (globalData.coinControl && globalData.selectedUtxos && globalData.selectedUtxos.size > 0) {
                     spendableSats = 0
@@ -2166,14 +1972,10 @@
                 }
                 var overLimit = totalSats > spendableSats && totalSats > 0
                 var canSend   = allFilled && allAmtOk && feeOk && !overLimit && totalSats > 0
-                // — Button —
                 $('#send-tx').prop('disabled', !canSend)
-                // — Balance label turns red when over limit —
                 $('#wallet-send .wallet-balance').toggleClass('text-danger', overLimit)
-                // — Fee field: red when typed but invalid —
                 var feeTyped = $('#send-fee').val() !== ''
                 $('#send-fee').toggleClass('is-invalid', feeTyped && (!feeOk || overLimit))
-                // — Amount fields: red when over limit or typed but invalid —
                 $('#send-outputs [name="send-ammount"]').each(function() {
                     var amtSats = parseAmountSats($(this).val())
                     var typed   = $(this).val() !== ''
@@ -2289,7 +2091,6 @@
                     var decimals   = getConfig()['decimals']
                     var feeStr     = $('#send-fee').val() !== '' ? $('#send-fee').val() : String(globalData.rfee)
                     var feeSats    = parseAmountSats(feeStr)
-                    // Minimum fee in satoshis (config stores it in display units)
                     var minFeeSats = parseAmountSats(String(getConfig()['fee']))
                     if (feeSats === null || feeSats <= 0) {
                         showSendError(messages.error['not-valid-fee']); error = true
@@ -2309,9 +2110,7 @@
                         }
                         if (amtSats !== null) outputsSats += amtSats
                     })
-                    // Total = outputs + fee, entirely in satoshis (integers)
                     var totalSats = outputsSats + (feeSats || 0)
-                    // Spendable in satoshis: respect coin-control selection when active
                     var spendableSats
                     if (globalData.coinControl && globalData.selectedUtxos && globalData.selectedUtxos.size > 0) {
                         spendableSats = 0
@@ -2325,31 +2124,25 @@
                     }
                     if (!error) {
                         if (totalSats <= spendableSats) {
-                            // Pass display amount to showConfirmation for UI label only
                             showConfirmation(amountFormat(totalSats), totalSats, feeSats, outputsSats)
                         } else {
                             showSendError(messages.error['not-enough-funds'])
                         }
                     }
                 })
-                // ─── Input filtering + validation event bindings (validateSendForm is global) ──
-                // Input filtering for fee field + trigger validation
                 $('#send-fee').on('input', function() {
                     var cur = filterAmountStr($(this).val(), getConfig()['decimals'])
                     if (cur !== $(this).val()) $(this).val(cur)
                     validateSendForm()
                 })
-                // Input filtering + validation for amount fields (event delegation covers dynamic rows)
                 $('#send-outputs').on('input', '[name="send-ammount"]', function() {
                     var cur = filterAmountStr($(this).val(), getConfig()['decimals'])
                     if (cur !== $(this).val()) $(this).val(cur)
                     validateSendForm()
                 })
-                // Validate when address changes
                 $('#send-outputs').on('input', '[name="send-address"]', function() {
                     validateSendForm()
                 })
-                // Paste protection on fee and amount fields
                 $(document).on('paste', '#send-fee, [name="send-ammount"]', function() {
                     var self = this
                     setTimeout(function() {
@@ -2436,7 +2229,7 @@
                         validateSendForm()
                         e.preventDefault()
                     })
-                    validateSendForm()  // new empty row → button must disable
+                    validateSendForm()
                     e.preventDefault()
                 })
                 $('#send-reset').click(function(e) { resetTxForm(); e.preventDefault() })
