@@ -758,54 +758,58 @@
                 function getWIF() {
                     return keyPair ? keyPair.toWIF() : null;
                 }
+                function getPrivKeyHex() {
+                    if (!keyPair || !keyPair.privateKey) return null;
+                    return bitcoin.Buffer.from(keyPair.privateKey).toString('hex');
+                }
                 function signAllInputs(psbt) {
                     if (!keyPair) throw new Error('Wallet locked');
                     psbt.signAllInputs(keyPair);
                 }
-                function deriveAddress(type) {
-                    if (!keyPair) return '';
+                function deriveAddress(type, pubKey) {
+                    if (!keyPair || !pubKey) return '';
                     var network = getConfig()['network'];
                     if (type === 'bech32') {
-                        return bitcoin.payments.p2wpkh({ pubkey: globalData.pubKey, network: network }).address;
+                        return bitcoin.payments.p2wpkh({ pubkey: pubKey, network: network }).address;
                     } else if (type === 'segwit') {
-                        var redeem = bitcoin.payments.p2wpkh({ pubkey: globalData.pubKey, network: network });
+                        var redeem = bitcoin.payments.p2wpkh({ pubkey: pubKey, network: network });
                         return bitcoin.payments.p2sh({ redeem: redeem, network: network }).address;
                     } else {
-                        return bitcoin.payments.p2pkh({ pubkey: globalData.pubKey, network: network }).address;
+                        return bitcoin.payments.p2pkh({ pubkey: pubKey, network: network }).address;
                     }
                 }
-                function getScriptHex(type) {
-                    if (!keyPair) return '';
+                function getScriptHex(type, pubKey) {
+                    if (!keyPair || !pubKey) return '';
                     var network = getConfig()['network'];
                     if (type === 'bech32') {
-                        return bitcoin.Buffer.from(bitcoin.payments.p2wpkh({ pubkey: globalData.pubKey, network: network }).output).toString('hex');
+                        return bitcoin.Buffer.from(bitcoin.payments.p2wpkh({ pubkey: pubKey, network: network }).output).toString('hex');
                     } else if (type === 'segwit') {
-                        var redeem = bitcoin.payments.p2wpkh({ pubkey: globalData.pubKey, network: network });
+                        var redeem = bitcoin.payments.p2wpkh({ pubkey: pubKey, network: network });
                         return bitcoin.Buffer.from(bitcoin.payments.p2sh({ redeem: redeem, network: network }).output).toString('hex');
                     } else {
-                        return bitcoin.Buffer.from(bitcoin.payments.p2pkh({ pubkey: globalData.pubKey, network: network }).output).toString('hex');
+                        return bitcoin.Buffer.from(bitcoin.payments.p2pkh({ pubkey: pubKey, network: network }).output).toString('hex');
                     }
                 }
-                function getAllScriptHexes() {
+                function getAllScriptHexes(pubKey) {
                     var set = new Set();
-                    if (!keyPair) return set;
+                    if (!keyPair || !pubKey) return set;
                     var network = getConfig()['network'];
-                    set.add(bitcoin.Buffer.from(bitcoin.payments.p2wpkh({ pubkey: globalData.pubKey, network: network }).output).toString('hex').toLowerCase());
-                    var redeem = bitcoin.payments.p2wpkh({ pubkey: globalData.pubKey, network: network });
+                    set.add(bitcoin.Buffer.from(bitcoin.payments.p2wpkh({ pubkey: pubKey, network: network }).output).toString('hex').toLowerCase());
+                    var redeem = bitcoin.payments.p2wpkh({ pubkey: pubKey, network: network });
                     set.add(bitcoin.Buffer.from(bitcoin.payments.p2sh({ redeem: redeem, network: network }).output).toString('hex').toLowerCase());
-                    set.add(bitcoin.Buffer.from(bitcoin.payments.p2pkh({ pubkey: globalData.pubKey, network: network }).output).toString('hex').toLowerCase());
+                    set.add(bitcoin.Buffer.from(bitcoin.payments.p2pkh({ pubkey: pubKey, network: network }).output).toString('hex').toLowerCase());
                     return set;
                 }
-                function getAllAddresses() {
+                function getAllAddresses(pubKey) {
                     var set = new Set();
-                    if (!keyPair) return set;
+                    if (!keyPair || !pubKey) return set;
                     var network = getConfig()['network'];
-                    try { set.add(bitcoin.payments.p2wpkh({ pubkey: globalData.pubKey, network: network }).address); } catch(e) {}
+                    try { set.add(bitcoin.payments.p2wpkh({ pubkey: pubKey, network: network }).address); } catch(e) {}
                     try {
-                        var redeem = bitcoin.payments.p2wpkh({ pubkey: globalData.pubKey, network: network });
+                        var redeem = bitcoin.payments.p2wpkh({ pubkey: pubKey, network: network });
                         set.add(bitcoin.payments.p2sh({ redeem: redeem, network: network }).address);
                     } catch(e) {}
-                    try { set.add(bitcoin.payments.p2pkh({ pubkey: globalData.pubKey, network: network }).address); } catch(e) {}
+                    try { set.add(bitcoin.payments.p2pkh({ pubkey: pubKey, network: network }).address); } catch(e) {}
                     return set;
                 }
                 function isUnlocked() {
@@ -825,6 +829,7 @@
                     getPublicKeyHex: getPublicKeyHex,
                     getPublicKeyBytes: getPublicKeyBytes,
                     getWIF: getWIF,
+                    getPrivKeyHex: getPrivKeyHex,
                     signAllInputs: signAllInputs,
                     deriveAddress: deriveAddress,
                     getScriptHex: getScriptHex,
@@ -858,6 +863,8 @@
                     this.address         = '';
                     this.scriptHex       = undefined;
                     this.pubKeyHex       = undefined;
+                    // Зануляем байты публичного ключа перед сбросом ссылки
+                    if (this.pubKey instanceof Uint8Array) this.pubKey.fill(0);
                     this.pubKey          = null;
                     this.allScriptHexes  = null;
                     this.allAddresses    = null;
@@ -914,26 +921,28 @@
                     return null;
                 }
             }
-            async function saveWalletWif(wif, pin) {
-                var pubkey = globalData.pubKeyHex;
-                await saveEncrypted(STORAGE_KEY_PUB,  pubkey, pin);
-                await saveEncrypted(STORAGE_KEY_PRIV, wif,    pin);
-                localStorage.removeItem(STORAGE_KEY_SEED);
-                wif = '';
-            }
-            async function saveWalletBip39(mnemonic, wif, pin) {
-                var pubkey = globalData.pubKeyHex;
+            async function saveWalletWif(pin) {
+                var pubkey  = globalData.pubKeyHex;
+                var privHex = Keystore.getPrivKeyHex();
                 await saveEncrypted(STORAGE_KEY_PUB,  pubkey,   pin);
-                await saveEncrypted(STORAGE_KEY_PRIV, wif,      pin);
+                await saveEncrypted(STORAGE_KEY_PRIV, privHex,  pin);
+                localStorage.removeItem(STORAGE_KEY_SEED);
+                privHex = '';
+            }
+            async function saveWalletBip39(mnemonic, pin) {
+                var pubkey  = globalData.pubKeyHex;
+                var privHex = Keystore.getPrivKeyHex();
+                await saveEncrypted(STORAGE_KEY_PUB,  pubkey,   pin);
+                await saveEncrypted(STORAGE_KEY_PRIV, privHex,  pin);
                 await saveEncrypted(STORAGE_KEY_SEED, mnemonic, pin);
                 mnemonic = '';
-                wif = '';
+                privHex  = '';
             }
             async function loadWallet(pin) {
-                var pubHex = await loadEncrypted(STORAGE_KEY_PUB, pin);
-                var wif    = await loadEncrypted(STORAGE_KEY_PRIV, pin);
-                if (!pubHex || !wif) return null;
-                return { pubkey: pubHex, wif: wif };
+                var pubHex  = await loadEncrypted(STORAGE_KEY_PUB,  pin);
+                var privHex = await loadEncrypted(STORAGE_KEY_PRIV, pin);
+                if (!pubHex || !privHex) return null;
+                return { pubkey: pubHex, privHex: privHex };
             }
             var AUTO_LOCK_MS   = 20 * 60 * 1000
             var _autoLockTimer = null
@@ -1602,23 +1611,24 @@
                     }
 
                     // One‑time public key extraction (only when a wallet is created)
+                    // new Uint8Array(...) — копия, не ссылка на буфер keyPair
                     globalData.pubKeyHex = Keystore.getPublicKeyHex();
-                    globalData.pubKey    = Keystore.getPublicKeyBytes();
+                    globalData.pubKey    = new Uint8Array(Keystore.getPublicKeyBytes());
 
                     if (bip39Mnemonic) {
-                        await saveWalletBip39(bip39Mnemonic, Keystore.getWIF(), pin);
+                        await saveWalletBip39(bip39Mnemonic, pin);
                     } else {
-                        await saveWalletWif(Keystore.getWIF(), pin);
+                        await saveWalletWif(pin);
                     }
                     showMessage(getText('wallet-saved'));
                     updateSavedWalletUI();
                 }
 
                 globalData.status         = 'unlocked';
-                globalData.address        = Keystore.deriveAddress(getAddressType());
-                globalData.scriptHex      = Keystore.getScriptHex(getAddressType());
-                globalData.allScriptHexes = Keystore.getAllScriptHexes();
-                globalData.allAddresses   = Keystore.getAllAddresses();
+                globalData.address        = Keystore.deriveAddress(getAddressType(), globalData.pubKey);
+                globalData.scriptHex      = Keystore.getScriptHex(getAddressType(), globalData.pubKey);
+                globalData.allScriptHexes = Keystore.getAllScriptHexes(globalData.pubKey);
+                globalData.allAddresses   = Keystore.getAllAddresses(globalData.pubKey);
 
                 _showWalletUI();
                 wsConnect();
@@ -2092,15 +2102,16 @@
                         $('#pin-login-error').addClass('d-none');
                         $('#pin-login-input').val('');
 
+                        var privBytes = new Uint8Array(bitcoin.Buffer.from(walletData.privHex, 'hex'));
                         Keystore.setKeyPair(
-                            bitcoin.ECPair.fromWIF(walletData.wif, getConfig()['network'])
+                            bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes), { network: getConfig()['network'] })
                         );
+                        privBytes.fill(0);
+                        walletData.privHex = '';
 
                         // Public key loaded straight from encrypted localStorage
                         globalData.pubKeyHex = walletData.pubkey;
-                        globalData.pubKey    = bitcoin.Buffer.from(walletData.pubkey, 'hex');
-
-                        walletData.wif = '';
+                        globalData.pubKey    = new Uint8Array(bitcoin.Buffer.from(walletData.pubkey, 'hex'));
                         pin = '';
                         openWallet(false);
                     } catch (e) {
@@ -2245,14 +2256,17 @@
                                 var regnums    = (pass.match(/[0-9]+/g)) ? pass.match(/[0-9]+/g).length   : 1;
                                 s += ((regnums + regchars) + regupchars) * pass.length + '3571';
                                 s += (s + '' + s);
-                                for (var i = 0; i <= 51; i++) s = sha256.update(s).hex();
+                                for (var i = 0; i <= 50; i++) s = sha256.update(s).hex();
+                                var privBytes = new Uint8Array(sha256.update(s).array());
+                                s = '';
                                 $('#open-email').val('');
                                 $('#open-password').val('');
                                 $('#open-password-confirm').val('');
                                 Keystore.setKeyPair(bitcoin.ECPair.fromPrivateKey(
-                                    bitcoin.Buffer.from(s, 'hex'),
+                                    bitcoin.Buffer.from(privBytes),
                                     { 'network': getConfig()['network'] }
                                 ));
+                                privBytes.fill(0);
                                 pass = '';
                                 passConfirm = '';
                                 openWallet(true);
