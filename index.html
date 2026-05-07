@@ -862,6 +862,11 @@
             function hasSeedBackup() {
                 return localStorage.getItem(STORAGE_KEY_SEED) !== null;
             }
+            function clearSeedState() {
+                _seedState.mnemonic = '';
+				_seedState.strength = 256;
+                _seedState.verifyPositions = [];
+            }
             async function saveEncrypted(storageKey, plaintext, pin) {
                 var enc  = new TextEncoder();
                 var salt = crypto.getRandomValues(new Uint8Array(16));
@@ -964,6 +969,7 @@
                     });
                 } catch(e) {}
 
+                clearSeedState();
                 Keystore.clear();
                 globalData.clear();
 
@@ -1530,7 +1536,7 @@
                 $('#restore-word-error').addClass('d-none')
                 $('#restore-path').val("m/84'/0'/0'/0/0")
                 $('#restore-advanced').removeClass('show')
-                _seedState = { mnemonic: '', strength: 256, verifyPositions: [] }
+                clearSeedState();
             }
              function _showWalletUI() {
                 var pubkey = globalData.pubKeyHex;
@@ -1606,6 +1612,7 @@
             function closeWallet() {
                 _stopAutoLock();
                 wsDisconnect();
+
                 clearPrivKeyInput();
                 $('#wallet-privkey-copy-btn').addClass('d-none');
                 $('#toggle-wallet-privkey').text(getText('show'));
@@ -1617,7 +1624,8 @@
 
                 resetTxForm();
                 _hideSeedReveal();
-                Keystore.clearMnemonic();
+
+                clearSeedState();
                 Keystore.clear();
                 globalData.clear();
 
