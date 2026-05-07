@@ -727,10 +727,8 @@
                 var pi = document.getElementById('wallet-privkey-input');
                 if (pi) { pi.value = wif; pi.type = 'text'; }
             }
-
             var Keystore = (function() {
                 var keyPair = null;
-
                 function getPublicKeyHex() {
                     if (!keyPair) return '';
                     return bitcoin.Buffer.from(keyPair.publicKey).toString('hex');
@@ -749,46 +747,46 @@
                     if (!keyPair) return '';
                     var network = getConfig()['network'];
                     if (type === 'bech32') {
-                        return bitcoin.payments.p2wpkh({ pubkey: keyPair.publicKey, network: network }).address;
+                        return bitcoin.payments.p2wpkh({ pubkey: globalData.pubKey, network: network }).address;
                     } else if (type === 'segwit') {
-                        var redeem = bitcoin.payments.p2wpkh({ pubkey: keyPair.publicKey, network: network });
+                        var redeem = bitcoin.payments.p2wpkh({ pubkey: globalData.pubKey, network: network });
                         return bitcoin.payments.p2sh({ redeem: redeem, network: network }).address;
                     } else {
-                        return bitcoin.payments.p2pkh({ pubkey: keyPair.publicKey, network: network }).address;
+                        return bitcoin.payments.p2pkh({ pubkey: globalData.pubKey, network: network }).address;
                     }
                 }
                 function getScriptHex(type) {
                     if (!keyPair) return '';
                     var network = getConfig()['network'];
                     if (type === 'bech32') {
-                        return bitcoin.Buffer.from(bitcoin.payments.p2wpkh({ pubkey: keyPair.publicKey, network: network }).output).toString('hex');
+                        return bitcoin.Buffer.from(bitcoin.payments.p2wpkh({ pubkey: globalData.pubKey, network: network }).output).toString('hex');
                     } else if (type === 'segwit') {
-                        var redeem = bitcoin.payments.p2wpkh({ pubkey: keyPair.publicKey, network: network });
+                        var redeem = bitcoin.payments.p2wpkh({ pubkey: globalData.pubKey, network: network });
                         return bitcoin.Buffer.from(bitcoin.payments.p2sh({ redeem: redeem, network: network }).output).toString('hex');
                     } else {
-                        return bitcoin.Buffer.from(bitcoin.payments.p2pkh({ pubkey: keyPair.publicKey, network: network }).output).toString('hex');
+                        return bitcoin.Buffer.from(bitcoin.payments.p2pkh({ pubkey: globalData.pubKey, network: network }).output).toString('hex');
                     }
                 }
                 function getAllScriptHexes() {
                     var set = new Set();
                     if (!keyPair) return set;
                     var network = getConfig()['network'];
-                    set.add(bitcoin.Buffer.from(bitcoin.payments.p2wpkh({ pubkey: keyPair.publicKey, network: network }).output).toString('hex').toLowerCase());
-                    var redeem = bitcoin.payments.p2wpkh({ pubkey: keyPair.publicKey, network: network });
+                    set.add(bitcoin.Buffer.from(bitcoin.payments.p2wpkh({ pubkey: globalData.pubKey, network: network }).output).toString('hex').toLowerCase());
+                    var redeem = bitcoin.payments.p2wpkh({ pubkey: globalData.pubKey, network: network });
                     set.add(bitcoin.Buffer.from(bitcoin.payments.p2sh({ redeem: redeem, network: network }).output).toString('hex').toLowerCase());
-                    set.add(bitcoin.Buffer.from(bitcoin.payments.p2pkh({ pubkey: keyPair.publicKey, network: network }).output).toString('hex').toLowerCase());
+                    set.add(bitcoin.Buffer.from(bitcoin.payments.p2pkh({ pubkey: globalData.pubKey, network: network }).output).toString('hex').toLowerCase());
                     return set;
                 }
                 function getAllAddresses() {
                     var set = new Set();
                     if (!keyPair) return set;
                     var network = getConfig()['network'];
-                    try { set.add(bitcoin.payments.p2wpkh({ pubkey: keyPair.publicKey, network: network }).address); } catch(e) {}
+                    try { set.add(bitcoin.payments.p2wpkh({ pubkey: globalData.pubKey, network: network }).address); } catch(e) {}
                     try {
-                        var redeem = bitcoin.payments.p2wpkh({ pubkey: keyPair.publicKey, network: network });
+                        var redeem = bitcoin.payments.p2wpkh({ pubkey: globalData.pubKey, network: network });
                         set.add(bitcoin.payments.p2sh({ redeem: redeem, network: network }).address);
                     } catch(e) {}
-                    try { set.add(bitcoin.payments.p2pkh({ pubkey: keyPair.publicKey, network: network }).address); } catch(e) {}
+                    try { set.add(bitcoin.payments.p2pkh({ pubkey: globalData.pubKey, network: network }).address); } catch(e) {}
                     return set;
                 }
                 function isUnlocked() {
@@ -818,7 +816,6 @@
                     clear: clear
                 };
             })();
-
             var globalData = {
                 status:          'locked',
                 balance:         0,
@@ -827,6 +824,7 @@
                 address:         undefined,
                 scriptHex:       undefined,
                 pubKeyHex:       undefined,
+                pubKey:          null,
                 rfee:            getConfig()['fee'],
                 utxos:           [],
                 coinControl:     false,
@@ -837,11 +835,11 @@
                     this.tx = { amount: 0, outputs: [], fee: 0 };
                 },
                 clear: function() {
-                    // Keys are now managed by Keystore, no need to destroy here
                     this.status          = 'locked';
                     this.address         = '';
                     this.scriptHex       = undefined;
                     this.pubKeyHex       = undefined;
+                    this.pubKey          = null;
                     this.allScriptHexes  = null;
                     this.allAddresses    = null;
                     this.balance         = 0;
@@ -858,7 +856,6 @@
             var STORAGE_KEY_PUB  = 'bte_wallet_pubkey';
             var STORAGE_KEY_PRIV = 'bte_wallet_privkey';
             var STORAGE_KEY_SEED = 'bte_wallet_seed';
-
             function hasSeedBackup() {
                 return localStorage.getItem(STORAGE_KEY_SEED) !== null;
             }
@@ -879,7 +876,6 @@
                     data: Array.from(new Uint8Array(ct))
                 }));
             }
-
             async function loadEncrypted(storageKey, pin) {
                 var raw = localStorage.getItem(storageKey);
                 if (!raw) return null;
@@ -899,24 +895,21 @@
                     return null;
                 }
             }
-
             async function saveWalletWif(wif, pin) {
-                var pubkey = Keystore.getPublicKeyHex();
+                var pubkey = globalData.pubKeyHex;
                 await saveEncrypted(STORAGE_KEY_PUB,  pubkey, pin);
                 await saveEncrypted(STORAGE_KEY_PRIV, wif,    pin);
                 localStorage.removeItem(STORAGE_KEY_SEED);
                 wif = '';
             }
-
             async function saveWalletBip39(mnemonic, wif, pin) {
-                var pubkey = Keystore.getPublicKeyHex();
+                var pubkey = globalData.pubKeyHex;
                 await saveEncrypted(STORAGE_KEY_PUB,  pubkey,   pin);
                 await saveEncrypted(STORAGE_KEY_PRIV, wif,      pin);
                 await saveEncrypted(STORAGE_KEY_SEED, mnemonic, pin);
                 mnemonic = '';
                 wif = '';
             }
-
             async function loadWallet(pin) {
                 var pubHex = await loadEncrypted(STORAGE_KEY_PUB, pin);
                 var wif    = await loadEncrypted(STORAGE_KEY_PRIV, pin);
@@ -957,7 +950,6 @@
             function forgetSavedWallet() {
                 _stopAutoLock();
                 wsDisconnect();
-
                 [STORAGE_KEY_PUB, STORAGE_KEY_PRIV, STORAGE_KEY_SEED].forEach(function(k) {
                     try { localStorage.removeItem(k); } catch(e) {}
                 });
@@ -968,11 +960,9 @@
                         }
                     });
                 } catch(e) {}
-
                 clearSeedState();
                 Keystore.clear();
                 globalData.clear();
-
                 clearPrivKeyInput();
                 $('#wallet-privkey-copy-btn').addClass('d-none');
                 $('#toggle-wallet-privkey').text(getText('show'));
@@ -980,7 +970,6 @@
                 $('#wallet-keys-script input').val('');
                 $('#wallet-address').text('');
                 $('#qr-code-addres').empty();
-
                 resetTxForm();
                 _hideSeedReveal();
                 $('#wallet-block').addClass('d-none');
@@ -1544,28 +1533,24 @@
                 var redeem = '';
                 if (addressType !== 'legacy') {
                     redeem = '0014' + bitcoin.Buffer.from(
-                        bitcoin.payments.p2wpkh({ pubkey: Keystore.getPublicKeyBytes(), network: getConfig()['network'] }).hash
+                        bitcoin.payments.p2wpkh({ pubkey: globalData.pubKey, network: getConfig()['network'] }).hash
                     ).toString('hex');
                 }
-
                 $('#wallet-keys-pubkey input').val(pubkey);
                 clearPrivKeyInput();
                 $('#wallet-privkey-copy-btn').addClass('d-none');
                 $('#toggle-wallet-privkey').text(getText('show'));
                 $('#wallet-keys-script input').val(redeem);
-
                 if (addressType === 'legacy') {
                     $('#wallet-keys-script').addClass('d-none');
                 } else {
                     $('#wallet-keys-script').removeClass('d-none');
                 }
-
                 if (hasSeedBackup()) {
                     $('#wallet-keys-seed').removeClass('d-none');
                 } else {
                     $('#wallet-keys-seed').addClass('d-none');
                 }
-
                 _hideSeedReveal();
                 $('#wallet-address').text(globalData.address);
                 $('#pin-login-block').addClass('d-none');
@@ -1574,12 +1559,10 @@
                 $('#send-fee').attr('placeholder', getText('fee') + ' (' + getText('recommended') + ' ' + globalData.rfee + ' ' + getConfig()['ticker'] + ')');
                 showQrAddress(getConfig()['uri'] + globalData.address);
                 renderHistory(loadHistory());
-            
                 globalData.balance = 0;
                 globalData.immatureBalance = 0;
                 globalData.utxos = [];
                 _renderBalanceDisplay();
-
                 // Force re-subscribe to fetch current balance / UTXO when WS is already active
                 if (_ws && _wsActive) {
                     _ws.emit('subscribe', { address: globalData.address });
@@ -1601,14 +1584,13 @@
                     showMessage(getText('wallet-saved'));
                     updateSavedWalletUI();
                 }
-
                 globalData.status         = 'unlocked';
                 globalData.pubKeyHex      = Keystore.getPublicKeyHex();
+                globalData.pubKey         = Keystore.getPublicKeyBytes();
                 globalData.address        = Keystore.deriveAddress(getAddressType());
                 globalData.scriptHex      = Keystore.getScriptHex(getAddressType());
                 globalData.allScriptHexes = Keystore.getAllScriptHexes();
                 globalData.allAddresses   = Keystore.getAllAddresses();
-
                 _showWalletUI();
                 wsConnect();
                 setHomeTitle();
@@ -1617,23 +1599,18 @@
             function closeWallet() {
                 _stopAutoLock();
                 wsDisconnect();
-
                 clearPrivKeyInput();
                 $('#wallet-privkey-copy-btn').addClass('d-none');
                 $('#toggle-wallet-privkey').text(getText('show'));
-
                 $('#wallet-keys-pubkey input').val('');
                 $('#wallet-keys-script input').val('');
                 $('#wallet-address').text('');
                 $('#qr-code-addres').empty();
-
                 resetTxForm();
                 _hideSeedReveal();
-
                 clearSeedState();
                 Keystore.clear();
                 globalData.clear();
-
                 $('#wallet-block').addClass('d-none');
                 updateSavedWalletUI();
                 setHomeTitle();
@@ -1750,7 +1727,7 @@
                     }
                     var value     = 0;
                     var inputMeta = [];
-                    var pubkey    = Keystore.getPublicKeyBytes();
+                    var pubkey    = globalData.pubKey;
                     for (var i = 0; i < spendable.length; i++) {
                         var u      = spendable[i];
                         var script = bitcoin.Buffer.from(u.script, 'hex');
@@ -2041,11 +2018,9 @@
                         }
                         $('#pin-login-error').addClass('d-none');
                         $('#pin-login-input').val('');
-
                         Keystore.setKeyPair(
                             bitcoin.ECPair.fromWIF(walletData.wif, getConfig()['network'])
                         );
-
                         walletData.wif = '';
                         pin = '';
                         openWallet(false);
@@ -2318,11 +2293,10 @@
                     clearPrivKeyInput();
                     $('#wallet-privkey-copy-btn').addClass('d-none');
                     $('#toggle-wallet-privkey').text(getText('show'));
-
                     var redeem = '';
                     if (newType !== 'legacy') {
                         redeem = '0014' + bitcoin.Buffer.from(
-                            bitcoin.payments.p2wpkh({ pubkey: Keystore.getPublicKeyBytes(), network: getConfig()['network'] }).hash
+                            bitcoin.payments.p2wpkh({ pubkey: globalData.pubKey, network: getConfig()['network'] }).hash
                         ).toString('hex');
                     }
                     $('#wallet-keys-script input').val(redeem);
@@ -2331,7 +2305,6 @@
                     } else {
                         $('#wallet-keys-script').removeClass('d-none');
                     }
-
                     setHomeTitle();
                 });
                 $('#wallet-backend button').click(function() {
@@ -2488,7 +2461,6 @@
                 });
                 $('#btn-show-seed').click(async function() {
                     if (!hasSeedBackup()) return;
-
                     var seedData = await new Promise(function(resolve) {
                         $('#pin-modal-title').text(getText('seed-pin-modal-title'));
                         $('#pin-modal-desc').text(getText('seed-pin-modal-desc'));
@@ -2496,7 +2468,6 @@
                         $('#pin-error').addClass('d-none');
                         var modal = new bootstrap.Modal(document.getElementById('pin-modal'), { keyboard: false });
                         modal.show();
-
                         function onConfirm() {
                             var p = $('#pin-input').val();
                             loadEncrypted(STORAGE_KEY_SEED, p).then(function(mnemonic) {
@@ -2511,20 +2482,16 @@
                                 resolve(result);
                             });
                         }
-
                         function onCancel() {
                             $('#pin-confirm').off('click', onConfirm);
                             $('#pin-cancel').off('click', onCancel);
                             modal.hide();
                             resolve(null);
                         }
-
                         $('#pin-confirm').off('click').on('click', onConfirm);
                         $('#pin-cancel').off('click').on('click', onCancel);
                     });
-
                     if (!seedData) return;
-
                     var words = seedData.mnemonic.split(' ');
                     seedData.mnemonic = '';
                     seedData = null;
