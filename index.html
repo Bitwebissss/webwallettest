@@ -1538,7 +1538,7 @@
                 $('#restore-advanced').removeClass('show')
                 clearSeedState();
             }
-             function _showWalletUI() {
+            function _showWalletUI() {
                 var pubkey = globalData.pubKeyHex;
                 var addressType = getAddressType();
                 var redeem = '';
@@ -1574,11 +1574,16 @@
                 $('#send-fee').attr('placeholder', getText('fee') + ' (' + getText('recommended') + ' ' + globalData.rfee + ' ' + getConfig()['ticker'] + ')');
                 showQrAddress(getConfig()['uri'] + globalData.address);
                 renderHistory(loadHistory());
-
+            
                 globalData.balance = 0;
                 globalData.immatureBalance = 0;
                 globalData.utxos = [];
                 _renderBalanceDisplay();
+
+                // Force re-subscribe to fetch current balance / UTXO when WS is already active
+                if (_ws && _wsActive) {
+                    _ws.emit('subscribe', { address: globalData.address });
+                }
             }
             async function openWallet(offerPin, bip39Mnemonic) {
                 if (offerPin && !hasSavedWallet()) {
@@ -2446,7 +2451,7 @@
                         $('#restore-input').val(words.slice(0, 12).join(' '))
                     }
                 })
-                 $('#seed-restore-btn').click(async function() {
+                $('#seed-restore-btn').click(async function() {
                     if (typeof bip39Bundle === 'undefined') { alert('bip39-bundle.min.js not loaded'); return; }
                     $('#restore-word-error').addClass('d-none');
                     var raw = $('#restore-input').val().trim().toLowerCase().replace(/\s+/g, ' ');
