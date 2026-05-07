@@ -2036,7 +2036,6 @@
                         if (!walletData) {
                             $('#pin-login-error').text(getText('pin-login-error')).removeClass('d-none');
                             $('#pin-login-input').val('').focus();
-                            pin = '';
                             return;
                         }
                         $('#pin-login-error').addClass('d-none');
@@ -2047,12 +2046,10 @@
                         );
 
                         walletData.wif = '';
-                        pin = '';
                         openWallet(false);
                     } catch (e) {
                         $('#pin-login-btn').prop('disabled', false).text(getText('pin-login-btn'));
                         $('#pin-login-error').text(getText('pin-login-error')).removeClass('d-none');
-                        pin = '';
                     }
                 }
                 $('#pin-login-btn').click(doPinLogin)
@@ -2167,12 +2164,9 @@
                             openWallet(true);
                         } catch(err) {
                             showMessage(messages.error['bad-priv-key']);
-                        } finally {
-                            wif = '';
                         }
                     } else {
                         showMessage(messages.error['bad-priv-key']);
-                        wif = '';
                     }
                     e.preventDefault();
                 });
@@ -2199,12 +2193,10 @@
                                     bitcoin.Buffer.from(s, 'hex'),
                                     { 'network': getConfig()['network'] }
                                 ));
-                                pass = '';
-                                passConfirm = '';
                                 openWallet(true);
-                            } else { showMessage(messages.error['pass-not-match']); pass = ''; passConfirm = ''; }
-                        } else { showMessage(messages.error['pass-too-short']); pass = ''; passConfirm = ''; }
-                    } else { showMessage(getText('identity-too-short')); pass = ''; passConfirm = ''; }
+                            } else { showMessage(messages.error['pass-not-match']); }
+                        } else { showMessage(messages.error['pass-too-short']); }
+                    } else { showMessage(getText('identity-too-short')); }
                     e.preventDefault();
                 });
                 $('#send-confirm').click(function(e) { sendTransaction(); e.preventDefault() })
