@@ -2373,10 +2373,10 @@
                     globalData.selectedUtxos = null;
                     globalData.immatureBalance = 0;
                     globalData._lastRendered = { balance: -1, immature: -1, utxoFingerprint: '' };
-                    globalData.address   = Keystore.deriveAddress(newType);
-                    globalData.scriptHex = Keystore.getScriptHex(newType);
-                    globalData.allScriptHexes = Keystore.getAllScriptHexes();
-                    globalData.allAddresses   = Keystore.getAllAddresses();
+                    globalData.address        = Keystore.deriveAddress(newType, globalData.pubKey);
+                    globalData.scriptHex      = Keystore.getScriptHex(newType, globalData.pubKey);
+                    globalData.allScriptHexes = Keystore.getAllScriptHexes(globalData.pubKey);
+                    globalData.allAddresses   = Keystore.getAllAddresses(globalData.pubKey);
                     if (_ws && _wsActive) {
                         _ws.emit('subscribe', { address: globalData.address });
                     }
