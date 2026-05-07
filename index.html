@@ -1576,6 +1576,11 @@
                         seedReset();
                         return;
                     }
+
+                    // One‑time public key extraction (only when a wallet is created)
+                    globalData.pubKeyHex = Keystore.getPublicKeyHex();
+                    globalData.pubKey    = Keystore.getPublicKeyBytes();
+
                     if (bip39Mnemonic) {
                         await saveWalletBip39(bip39Mnemonic, Keystore.getWIF(), pin);
                     } else {
@@ -1584,13 +1589,13 @@
                     showMessage(getText('wallet-saved'));
                     updateSavedWalletUI();
                 }
+
                 globalData.status         = 'unlocked';
-                globalData.pubKeyHex      = Keystore.getPublicKeyHex();
-                globalData.pubKey         = Keystore.getPublicKeyBytes();
                 globalData.address        = Keystore.deriveAddress(getAddressType());
                 globalData.scriptHex      = Keystore.getScriptHex(getAddressType());
                 globalData.allScriptHexes = Keystore.getAllScriptHexes();
                 globalData.allAddresses   = Keystore.getAllAddresses();
+
                 _showWalletUI();
                 wsConnect();
                 setHomeTitle();
@@ -2018,9 +2023,15 @@
                         }
                         $('#pin-login-error').addClass('d-none');
                         $('#pin-login-input').val('');
+
                         Keystore.setKeyPair(
                             bitcoin.ECPair.fromWIF(walletData.wif, getConfig()['network'])
                         );
+
+                        // Public key loaded straight from encrypted localStorage
+                        globalData.pubKeyHex = walletData.pubkey;
+                        globalData.pubKey    = bitcoin.Buffer.from(walletData.pubkey, 'hex');
+
                         walletData.wif = '';
                         pin = '';
                         openWallet(false);
