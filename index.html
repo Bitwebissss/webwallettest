@@ -730,8 +730,6 @@
 
             var Keystore = (function() {
                 var keyPair = null;
-                var isBip39 = false;
-                var mnemonic = '';
 
                 function getPublicKeyHex() {
                     if (!keyPair) return '';
@@ -796,30 +794,15 @@
                 function isUnlocked() {
                     return keyPair !== null;
                 }
-                function setKeyPair(kp, isBip39Flag) {
+                function setKeyPair(kp) {
                     if (keyPair) destroyKeyMaterial(keyPair);
                     keyPair = kp;
-                    isBip39 = !!isBip39Flag;
-                }
-                function isBip39Wallet() {
-                    return isBip39;
                 }
                 function clear() {
                     if (keyPair) {
                         destroyKeyMaterial(keyPair);
                         keyPair = null;
                     }
-                    mnemonic = '';
-                    isBip39 = false;
-                }
-                function setMnemonic(m) {
-                    mnemonic = m;
-                }
-                function getMnemonic() {
-                    return mnemonic;
-                }
-                function clearMnemonic() {
-                    mnemonic = '';
                 }
                 return {
                     getPublicKeyHex: getPublicKeyHex,
@@ -832,11 +815,7 @@
                     getAllAddresses: getAllAddresses,
                     isUnlocked: isUnlocked,
                     setKeyPair: setKeyPair,
-                    isBip39Wallet: isBip39Wallet,
-                    clear: clear,
-                    setMnemonic: setMnemonic,
-                    getMnemonic: getMnemonic,
-                    clearMnemonic: clearMnemonic
+                    clear: clear
                 };
             })();
 
@@ -876,7 +855,69 @@
                 }
             };
             var messages = initMessages()
-            var STORAGE_KEY = 'bte_wallet_v2'
+            var STORAGE_KEY_PUB  = 'bte_wallet_pubkey';
+            var STORAGE_KEY_PRIV = 'bte_wallet_privkey';
+            var STORAGE_KEY_SEED = 'bte_wallet_seed';
+
+            function hasSeedBackup() {
+                return localStorage.getItem(STORAGE_KEY_SEED) !== null;
+            }
+            async function saveEncrypted(storageKey, plaintext, pin) {
+                var enc  = new TextEncoder();
+                var salt = crypto.getRandomValues(new Uint8Array(16));
+                var iv   = crypto.getRandomValues(new Uint8Array(12));
+                var key  = await deriveKey(pin, salt);
+                var ct   = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, enc.encode(plaintext));
+                localStorage.setItem(storageKey, JSON.stringify({
+                    salt: Array.from(salt),
+                    iv:   Array.from(iv),
+                    data: Array.from(new Uint8Array(ct))
+                }));
+            }
+
+            async function loadEncrypted(storageKey, pin) {
+                var raw = localStorage.getItem(storageKey);
+                if (!raw) return null;
+                var blob = JSON.parse(raw);
+                var key  = await deriveKey(pin, new Uint8Array(blob.salt));
+                try {
+                    var pt = await crypto.subtle.decrypt(
+                        { name: 'AES-GCM', iv: new Uint8Array(blob.iv) },
+                        key,
+                        new Uint8Array(blob.data)
+                    );
+                    var ptView  = new Uint8Array(pt);
+                    var decoded = new TextDecoder().decode(pt);
+                    ptView.fill(0);
+                    return decoded;
+                } catch(e) {
+                    return null;
+                }
+            }
+
+            async function saveWalletWif(wif, pin) {
+                var pubkey = Keystore.getPublicKeyHex();
+                await saveEncrypted(STORAGE_KEY_PUB,  pubkey, pin);
+                await saveEncrypted(STORAGE_KEY_PRIV, wif,    pin);
+                localStorage.removeItem(STORAGE_KEY_SEED);
+                wif = '';
+            }
+
+            async function saveWalletBip39(mnemonic, wif, pin) {
+                var pubkey = Keystore.getPublicKeyHex();
+                await saveEncrypted(STORAGE_KEY_PUB,  pubkey,   pin);
+                await saveEncrypted(STORAGE_KEY_PRIV, wif,      pin);
+                await saveEncrypted(STORAGE_KEY_SEED, mnemonic, pin);
+                mnemonic = '';
+                wif = '';
+            }
+
+            async function loadWallet(pin) {
+                var pubHex = await loadEncrypted(STORAGE_KEY_PUB, pin);
+                var wif    = await loadEncrypted(STORAGE_KEY_PRIV, pin);
+                if (!pubHex || !wif) return null;
+                return { pubkey: pubHex, wif: wif };
+            }
             var AUTO_LOCK_MS   = 20 * 60 * 1000
             var _autoLockTimer = null
             function _resetAutoLock() {
@@ -904,115 +945,25 @@
                     false,
                     ['encrypt', 'decrypt']
                 )
-            }
-            async function saveWif(wif, pin) {
-                var enc     = new TextEncoder()
-                var salt    = crypto.getRandomValues(new Uint8Array(16))
-                var iv      = crypto.getRandomValues(new Uint8Array(12))
-                var key     = await deriveKey(pin, salt)
-                var payload = JSON.stringify({ type: 'wif', wif: wif })
-                wif = ''
-                var ct      = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, enc.encode(payload))
-                localStorage.setItem(STORAGE_KEY, JSON.stringify({
-                    salt: Array.from(salt),
-                    iv:   Array.from(iv),
-                    data: Array.from(new Uint8Array(ct))
-                }))
-            }
-            
-            async function saveBip39(mnemonic, wif, pin) {
-                var enc     = new TextEncoder()
-                var salt    = crypto.getRandomValues(new Uint8Array(16))
-                var iv      = crypto.getRandomValues(new Uint8Array(12))
-                var key     = await deriveKey(pin, salt)
-                var payload = JSON.stringify({ type: 'bip39', mnemonic: mnemonic, wif: wif })
-                mnemonic = ''
-                wif = ''
-                var ct      = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, enc.encode(payload))
-                localStorage.setItem(STORAGE_KEY, JSON.stringify({
-                    salt: Array.from(salt),
-                    iv:   Array.from(iv),
-                    data: Array.from(new Uint8Array(ct))
-                }))
-            }
-            async function loadCredentials(pin) {
-                var raw = localStorage.getItem(STORAGE_KEY)
-                if (!raw) return null
-                var blob = JSON.parse(raw)
-                var key  = await deriveKey(pin, new Uint8Array(blob.salt))
-                try {
-                    var pt = await crypto.subtle.decrypt(
-                        { name: 'AES-GCM', iv: new Uint8Array(blob.iv) },
-                        key,
-                        new Uint8Array(blob.data)
-                    )
-                    var ptView  = new Uint8Array(pt)
-                    var decoded = new TextDecoder().decode(pt)
-                    ptView.fill(0)
-                    return JSON.parse(decoded)
-                } catch(e) {
-                    return null
-                }
-            }
-            function openFromCredentials(creds) {
-                if (!creds) return false;
-                var success = false;
-                try {
-                    if (creds.type === 'bip39') {
-                        Keystore.setKeyPair(bitcoin.ECPair.fromWIF(creds.wif, getConfig()['network']), true);
-                        creds.mnemonic = '';
-                    } else if (creds.type === 'wif') {
-                        Keystore.setKeyPair(bitcoin.ECPair.fromWIF(creds.wif, getConfig()['network']), false);
-                    } else if (creds.type === 'credentials') {
-                        var identity = creds.identity;
-                        var pass     = creds.password;
-                        var s = identity;
-                        s += '|' + pass + '|';
-                        s += s.length + '|!@' + ((pass.length * 7) + identity.length) * 7;
-                        var regchars   = (pass.match(/[a-z]+/g)) ? pass.match(/[a-z]+/g).length   : 1;
-                        var regupchars = (pass.match(/[A-Z]+/g)) ? pass.match(/[A-Z]+/g).length   : 1;
-                        var regnums    = (pass.match(/[0-9]+/g)) ? pass.match(/[0-9]+/g).length   : 1;
-                        s += ((regnums + regchars) + regupchars) * pass.length + '3571';
-                        s += (s + '' + s);
-                        for (var i = 0; i <= 51; i++) s = sha256.update(s).hex();
-                        Keystore.setKeyPair(bitcoin.ECPair.fromPrivateKey(
-                            bitcoin.Buffer.from(s, 'hex'),
-                            { network: getConfig()['network'] }
-                        ), false);
-                    } else {
-                        return false;
-                    }
-                    success = true;
-                } catch(e) {
-                    Keystore.clear();
-                } finally {
-                    if (creds) {
-                        creds.wif = ''; creds.mnemonic = ''; creds.identity = ''; creds.password = '';
-                    }
-                }
-                if (!success) return false;
-                openWallet(false);
-                return true;
-            }
+            }            
             function hasSavedWallet() {
-                return localStorage.getItem(STORAGE_KEY) !== null
+                return localStorage.getItem(STORAGE_KEY_PRIV) !== null;
             }
             function forgetSavedWallet() {
                 _stopAutoLock();
                 wsDisconnect();
 
+                [STORAGE_KEY_PUB, STORAGE_KEY_PRIV, STORAGE_KEY_SEED].forEach(function(k) {
+                    try { localStorage.removeItem(k); } catch(e) {}
+                });
                 try {
                     Object.keys(localStorage).forEach(function(k) {
-                        if (
-                            k === STORAGE_KEY ||
-                            k.indexOf('bte_history_') === 0 ||
-                            k.indexOf('bte_utxo_')    === 0 ||
-                            k.indexOf('bte_wallet_')  === 0
-                        ) localStorage.removeItem(k);
+                        if (k.indexOf('bte_history_') === 0 || k.indexOf('bte_utxo_') === 0 || k.indexOf('bte_wallet_') === 0) {
+                            localStorage.removeItem(k);
+                        }
                     });
                 } catch(e) {}
 
-                Keystore.clearMnemonic();
                 Keystore.clear();
                 globalData.clear();
 
@@ -1581,11 +1532,15 @@
                 $('#restore-advanced').removeClass('show')
                 _seedState = { mnemonic: '', strength: 256, verifyPositions: [] }
             }
-            function _showWalletUI() {
+             function _showWalletUI() {
                 var pubkey = globalData.pubKeyHex;
-                var redeem = '0014' + bitcoin.Buffer.from(
-                    bitcoin.payments.p2wpkh({ pubkey: Keystore.getPublicKeyBytes(), network: getConfig()['network'] }).hash
-                ).toString('hex');
+                var addressType = getAddressType();
+                var redeem = '';
+                if (addressType !== 'legacy') {
+                    redeem = '0014' + bitcoin.Buffer.from(
+                        bitcoin.payments.p2wpkh({ pubkey: Keystore.getPublicKeyBytes(), network: getConfig()['network'] }).hash
+                    ).toString('hex');
+                }
 
                 $('#wallet-keys-pubkey input').val(pubkey);
                 clearPrivKeyInput();
@@ -1593,11 +1548,18 @@
                 $('#toggle-wallet-privkey').text(getText('show'));
                 $('#wallet-keys-script input').val(redeem);
 
-                if (Keystore.isBip39Wallet()) {
+                if (addressType === 'legacy') {
+                    $('#wallet-keys-script').addClass('d-none');
+                } else {
+                    $('#wallet-keys-script').removeClass('d-none');
+                }
+
+                if (hasSeedBackup()) {
                     $('#wallet-keys-seed').removeClass('d-none');
                 } else {
                     $('#wallet-keys-seed').addClass('d-none');
                 }
+
                 _hideSeedReveal();
                 $('#wallet-address').text(globalData.address);
                 $('#pin-login-block').addClass('d-none');
@@ -1617,16 +1579,13 @@
                     var pin = await askPinSetup();
                     if (pin === null) {
                         Keystore.clear();
-                        Keystore.clearMnemonic();
                         seedReset();
                         return;
                     }
                     if (bip39Mnemonic) {
-                        await saveBip39(bip39Mnemonic, Keystore.getWIF(), pin);
-                        Keystore.setMnemonic(bip39Mnemonic);
-                        Keystore.clearMnemonic();   // clear from JS string
+                        await saveWalletBip39(bip39Mnemonic, Keystore.getWIF(), pin);
                     } else {
-                        await saveWif(Keystore.getWIF(), pin);
+                        await saveWalletWif(Keystore.getWIF(), pin);
                     }
                     showMessage(getText('wallet-saved'));
                     updateSavedWalletUI();
@@ -2051,30 +2010,34 @@
                 $('#pin-input').on('keydown', function(e) {
                     if (e.key === 'Enter') $('#pin-confirm').click()
                 })
-                function doPinLogin() {
-                    var pin = $('#pin-login-input').val()
+                async function doPinLogin() {
+                    var pin = $('#pin-login-input').val();
                     if (!pin) {
-                        $('#pin-login-error').text(getText('pin-login-error')).removeClass('d-none')
-                        return
+                        $('#pin-login-error').text(getText('pin-login-error')).removeClass('d-none');
+                        return;
                     }
-                    $('#pin-login-btn').prop('disabled', true).text(getText('loading'))
-                    loadCredentials(pin).then(function(creds) {
-                        $('#pin-login-btn').prop('disabled', false).text(getText('pin-login-btn'))
-                        if (!creds) {
-                            $('#pin-login-error').text(getText('pin-login-error')).removeClass('d-none')
-                            $('#pin-login-input').val('').focus()
-                            return
+                    $('#pin-login-btn').prop('disabled', true).text(getText('loading'));
+                    try {
+                        var walletData = await loadWallet(pin);
+                        $('#pin-login-btn').prop('disabled', false).text(getText('pin-login-btn'));
+                        if (!walletData) {
+                            $('#pin-login-error').text(getText('pin-login-error')).removeClass('d-none');
+                            $('#pin-login-input').val('').focus();
+                            return;
                         }
-                        $('#pin-login-error').addClass('d-none')
-                        $('#pin-login-input').val('')
-                        if (!openFromCredentials(creds)) {
-                            showMessage(getText('wallet-corrupted'))
-                            forgetSavedWallet()
-                        }
-                    }).catch(function() {
-                        $('#pin-login-btn').prop('disabled', false).text(getText('pin-login-btn'))
-                        $('#pin-login-error').text(getText('pin-login-error')).removeClass('d-none')
-                    })
+                        $('#pin-login-error').addClass('d-none');
+                        $('#pin-login-input').val('');
+
+                        Keystore.setKeyPair(
+                            bitcoin.ECPair.fromWIF(walletData.wif, getConfig()['network'])
+                        );
+
+                        walletData.wif = '';
+                        openWallet(false);
+                    } catch (e) {
+                        $('#pin-login-btn').prop('disabled', false).text(getText('pin-login-btn'));
+                        $('#pin-login-error').text(getText('pin-login-error')).removeClass('d-none');
+                    }
                 }
                 $('#pin-login-btn').click(doPinLogin)
                 $('#pin-login-input').on('keydown', function(e) { if (e.key === 'Enter') doPinLogin() })
@@ -2183,7 +2146,7 @@
                     var wif = $('#passphrase').val().trim();
                     if ([51, 52].includes(wif.length)) {
                         try {
-                            Keystore.setKeyPair(bitcoin.ECPair.fromWIF(wif, getConfig()['network']), false);
+                            Keystore.setKeyPair(bitcoin.ECPair.fromWIF(wif, getConfig()['network']));
                             $('#passphrase').val('');
                             openWallet(true);
                         } catch(err) {
@@ -2216,7 +2179,7 @@
                                 Keystore.setKeyPair(bitcoin.ECPair.fromPrivateKey(
                                     bitcoin.Buffer.from(s, 'hex'),
                                     { 'network': getConfig()['network'] }
-                                ), false);
+                                ));
                                 openWallet(true);
                             } else { showMessage(messages.error['pass-not-match']); }
                         } else { showMessage(messages.error['pass-too-short']); }
@@ -2450,7 +2413,7 @@
                         var privBytes = bip39Bundle.mnemonicToPrivKey(_seedState.mnemonic, "m/84'/0'/0'/0/0");
                         var keyPair = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes));
                         privBytes.fill(0);
-                        Keystore.setKeyPair(keyPair, true);
+                        Keystore.setKeyPair(keyPair);
                         openWallet(true, _seedState.mnemonic);
                     } catch(err) {
                         alert('Key derivation error: ' + err.message);
@@ -2482,7 +2445,7 @@
                         var privBytes = bip39Bundle.mnemonicToPrivKey(raw, path);
                         var keyPair = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes));
                         privBytes.fill(0);
-                        Keystore.setKeyPair(keyPair, true);
+                        Keystore.setKeyPair(keyPair);
                         await openWallet(true, raw);
                         $('#restore-input').val('');
                         raw = '';
@@ -2491,50 +2454,54 @@
                     }
                 });
                 $('#btn-show-seed').click(async function() {
-                    if (!localStorage.getItem(STORAGE_KEY)) return
+                    if (!hasSeedBackup()) return;
+
                     var seedData = await new Promise(function(resolve) {
-                        $('#pin-modal-title').text(getText('seed-pin-modal-title'))
-                        $('#pin-modal-desc').text(getText('seed-pin-modal-desc'))
-                        $('#pin-input').val('')
-                        $('#pin-error').addClass('d-none')
-                        var modal = new bootstrap.Modal(document.getElementById('pin-modal'), { keyboard: false })
-                        modal.show()
+                        $('#pin-modal-title').text(getText('seed-pin-modal-title'));
+                        $('#pin-modal-desc').text(getText('seed-pin-modal-desc'));
+                        $('#pin-input').val('');
+                        $('#pin-error').addClass('d-none');
+                        var modal = new bootstrap.Modal(document.getElementById('pin-modal'), { keyboard: false });
+                        modal.show();
+
                         function onConfirm() {
-                            var p = $('#pin-input').val()
-                            loadCredentials(p).then(function(creds) {
-                                if (!creds || creds.type !== 'bip39') {
-                                    $('#pin-error').removeClass('d-none')
-                                    creds = null
-                                    return
+                            var p = $('#pin-input').val();
+                            loadEncrypted(STORAGE_KEY_SEED, p).then(function(mnemonic) {
+                                if (!mnemonic) {
+                                    $('#pin-error').removeClass('d-none');
+                                    return;
                                 }
-                                var result = { mnemonic: creds.mnemonic }
-                                creds.mnemonic = ''
-                                creds = null
-                                modal.hide()
-                                $('#pin-confirm').off('click', onConfirm)
-                                resolve(result)
-                            })
+                                var result = { mnemonic: mnemonic };
+                                mnemonic = '';
+                                modal.hide();
+                                $('#pin-confirm').off('click', onConfirm);
+                                resolve(result);
+                            });
                         }
+
                         function onCancel() {
-                            $('#pin-confirm').off('click', onConfirm)
-                            $('#pin-cancel').off('click', onCancel)
-                            modal.hide()
-                            resolve(null)
+                            $('#pin-confirm').off('click', onConfirm);
+                            $('#pin-cancel').off('click', onCancel);
+                            modal.hide();
+                            resolve(null);
                         }
-                        $('#pin-confirm').off('click').on('click', onConfirm)
-                        $('#pin-cancel').off('click').on('click', onCancel)
-                    })
-                    if (!seedData) return
-                    var words = seedData.mnemonic.split(' ')
-                    seedData.mnemonic = ''
-                    seedData = null
-                    seedRenderGrid(words, '#wallet-seed-grid')
-                    words.fill('')
-                    words = null
-                    $('#wallet-seed-hidden').addClass('d-none')
-                    $('#wallet-seed-revealed').removeClass('d-none')
-                    setTimeout(_hideSeedReveal, 60000)
-                })
+
+                        $('#pin-confirm').off('click').on('click', onConfirm);
+                        $('#pin-cancel').off('click').on('click', onCancel);
+                    });
+
+                    if (!seedData) return;
+
+                    var words = seedData.mnemonic.split(' ');
+                    seedData.mnemonic = '';
+                    seedData = null;
+                    seedRenderGrid(words, '#wallet-seed-grid');
+                    words.fill('');
+                    words = null;
+                    $('#wallet-seed-hidden').addClass('d-none');
+                    $('#wallet-seed-revealed').removeClass('d-none');
+                    setTimeout(_hideSeedReveal, 60000);
+                });
                 $('#btn-hide-seed').click(_hideSeedReveal)
                 $('#btn-copy-seed').click(function() {
                     var mnemonic = []
