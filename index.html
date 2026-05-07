@@ -62,7 +62,7 @@
             };
         </script>
         <script src="js/multilang.js"
-                integrity="sha512-xRz93CvYbUGHJniGPZvkTkO5tH6cuCt+IPOaOEOKiO2hLQwsUYAJ1vdG9iCBDagd6zYFAh8XgaeX40HE4/S9Mg==" 
+                integrity="sha512-iMGC5IihoF4Vikq21d2jXOFxPmtpNvoi1hDg7MSWlVvHb7RJaHaj89ItVOfEj0G4RntXEA8e/HucG4DcPjteUQ==" 
                 crossorigin="anonymous"></script>
         <!-- Self build see BUILD4_bip39.md -->
         <script src="js/bip39-bundle.min.js"
@@ -574,7 +574,26 @@
                     .replace(/"/g, '&quot;')
                     .replace(/'/g, '&#039;')
             }
-            var stream        = undefined
+            function wipeInputValue(selector) {
+                $(selector).each(function() {
+                    if (this && typeof this.value === 'string') {
+                        this.value = '';
+                    }
+                });
+            }
+            function clearSensitiveInputs() {
+                wipeInputValue('#open-email');
+                wipeInputValue('#open-password');
+                wipeInputValue('#open-password-confirm');
+                wipeInputValue('#passphrase');
+                wipeInputValue('#pin-input');
+                wipeInputValue('#restore-input');
+                wipeInputValue('#transaction-broadcast-raw');
+            }
+            var stream        = null
+            var scanVideo     = null
+            var scanRafId     = null
+            var scanSession   = 0
             var walletVersion = '0.5'
             var networkConfigs = {
                 'BTE': {
@@ -949,6 +968,7 @@
             }
             function forgetSavedWallet() {
                 _stopAutoLock();
+                stopStream();
                 wsDisconnect();
                 [STORAGE_KEY_PUB, STORAGE_KEY_PRIV, STORAGE_KEY_SEED].forEach(function(k) {
                     try { localStorage.removeItem(k); } catch(e) {}
@@ -960,6 +980,7 @@
                         }
                     });
                 } catch(e) {}
+                clearSensitiveInputs();
                 clearSeedState();
                 Keystore.clear();
                 globalData.clear();
@@ -1524,7 +1545,7 @@
                 $('#seed-word-grid').empty()
                 $('#seed-generate-warning, #seed-verify-error').addClass('d-none')
                 $('#seed-verify-fields').empty()
-                $('#restore-input').val('')
+                clearSensitiveInputs()
                 $('#restore-word-error').addClass('d-none')
                 $('#restore-path').val("m/84'/0'/0'/0/0")
                 $('#restore-advanced').removeClass('show')
@@ -1606,6 +1627,7 @@
             }
             function closeWallet() {
                 _stopAutoLock();
+                stopStream();
                 wsDisconnect();
                 clearPrivKeyInput();
                 $('#wallet-privkey-copy-btn').addClass('d-none');
@@ -1616,6 +1638,7 @@
                 $('#qr-code-addres').empty();
                 resetTxForm();
                 _hideSeedReveal();
+                clearSensitiveInputs();
                 clearSeedState();
                 Keystore.clear();
                 globalData.clear();
@@ -1682,7 +1705,7 @@
             function showConfirmation(amount, totalSats, feeSats, outputsSats) {
                 $('#confirm-amount').text(amount + ' ' + getConfig()['ticker'])
                 $('#send-modal-error').addClass('d-none').html('')
-                $('#send-modal').modal('toggle')
+                $('#send-modal').modal('show')
                 $('#send-title').text(messages.title['sure'])
                 $('#send-cancel').removeClass('disabled d-none')
                 $('#send-confirm').removeClass('disabled d-none')
@@ -1690,6 +1713,7 @@
                 $('#confirm-screen').removeClass('d-none')
                 $('#status-screen').addClass('d-none')
                 $('#status-screen span').html('')
+                globalData.tx.outputs = []
                 $.each($('#send-outputs .send-outputs-item'), function(key, item) {
                     var address = $('[name="send-address"]', item).val().trim()
                     var amtSats = parseAmountSats($('[name="send-ammount"]', item).val())
@@ -1847,22 +1871,60 @@
                 return false
             }
             function stopStream() {
-                if (stream != undefined) stream.getTracks().forEach(function(t) { t.stop() })
+                scanSession += 1;
+                if (scanRafId !== null) {
+                    cancelAnimationFrame(scanRafId);
+                    scanRafId = null;
+                }
+                if (scanVideo) {
+                    try { scanVideo.pause(); } catch(e) {}
+                    try { scanVideo.srcObject = null; } catch(e) {}
+                    scanVideo = null;
+                }
+                if (stream != null) {
+                    try { stream.getTracks().forEach(function(t) { t.stop() }) } catch(e) {}
+                    stream = null;
+                }
+                var canvasElement = document.getElementById('scan-canvas');
+                if (canvasElement) {
+                    try {
+                        var canvas = canvasElement.getContext('2d');
+                        if (canvas) canvas.clearRect(0, 0, canvasElement.width || 0, canvasElement.height || 0);
+                    } catch(e) {}
+                    canvasElement.hidden = true;
+                    canvasElement.width = 0;
+                    canvasElement.height = 0;
+                }
             }
             function startStream() {
                 var canvasElement = document.getElementById('scan-canvas')
                 var canvas = canvasElement.getContext('2d')
                 var video  = document.createElement('video')
+                var session = ++scanSession
                 canvasElement.hidden = true
                 $('#loading-message').text(getText('webcam-message')).removeClass('d-none')
+                stopStream()
+                scanSession = session
+                scanVideo = video
                 navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(function(gstream) {
+                    if (session !== scanSession) {
+                        try { gstream.getTracks().forEach(function(t) { t.stop() }) } catch(e) {}
+                        return
+                    }
                     stream = gstream
+                    scanVideo = video
                     video.srcObject = stream
                     video.setAttribute('playsinline', true)
                     video.play()
-                    requestAnimationFrame(tick)
+                    scanRafId = requestAnimationFrame(tick)
+                }).catch(function() {
+                    if (session !== scanSession) return
+                    stopStream()
+                    $('#loading-message').text(getText('webcam-message')).removeClass('d-none')
+                    showMessage(getText('webcam-message'))
                 })
                 function tick() {
+                    if (session !== scanSession) return
                     $('#loading-message').text(getText('webcam-loading'))
                     var stop = false
                     if (video.readyState === video.HAVE_ENOUGH_DATA) {
@@ -1884,8 +1946,11 @@
                             }
                         }
                     }
-                    if (!stop) requestAnimationFrame(tick)
-                    else { $('#scan-modal').modal('toggle'); stopStream() }
+                    if (!stop) {
+                        scanRafId = requestAnimationFrame(tick)
+                    } else {
+                        $('#scan-modal').modal('hide'); stopStream()
+                    }
                 }
             }
             function showScanModal() {
@@ -2520,9 +2585,13 @@
                 $('#btn-copy-seed').click(function() {
                     var mnemonic = []
                     $('#wallet-seed-grid strong').each(function() { mnemonic.push($(this).text()) })
-                    if (mnemonic.length) copyToClipboard(mnemonic.join(' '), $(this))
-                    mnemonic.fill('')
-                    mnemonic = null
+                    try {
+                        if (mnemonic.length) copyToClipboard(mnemonic.join(' '), $(this))
+                    } finally {
+                        mnemonic.fill('')
+                        mnemonic.length = 0
+                        mnemonic = null
+                    }
                 })
                 $('.tab-link').on('click', function() {
                     if ($(this).data('tab-family') === 'wallet-block' && $(this).data('tab-name') !== 'wallet-keys') {
