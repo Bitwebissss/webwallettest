@@ -2157,7 +2157,7 @@
                 $('#toggle-wallet-privkey').click(function() {
                     if ($(this).text() == getText('show')) {
                         if (globalData.keys && globalData.keys.privateKey) {
-                            _privkeyReveal('wallet-privkey-canvas', globalData.keys.toWIF())
+                            revealPrivKeyInput(globalData.keys.toWIF());
                             $('#wallet-privkey-copy-btn').removeClass('d-none')
                             $(this).text(getText('hide'))
                         }
