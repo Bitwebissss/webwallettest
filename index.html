@@ -2305,9 +2305,20 @@
                     clearPrivKeyInput();
                     $('#wallet-privkey-copy-btn').addClass('d-none');
                     $('#toggle-wallet-privkey').text(getText('show'));
-                    $('#wallet-keys-script input').val('0014' + bitcoin.Buffer.from(
-                        bitcoin.payments.p2wpkh({ pubkey: Keystore.getPublicKeyBytes(), network: getConfig()['network'] }).hash
-                    ).toString('hex'));
+
+                    var redeem = '';
+                    if (newType !== 'legacy') {
+                        redeem = '0014' + bitcoin.Buffer.from(
+                            bitcoin.payments.p2wpkh({ pubkey: Keystore.getPublicKeyBytes(), network: getConfig()['network'] }).hash
+                        ).toString('hex');
+                    }
+                    $('#wallet-keys-script input').val(redeem);
+                    if (newType === 'legacy') {
+                        $('#wallet-keys-script').addClass('d-none');
+                    } else {
+                        $('#wallet-keys-script').removeClass('d-none');
+                    }
+
                     setHomeTitle();
                 });
                 $('#wallet-backend button').click(function() {
@@ -2423,6 +2434,7 @@
                         privBytes.fill(0);
                         Keystore.setKeyPair(keyPair);
                         openWallet(true, _seedState.mnemonic);
+                        _seedState.mnemonic = '';
                     } catch(err) {
                         alert('Key derivation error: ' + err.message);
                     }
@@ -2434,7 +2446,7 @@
                         $('#restore-input').val(words.slice(0, 12).join(' '))
                     }
                 })
-                $('#seed-restore-btn').click(async function() {
+                 $('#seed-restore-btn').click(async function() {
                     if (typeof bip39Bundle === 'undefined') { alert('bip39-bundle.min.js not loaded'); return; }
                     $('#restore-word-error').addClass('d-none');
                     var raw = $('#restore-input').val().trim().toLowerCase().replace(/\s+/g, ' ');
@@ -2456,7 +2468,7 @@
                         Keystore.setKeyPair(keyPair);
                         await openWallet(true, raw);
                         $('#restore-input').val('');
-                        raw = '';
+                        _seedState.mnemonic = '';
                     } catch(err) {
                         $('#restore-word-error').text(getText('seed-deriv-error') + ' ' + err.message).removeClass('d-none');
                     }
