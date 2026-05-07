@@ -547,6 +547,7 @@
             </div>
         </footer>
         <script>
+        (function() {
             'use strict';
 
             function applyTheme(mode) {
@@ -2385,6 +2386,8 @@
                     _wsActive = false;
                 }
             }
+			window.setTheme = setTheme;
+		    })();
         </script>
     </body>
 </html>
