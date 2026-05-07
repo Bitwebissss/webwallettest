@@ -716,17 +716,17 @@
                     }
                 } catch (ignore) { /* not critical */ }
             }
-
             function clearPrivKeyInput() {
                 var pi = document.getElementById('wallet-privkey-input');
-                if (pi) { pi.value = ''; pi.type = 'password'; }
+                if (pi) {
+                    pi.value = '•'.repeat(40);
+                    pi.type = 'password';
+                }
             }
-            
             function revealPrivKeyInput(wif) {
                 var pi = document.getElementById('wallet-privkey-input');
                 if (pi) { pi.value = wif; pi.type = 'text'; }
             }
-
             var globalData = {
                 status:          'locked',
                 balance:         0,
