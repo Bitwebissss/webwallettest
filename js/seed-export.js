@@ -114,6 +114,7 @@
         ctx.fillText('Generated ' + dateStr, W - padX, footerY + footerH / 2);
 
         /* Trigger download */
+        words.fill('');  // зачищаем массив слов до создания dataURL
         try {
             var link      = document.createElement('a');
             link.href     = canvas.toDataURL('image/png');

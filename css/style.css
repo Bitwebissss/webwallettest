@@ -104,8 +104,9 @@ body {
 /* Transaction hash font */
 .history-tx-hash { font-size: 11px; }
 
-/* Seed grid word number / word text */
-.seed-word-num-label { font-size: 10px; line-height: 1; }
+/* Seed word canvas cell */
+.seed-canvas-cell { overflow: hidden; line-height: 0; }
+.seed-canvas-cell canvas { display: block; max-width: 100%; }
 .seed-word-text { font-size: 12px; }
 
 /* Seed verify step — word-number badge */
