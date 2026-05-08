@@ -377,7 +377,7 @@
             showMessage(getText('pin-login-error') || 'Wrong PIN');
             return;
         }
-        var seedPlain = await loadEncrypted(STORAGE_KEY_SEED, pin);
+        var seedEntropyHex = await loadEncrypted(STORAGE_KEY_SEED, pin);
         pin = null;
         // 2. Register a new passkey with PRF extension
         var challenge = crypto.getRandomValues(new Uint8Array(32));
@@ -410,7 +410,7 @@
             });
             var ext = credential.getClientExtensionResults();
             if (!ext.prf || !ext.prf.results || !ext.prf.results.first) {
-                privHex = ''; pubHex = ''; seedPlain = '';
+                privHex = ''; pubHex = ''; seedEntropyHex = '';
                 showMessage(getText('passkey-prf-unsupported') || 'This browser/device does not support the PRF extension required for passkey unlock. Use PIN instead.');
                 return;
             }
@@ -418,15 +418,15 @@
             // 3. Encrypt keys with PRF output
             await saveEncryptedWithKey(STORAGE_KEY_PRIV_PK, privHex, prfBytes);
             await saveEncryptedWithKey(STORAGE_KEY_PUB_PK,  pubHex,  prfBytes);
-            if (seedPlain) await saveEncryptedWithKey(STORAGE_KEY_SEED_PK, seedPlain, prfBytes);
+            if (seedEntropyHex) await saveEncryptedWithKey(STORAGE_KEY_SEED_PK, seedEntropyHex, prfBytes);
             prfBytes.fill(0);
-            privHex = ''; pubHex = ''; seedPlain = '';
+            privHex = ''; pubHex = ''; seedEntropyHex = '';
             // 4. Store credential ID — presence of this + PRIV_PK is the "enabled" signal
             localStorage.setItem(STORAGE_KEY_PK_ID,   _credIdToB64(credential.rawId));
             updatePasskeyUI();
             showMessage(getText('passkey-enabled') || '🔐 Passkey enabled — you can now unlock with biometrics');
         } catch(e) {
-            privHex = ''; pubHex = ''; seedPlain = '';
+            privHex = ''; pubHex = ''; seedEntropyHex = '';
             if (e.name === 'NotAllowedError') return;  // User cancelled — silent
             showMessage((getText('passkey-error') || 'Passkey error: ') + e.message);
         }
@@ -582,14 +582,16 @@
         privHex = '';
     }
     async function saveWalletBip39(mnemonic, pin, path) {
-        var pubkey  = globalData.pubKeyHex;
-        var privHex = Keystore.getPrivKeyHex();
-        await saveEncrypted(STORAGE_KEY_PUB,  pubkey,   pin);
-        await saveEncrypted(STORAGE_KEY_PRIV, privHex,  pin);
-        await saveEncrypted(STORAGE_KEY_SEED, mnemonic, pin);
+        var pubkey     = globalData.pubKeyHex;
+        var privHex    = Keystore.getPrivKeyHex();
+        var entropyHex = _mnemonicToEntropyHex(mnemonic);
+        mnemonic = '';  // no longer needed — entropy hex is the canonical form
+        await saveEncrypted(STORAGE_KEY_PUB,  pubkey,     pin);
+        await saveEncrypted(STORAGE_KEY_PRIV, privHex,    pin);
+        await saveEncrypted(STORAGE_KEY_SEED, entropyHex, pin);
         try { localStorage.setItem(STORAGE_KEY_PATH, path || DEFAULT_DERIV_PATH); } catch(e) {}
-        mnemonic = '';
-        privHex  = '';
+        privHex    = '';
+        entropyHex = '';
     }
     async function loadWallet(pin) {
         var pubHex  = await loadEncrypted(STORAGE_KEY_PUB,  pin);
@@ -618,13 +620,34 @@
             'raw', enc.encode(pin), { name: 'PBKDF2' }, false, ['deriveKey']
         )
         return crypto.subtle.deriveKey(
-            { name: 'PBKDF2', salt: salt, iterations: 200000, hash: 'SHA-256' },
+            { name: 'PBKDF2', salt: salt, iterations: 300000, hash: 'SHA-256' },
             km,
             { name: 'AES-GCM', length: 256 },
             false,
             ['encrypt', 'decrypt']
         )
-    }            
+    }
+    // ── Entropy helpers — store seed as hex bytes, not mnemonic words ─────────
+    // Converts mnemonic string → compact hex (e.g. "abandon ability..." → "0c1e3a...")
+    // Caller must zero the mnemonic string reference after calling.
+    function _mnemonicToEntropyHex(mnemonic) {
+        var bytes = bip39Bundle.mnemonicToEntropy(mnemonic);
+        var hex   = Array.from(bytes).map(function(b) {
+            return b.toString(16).padStart(2, '0');
+        }).join('');
+        bytes.fill(0);
+        return hex;
+    }
+    // Converts entropyHex back → mnemonic string for display or key derivation.
+    // Caller must zero both entropyHex reference and returned mnemonic after use.
+    function _entropyHexToMnemonic(entropyHex) {
+        var bytes    = new Uint8Array(entropyHex.match(/../g).map(function(h) {
+            return parseInt(h, 16);
+        }));
+        var mnemonic = bip39Bundle.entropyToMnemonic(bytes);
+        bytes.fill(0);
+        return mnemonic;
+    }
     function hasSavedWallet() {
         return localStorage.getItem(STORAGE_KEY_PRIV) !== null;
     }
@@ -673,9 +696,12 @@
         updatePasskeyLoginUI();
     }
     // ── Seed reveal helper (shared by PIN and passkey paths) ──────────────────
-    function _revealSeed(mnemonic) {
+    function _revealSeed(entropyHex) {
         if (_revealedWords.length) _revealedWords.fill('');
+        var mnemonic   = _entropyHexToMnemonic(entropyHex);
+        entropyHex     = '';
         _revealedWords = mnemonic.split(' ');
+        mnemonic       = '';
         seedRenderGrid(_revealedWords, '#wallet-seed-grid');
         $('#wallet-seed-hidden').addClass('d-none');
         $('#wallet-seed-revealed').removeClass('d-none');
@@ -1030,15 +1056,8 @@
         }
     }
     function showQrAddress(text) {
-        var container = document.getElementById('qr-code-addres');
-        container.innerHTML = '';
-        var canvas = document.createElement('canvas');
-        container.appendChild(canvas);
-        QRCode.toCanvas(canvas, text, {
-            width: 256,
-            margin: 2,
-            color: { dark: '#000000', light: '#ffffff' }
-        });
+        $('#qr-code-addres').empty()
+        $('#qr-code-addres').qrcode(text)
     }
     function _renderBalanceDisplay() {
         var total    = globalData.balance
@@ -1918,7 +1937,6 @@
                         privBytes.fill(0);
                         pass = '';
                         passConfirm = '';
-                        identity = '';
                         openWallet(true);
                     } else { showMessage(messages.error['pass-not-match']); pass = ''; passConfirm = ''; }
                 } else { showMessage(messages.error['pass-too-short']); pass = ''; passConfirm = ''; }
@@ -2292,14 +2310,14 @@
                         return;
                     }
                     var prfBytes = new Uint8Array(ext.prf.results.first);
-                    var seedDecrypted = await loadEncryptedWithKey(STORAGE_KEY_SEED_PK, prfBytes);
+                    var seedEntropyHex = await loadEncryptedWithKey(STORAGE_KEY_SEED_PK, prfBytes);
                     prfBytes.fill(0);
-                    if (!seedDecrypted) {
+                    if (!seedEntropyHex) {
                         showMessage(getText('passkey-decrypt-failed') || 'Seed not found via passkey — try PIN');
                         return;
                     }
-                    _revealSeed(seedDecrypted);
-                    seedDecrypted = '';
+                    _revealSeed(seedEntropyHex);
+                    seedEntropyHex = '';
                 } catch(e) {
                     if (e.name === 'NotAllowedError') return;
                     // Auto-retry on transient platform-authenticator errors
@@ -2310,20 +2328,20 @@
                     showMessage((getText('passkey-error') || 'Passkey error: ') + e.message);
                 }
             }
-            var title    = getText('seed-pin-modal-title');
-            var desc     = getText('seed-pin-modal-desc');
-            var mnemonic = null;
+            var title         = getText('seed-pin-modal-title');
+            var desc          = getText('seed-pin-modal-desc');
+            var entropyHex    = null;
             var canUsePasskey = isPasskeyEnabled() && hasSeedPkBackup();
             while (true) {
                 var pin = await askPin(title, desc, null, false, canUsePasskey ? onPasskeyChosen : null);
                 if (pin === null) return;  // cancelled or passkey path handled itself
-                mnemonic = await loadEncrypted(STORAGE_KEY_SEED, pin);
+                entropyHex = await loadEncrypted(STORAGE_KEY_SEED, pin);
                 pin = null;
-                if (mnemonic) break;
+                if (entropyHex) break;
                 desc = getText('pin-login-error') || 'Wrong PIN, try again.';
             }
-            _revealSeed(mnemonic);
-            mnemonic = '';
+            _revealSeed(entropyHex);
+            entropyHex = '';
         });
         $('#btn-hide-seed').click(_hideSeedReveal)
         $('#btn-save-seed-png').click(function() {
