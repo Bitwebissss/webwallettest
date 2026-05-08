@@ -432,7 +432,13 @@
         }
     }
     // ── Authenticate with passkey ──────────────────────────────────────────────
-    async function pkAuthenticate() {
+    function _isTransientPasskeyError(e) {
+        if (!e || !e.message) return false;
+        var m = e.message.toLowerCase();
+        return m.indexOf('transient') !== -1 || m.indexOf('unknown') !== -1;
+    }
+    async function pkAuthenticate(_retriesLeft) {
+        if (_retriesLeft === undefined) _retriesLeft = 2;
         var credIdStr = null;
         try { credIdStr = localStorage.getItem(STORAGE_KEY_PK_ID); } catch(e) {}
         if (!credIdStr) { showMessage(getText('passkey-not-setup') || 'Passkey not set up'); return; }
@@ -473,6 +479,11 @@
             openWallet(false);
         } catch(e) {
             if (e.name === 'NotAllowedError') return;  // User cancelled — silent
+            // Auto-retry on transient platform-authenticator errors (common in Chrome/Windows Hello)
+            if (_retriesLeft > 0 && _isTransientPasskeyError(e)) {
+                await new Promise(function(r) { setTimeout(r, 300); });
+                return pkAuthenticate(_retriesLeft - 1);
+            }
             showMessage((getText('passkey-error') || 'Passkey error: ') + e.message);
         }
     }
@@ -487,7 +498,8 @@
     // ── Disable passkey — accepts passkey OR PIN ───────────────────────────────
     async function pkDisable() {
         // Passkey callback: authenticate with passkey to prove identity, then disable
-        async function onPasskeyChosen() {
+        async function onPasskeyChosen(_retriesLeft) {
+            if (_retriesLeft === undefined) _retriesLeft = 2;
             var credIdStr = null;
             try { credIdStr = localStorage.getItem(STORAGE_KEY_PK_ID); } catch(e) {}
             if (!credIdStr) return;
@@ -503,9 +515,12 @@
                 });
                 _doPkDisable();
             } catch(e) {
-                if (e.name !== 'NotAllowedError') {
-                    showMessage((getText('passkey-error') || 'Passkey error: ') + e.message);
+                if (e.name === 'NotAllowedError') return;
+                if (_retriesLeft > 0 && _isTransientPasskeyError(e)) {
+                    await new Promise(function(r) { setTimeout(r, 300); });
+                    return onPasskeyChosen(_retriesLeft - 1);
                 }
+                showMessage((getText('passkey-error') || 'Passkey error: ') + e.message);
             }
         }
         var pin = await askPin(
@@ -1068,6 +1083,31 @@
         $('#wallet-seed-hidden').removeClass('d-none')
         $('#wallet-seed-revealed').addClass('d-none')
         $('#wallet-seed-grid').empty()
+    }
+    // ── Render seed words as canvas cells (used by both new-seed flow and _revealSeed) ──
+    function seedRenderGrid(words, containerId) {
+        var $g = $(containerId).empty();
+        var cs       = getComputedStyle(document.body);
+        var bgColor  = cs.getPropertyValue('--bs-body-bg').trim()        || '#f8f9fa';
+        var numColor = cs.getPropertyValue('--bs-secondary-color').trim() || '#6c757d';
+        var txtColor = cs.getPropertyValue('--bs-body-color').trim()     || '#212529';
+        words.forEach(function(w, i) {
+            var canvas = document.createElement('canvas');
+            canvas.width = 110; canvas.height = 42;
+            canvas.setAttribute('aria-hidden', 'true');
+            var ctx = canvas.getContext('2d');
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, 110, 42);
+            ctx.fillStyle = numColor;
+            ctx.font = '10px sans-serif';
+            ctx.fillText(i + 1, 5, 12);
+            ctx.fillStyle = txtColor;
+            ctx.font = 'bold 13px monospace';
+            ctx.fillText(w, 5, 31);
+            var $cell = $('<div class="border rounded px-1 py-1 text-center seed-canvas-cell"></div>');
+            $cell.append(canvas);
+            $g.append($cell);
+        });
     }
     function seedReset() {
         $('#seed-entry').removeClass('d-none')
@@ -2026,30 +2066,7 @@
         $('#copy-address-btn').click(function() {
             if (globalData.address) copyToClipboard(globalData.address, $(this))
         })
-        function seedRenderGrid(words, containerId) {
-            var $g = $(containerId).empty();
-            var cs      = getComputedStyle(document.body);
-            var bgColor  = cs.getPropertyValue('--bs-body-bg').trim()       || '#f8f9fa';
-            var numColor = cs.getPropertyValue('--bs-secondary-color').trim()|| '#6c757d';
-            var txtColor = cs.getPropertyValue('--bs-body-color').trim()    || '#212529';
-            words.forEach(function(w, i) {
-                var canvas = document.createElement('canvas');
-                canvas.width = 110; canvas.height = 42;
-                canvas.setAttribute('aria-hidden', 'true');
-                var ctx = canvas.getContext('2d');
-                ctx.fillStyle = bgColor;
-                ctx.fillRect(0, 0, 110, 42);
-                ctx.fillStyle = numColor;
-                ctx.font = '10px sans-serif';
-                ctx.fillText(i + 1, 5, 12);
-                ctx.fillStyle = txtColor;
-                ctx.font = 'bold 13px monospace';
-                ctx.fillText(w, 5, 31);
-                var $cell = $('<div class="border rounded px-1 py-1 text-center seed-canvas-cell"></div>');
-                $cell.append(canvas);
-                $g.append($cell);
-            });
-        }
+        // seedRenderGrid is defined at module scope — accessible here too
         $('#seed-btn-create').click(function() {
             $('#seed-entry').addClass('d-none')
             $('#seed-create').removeClass('d-none')
@@ -2237,7 +2254,8 @@
         $('#btn-show-seed').click(async function() {
             if (!hasSeedBackup()) return;
             // Passkey path for seed — decrypt from _pk record using PRF
-            async function onPasskeyChosen() {
+            async function onPasskeyChosen(_retriesLeft) {
+                if (_retriesLeft === undefined) _retriesLeft = 2;
                 var credIdStr = null;
                 try { credIdStr = localStorage.getItem(STORAGE_KEY_PK_ID); } catch(e) {}
                 if (!credIdStr) { showMessage(getText('passkey-not-setup') || 'Passkey not set up'); return; }
@@ -2266,9 +2284,13 @@
                     _revealSeed(seedDecrypted);
                     seedDecrypted = '';
                 } catch(e) {
-                    if (e.name !== 'NotAllowedError') {
-                        showMessage((getText('passkey-error') || 'Passkey error: ') + e.message);
+                    if (e.name === 'NotAllowedError') return;
+                    // Auto-retry on transient platform-authenticator errors
+                    if (_retriesLeft > 0 && _isTransientPasskeyError(e)) {
+                        await new Promise(function(r) { setTimeout(r, 300); });
+                        return onPasskeyChosen(_retriesLeft - 1);
                     }
+                    showMessage((getText('passkey-error') || 'Passkey error: ') + e.message);
                 }
             }
             var title    = getText('seed-pin-modal-title');
