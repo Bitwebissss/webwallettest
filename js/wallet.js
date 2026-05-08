@@ -378,10 +378,7 @@
     }
     async function checkPasskeySupport() {
         if (!window.PublicKeyCredential) return false;
-        if (!navigator.credentials || !navigator.credentials.create) return false;
-        try {
-            return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-        } catch(e) { return false; }
+        return !!(navigator.credentials && navigator.credentials.create);
     }
     // PRF salt — deterministic string, same on every call
     var _PK_PRF_SALT = new TextEncoder().encode('bitweb-wallet-v1');
@@ -715,18 +712,20 @@
         setHomeTitle();
     }
     function updateSavedWalletUI() {
-        if (hasSavedWallet()) {
-            $('#pin-login-block').removeClass('d-none')
-            $('#open-block').addClass('d-none')
-            $('#forget-wallet-section').removeClass('d-none')
+        if (hasSavedWallet() && !Keystore.isUnlocked()) {
+            $('#pin-login-block').removeClass('d-none');
+            $('#open-block').addClass('d-none');
+            $('#forget-wallet-section').removeClass('d-none');
+        } else if (!hasSavedWallet()) {
+            $('#pin-login-block').addClass('d-none');
+            $('#open-block').removeClass('d-none');
+            $('#forget-wallet-section').addClass('d-none');
         } else {
-            $('#pin-login-block').addClass('d-none')
-            $('#open-block').removeClass('d-none')
-            $('#forget-wallet-section').addClass('d-none')
+            $('#pin-login-block').addClass('d-none');
+            $('#open-block').addClass('d-none');
         }
         updatePasskeyLoginUI();
     }
-    // ── Seed reveal helper (shared by PIN and passkey paths) ──────────────────
     function _revealSeed(entropyHex) {
         if (_revealedWords.length) _revealedWords.fill('');
         var mnemonic   = _entropyHexToMnemonic(entropyHex);
