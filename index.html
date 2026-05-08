@@ -415,9 +415,10 @@
                                         <label tkey="address-type"></label>
                                         <div class="input-group pb-2">
                                             <select class="form-select">
-                                                <option>bech32</option>
-                                                <option>segwit</option>
-                                                <option>legacy</option>
+                                                <option value="taproot">taproot</option>
+                                                <option value="bech32">bech32</option>
+                                                <option value="segwit">segwit</option>
+                                                <option value="legacy">legacy</option>
                                             </select>
                                         </div>
                                     </div>
@@ -545,8 +546,6 @@
                 <span class="fa-brands fa-github"></span> <a target="_blank" rel="noopener noreferrer" href="https://github.com/bitweb-project/web-wallet">Bitweb</a>
             </div>
         </footer>
-        <script src="js/wallet.js"
-                integrity="sha512-aPUCzxx0Js1fg9toyZHcMY/kVAHfhcv9BLxFHBNxxU5qyDAJi/xwjzR20aQcorJaEHABNXF69di50UI9dZrpaQ=="
-                crossorigin="anonymous"></script>
+        <script src="js/wallet.js"></script>
     </body>
 </html>
