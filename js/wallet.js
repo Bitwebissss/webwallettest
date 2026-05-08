@@ -129,10 +129,77 @@
             buf.fill(0);
             return hex;
         }
+        // BIP341 key-path signer.
+        // Returns { signer, _rawD, _effectiveD, _tweakedD } — caller MUST wipe _* fields
+        // in a finally-block regardless of success/failure.
+        //
+        // Algorithm (BIP341 §4.4):
+        //   1. xOnlyPub  = pubkey[1..33]  (drop 0x02/0x03 prefix)
+        //   2. tweak     = taggedHash('TapTweak', xOnlyPub)
+        //   3. effectiveD = (y(P) is odd) ? privateNegate(d) : d   — lift to even-y point
+        //   4. tweakedD  = privateAdd(effectiveD, tweak) mod n
+        //   5. signer.publicKey = xOnlyPub  — matches tapInternalKey stored in PSBT input
+        //   6. signer.signSchnorr(hash) signs with tweakedD  (BIP340 Schnorr)
+        //
+        // Source of public key: keyPair.publicKey (33-byte compressed, from Keystore closure).
+        // The x-only form is always pubkey.slice(1) — prefix byte carries only parity info.
+        function _makeTaprootSigner() {
+            var ecc = bitcoin.ecc;
+            if (!ecc || typeof ecc.privateAdd !== 'function' ||
+                        typeof ecc.privateNegate !== 'function' ||
+                        typeof ecc.signSchnorr !== 'function') {
+                throw new Error('bitcoin.ecc unavailable — rebuild bundle (see BUILDBitcoinjs.md)');
+            }
+
+            // x-only internal key = drop parity prefix byte (32 bytes)
+            var xOnlyPub = keyPair.publicKey.slice(1);
+
+            // TapTweak = taggedHash('TapTweak', xOnlyPub)  — pure function, no key material
+            var tweak = bitcoin.crypto.taggedHash('TapTweak', xOnlyPub);
+
+            // Copies of sensitive material — zeroed in finally of every call-site
+            var rawD      = new Uint8Array(keyPair.privateKey);  // copy, never a reference
+            var effectiveD = null;
+            var tweakedD   = null;
+
+            try {
+                // BIP341: parity of y(P) determines whether to negate before adding tweak.
+                // Compressed pubkey prefix 0x03 = odd y  →  negate d.
+                var oddY = (keyPair.publicKey[0] === 0x03);
+                effectiveD = oddY ? ecc.privateNegate(rawD) : new Uint8Array(rawD);
+
+                // tweakedD = (effectiveD + tweak) mod n
+                tweakedD = ecc.privateAdd(effectiveD, tweak);
+                if (!tweakedD) throw new Error('Taproot tweak produced an invalid private key');
+
+                // Capture in local var so the closure cannot be confused by re-assignment
+                var _td = tweakedD;
+
+                var signer = {
+                    // Must be 32-byte x-only to match tapInternalKey in the PSBT input.
+                    // bitcoinjs-lib v7 uses this to locate the correct signer for the input.
+                    publicKey: xOnlyPub,
+
+                    // Called by psbt.signInput for taproot key-path inputs (BIP340 Schnorr).
+                    signSchnorr: function(hash) {
+                        return ecc.signSchnorr(hash, _td);
+                    }
+                };
+
+                return { signer: signer, _rawD: rawD, _effectiveD: effectiveD, _tweakedD: tweakedD };
+            } catch (e) {
+                // Wipe on construction error before re-throwing
+                if (rawD)      rawD.fill(0);
+                if (effectiveD) effectiveD.fill(0);
+                if (tweakedD)  tweakedD.fill(0);
+                throw e;
+            }
+        }
+
         function signAllInputs(psbt) {
             if (!keyPair) throw new Error('Wallet locked');
-            // For taproot inputs: sign with tweaked key (BIP340 Schnorr).
-            // For all other inputs: use standard ECDSA via signAllInputs.
+
+            // Fast path: no taproot inputs — plain ECDSA, no extra key material needed.
             var hasTaproot = psbt.data.inputs.some(function(inp) {
                 return inp.tapInternalKey && inp.tapInternalKey.length === 32;
             });
@@ -140,15 +207,30 @@
                 psbt.signAllInputs(keyPair);
                 return;
             }
-            // Mixed or taproot-only: sign each input individually
-            psbt.data.inputs.forEach(function(inp, idx) {
-                if (inp.tapInternalKey && inp.tapInternalKey.length === 32) {
-                    // Taproot key-path spend — bitcoinjs-lib handles the tweak internally
-                    psbt.signInput(idx, keyPair);
-                } else {
-                    psbt.signInput(idx, keyPair);
+
+            // Taproot present: build tweaked signer once, wipe in finally no matter what.
+            var tapMaterial = null;
+            try {
+                tapMaterial = _makeTaprootSigner();
+                var tapSigner = tapMaterial.signer;
+
+                psbt.data.inputs.forEach(function(inp, idx) {
+                    if (inp.tapInternalKey && inp.tapInternalKey.length === 32) {
+                        // Key-path spend: tweaked Schnorr signer
+                        psbt.signInput(idx, tapSigner);
+                    } else {
+                        // Legacy / SegWit input in mixed transaction: plain ECDSA
+                        psbt.signInput(idx, keyPair);
+                    }
+                });
+            } finally {
+                // Zero all intermediate private key copies regardless of success/failure.
+                if (tapMaterial) {
+                    if (tapMaterial._rawD)       tapMaterial._rawD.fill(0);
+                    if (tapMaterial._effectiveD) tapMaterial._effectiveD.fill(0);
+                    if (tapMaterial._tweakedD)   tapMaterial._tweakedD.fill(0);
                 }
-            });
+            }
         }
         function deriveAddress(type, pubKey) {
             if (!keyPair || !pubKey) return '';
