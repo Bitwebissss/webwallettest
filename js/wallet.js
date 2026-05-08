@@ -747,6 +747,7 @@
         if (Keystore.isUnlocked()) setTitle(getText('address') + ' ' + globalData.address)
         else setTitle(getText('open-wallet'))
     }
+    var _revealedWords = [];   // слова пока открыты в keys-вкладке; зануляются при hide
     var _seedState = {
         words: [],          // string[] — поэлементно обнуляем после использования
         enc: null,          // { iv, data } — ephemeral зашифрованный блоб на время verify
@@ -766,7 +767,7 @@
         blockExplorer: blockExplorer
     });
     function _hideSeedReveal() {
-        $('#wallet-seed-grid canvas').each(function() { $(this).data('seed-word', ''); });
+        if (_revealedWords.length) { _revealedWords.fill(''); _revealedWords = []; }
         $('#wallet-seed-hidden').removeClass('d-none')
         $('#wallet-seed-revealed').addClass('d-none')
         $('#wallet-seed-grid').empty()
@@ -1671,7 +1672,6 @@
                 ctx.font = 'bold 13px monospace';
                 ctx.fillText(w, 5, 31);
                 var $cell = $('<div class="border rounded px-1 py-1 text-center seed-canvas-cell"></div>');
-                $(canvas).data('seed-word', w);
                 $cell.append(canvas);
                 $g.append($cell);
             });
@@ -1712,6 +1712,7 @@
         // seed-btn-copy removed — clipboard exposure of full mnemonic eliminated
         $('#seed-btn-to-verify').click(async function() {
             if (!_seedState.words.length) return;
+            var $btn = $(this).prop('disabled', true);
             var words = _seedState.words;
             var len = words.length;
             function rnd(lo, hi) {
@@ -1722,46 +1723,51 @@
             var third = Math.floor(len / 3);
             var pos = [rnd(0, third - 1), rnd(third, third * 2 - 1), rnd(third * 2, len - 1)];
 
-            // Вычисляем HMAC для каждой позиции — plaintext слово не сохраняем
-            _seedState.verifyHashes = await Promise.all(pos.map(async function(p) {
-                var salt = crypto.getRandomValues(new Uint8Array(16));
-                var hmacKey = await crypto.subtle.importKey(
-                    'raw', salt, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+            try {
+                // Вычисляем HMAC для каждой позиции — plaintext слово не сохраняем
+                _seedState.verifyHashes = await Promise.all(pos.map(async function(p) {
+                    var salt = crypto.getRandomValues(new Uint8Array(16));
+                    var hmacKey = await crypto.subtle.importKey(
+                        'raw', salt, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+                    );
+                    var wordBytes = new TextEncoder().encode(words[p].toLowerCase());
+                    var sig = new Uint8Array(await crypto.subtle.sign('HMAC', hmacKey, wordBytes));
+                    wordBytes.fill(0);
+                    return { pos: p, salt: Array.from(salt), hash: Array.from(sig) };
+                }));
+
+                // Шифруем words эфемерным ключом, зачищаем plaintext массив
+                _seedState.tempKey = await crypto.subtle.generateKey(
+                    { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
                 );
-                var wordBytes = new TextEncoder().encode(words[p].toLowerCase());
-                var sig = new Uint8Array(await crypto.subtle.sign('HMAC', hmacKey, wordBytes));
-                wordBytes.fill(0);
-                return { pos: p, salt: Array.from(salt), hash: Array.from(sig) };
-            }));
+                var iv = crypto.getRandomValues(new Uint8Array(12));
+                var plain = new TextEncoder().encode(words.join(' '));
+                var ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, _seedState.tempKey, plain);
+                plain.fill(0);
+                _seedState.enc = { iv: Array.from(iv), data: Array.from(new Uint8Array(ct)) };
 
-            // Шифруем words эфемерным ключом, зачищаем plaintext массив
-            _seedState.tempKey = await crypto.subtle.generateKey(
-                { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
-            );
-            var iv = crypto.getRandomValues(new Uint8Array(12));
-            var plain = new TextEncoder().encode(words.join(' '));
-            var ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, _seedState.tempKey, plain);
-            plain.fill(0);
-            _seedState.enc = { iv: Array.from(iv), data: Array.from(new Uint8Array(ct)) };
+                // Зачищаем plaintext слова из памяти
+                _seedState.words.fill('');
+                _seedState.words = [];
 
-            // Зачищаем plaintext слова из памяти
-            _seedState.words.fill('');
-            _seedState.words = [];
-
-            // Рендерим поля верификации
-            var $fields = $('#seed-verify-fields').empty();
-            pos.forEach(function(p) {
-                $fields.append(
-                    '<div class="input-group input-group-sm mb-2">' +
-                    '<span class="input-group-text seed-verify-num">' + getText('seed-word-num') + ' ' + (p + 1) + '</span>' +
-                    '<input type="text" class="form-control font-monospace seed-verify-word" data-pos="' + p + '" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">' +
-                    '</div>'
-                );
-            });
-            $('#seed-verify-error').addClass('d-none');
-            $('#seed-create-step1').addClass('d-none');
-            $('#seed-create-step2').removeClass('d-none');
-            setTimeout(function() { $('.seed-verify-word').first().focus(); }, 100);
+                // Рендерим поля верификации
+                var $fields = $('#seed-verify-fields').empty();
+                pos.forEach(function(p) {
+                    $fields.append(
+                        '<div class="input-group input-group-sm mb-2">' +
+                        '<span class="input-group-text seed-verify-num">' + getText('seed-word-num') + ' ' + (p + 1) + '</span>' +
+                        '<input type="text" class="form-control font-monospace seed-verify-word" data-pos="' + p + '" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">' +
+                        '</div>'
+                    );
+                });
+                $('#seed-verify-error').addClass('d-none');
+                $('#seed-create-step1').addClass('d-none');
+                $('#seed-create-step2').removeClass('d-none');
+                setTimeout(function() { $('.seed-verify-word').first().focus(); }, 100);
+            } catch(e) {
+                $btn.prop('disabled', false);
+                alert('Crypto error: ' + (e.message || e));
+            }
         })
         $('#seed-verify-back').click(function() {
             $('#seed-create-step2').addClass('d-none')
@@ -1820,6 +1826,8 @@
                 Keystore.setKeyPair(keyPair);
                 await openWallet(true, mnemonic);
                 mnemonic = '';
+                // Если openWallet вернулся (PIN отменён) — снова включаем кнопку
+                $btn.prop('disabled', false);
             } catch(err) {
                 $btn.prop('disabled', false);
                 alert('Key derivation error: ' + err.message);
@@ -1894,35 +1902,22 @@
                 $('#pin-cancel').off('click').on('click', onCancel);
             });
             if (!seedData) return;
-            var words = seedData.mnemonic.split(' ');
+            if (_revealedWords.length) _revealedWords.fill('');
+            _revealedWords = seedData.mnemonic.split(' ');
             seedData.mnemonic = '';
             seedData = null;
-            seedRenderGrid(words, '#wallet-seed-grid');
-            words.fill('');
-            words = null;
+            seedRenderGrid(_revealedWords, '#wallet-seed-grid');
             $('#wallet-seed-hidden').addClass('d-none');
             $('#wallet-seed-revealed').removeClass('d-none');
             setTimeout(_hideSeedReveal, 60000);
         });
         $('#btn-hide-seed').click(_hideSeedReveal)
         // btn-copy-seed removed — clipboard exposure eliminated
-        // Save PNG читает слова из canvas ImageData — не из DOM-текста
         $('#btn-save-seed-png').click(function() {
-            var canvases = $('#wallet-seed-grid canvas');
-            if (!canvases.length) return;
-            // Временно собираем слова через off-screen canvas OCR не нужен:
-            // мы храним слова в data-атрибуте canvas только для PNG экспорта, сразу зачищаем
-            var words = [];
-            canvases.each(function() {
-                var w = $(this).data('seed-word') || '';
-                words.push(w);
-            });
-            if (!words.length || !words[0]) return;
-            var mn = words.join(' ');
+            if (!_revealedWords.length) return;
+            var mn = _revealedWords.join(' ');
             window.seedExportPNG(mn, getText);
             mn = '';
-            words.fill('');
-            words = [];
         })
         $('.tab-link').on('click', function() {
             if ($(this).data('tab-family') === 'wallet-block' && $(this).data('tab-name') !== 'wallet-keys') {
