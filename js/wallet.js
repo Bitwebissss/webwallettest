@@ -2052,10 +2052,19 @@
             initLang();
             var _ct; try { _ct = localStorage.getItem('bte_cfg_theme'); } catch(e) {}
             applyTheme(_ct || 'auto');
+            // Re-translate any live dynamic UI that isn't covered by tkey attributes
+            updatePasskeyUI();
+            updateSavedWalletUI();
             if (Keystore.isUnlocked()) {
                 setHomeTitle();
                 TxHistory.renderHistory(TxHistory.loadHistory());
                 if (!$('#coin-control-panel').hasClass('d-none')) renderCoinControl();
+                // Re-translate toggle-wallet-privkey button text based on current state
+                var $togBtn = $('#toggle-wallet-privkey');
+                if ($togBtn.length) {
+                    var isShowing = $('#wallet-privkey-input').attr('type') === 'text';
+                    $togBtn.text(isShowing ? getText('hide') : getText('show'));
+                }
             }
         });
         estimateFee().then(function(data) {
