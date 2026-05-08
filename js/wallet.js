@@ -249,6 +249,12 @@
     var STORAGE_KEY_PRIV = 'bte_wallet_privkey';
     var STORAGE_KEY_SEED = 'bte_wallet_seed';
     var STORAGE_KEY_PATH = 'bte_wallet_path';
+    // Passkey (WebAuthn PRF) duplicates — encrypted with PRF output instead of PIN
+    var STORAGE_KEY_PUB_PK   = 'bte_wallet_pubkey_pk';
+    var STORAGE_KEY_PRIV_PK  = 'bte_wallet_privkey_pk';
+    var STORAGE_KEY_SEED_PK  = 'bte_wallet_seed_pk';
+    var STORAGE_KEY_PK_ID    = 'bte_pk_credential_id';
+    var STORAGE_KEY_PK_FLAG  = 'bte_pass_key';          // '0' disabled, '1' enabled
     var DEFAULT_DERIV_PATH = "m/84'/738'/0'/0/0";
     function hasSeedBackup() {
         return localStorage.getItem(STORAGE_KEY_SEED) !== null;
@@ -291,6 +297,232 @@
             return null;
         }
     }
+    // ── Passkey helpers: encrypt / decrypt using raw 32-byte PRF key ────────────
+    // No PBKDF2 needed — PRF output is already full-entropy.
+    async function saveEncryptedWithKey(storageKey, plaintext, keyBytes) {
+        var iv  = crypto.getRandomValues(new Uint8Array(12));
+        var key = await crypto.subtle.importKey(
+            'raw', keyBytes, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+        );
+        var ct = await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv: iv }, key, new TextEncoder().encode(plaintext)
+        );
+        localStorage.setItem(storageKey, JSON.stringify({
+            iv:   Array.from(iv),
+            data: Array.from(new Uint8Array(ct))
+        }));
+    }
+    async function loadEncryptedWithKey(storageKey, keyBytes) {
+        var raw = localStorage.getItem(storageKey);
+        if (!raw) return null;
+        var blob = JSON.parse(raw);
+        var key  = await crypto.subtle.importKey(
+            'raw', keyBytes, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+        );
+        try {
+            var pt     = await crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv: new Uint8Array(blob.iv) }, key, new Uint8Array(blob.data)
+            );
+            var view   = new Uint8Array(pt);
+            var result = new TextDecoder().decode(pt);
+            view.fill(0);
+            return result;
+        } catch(e) { return null; }
+    }
+    // ── Passkey state helpers ─────────────────────────────────────────────────
+    function isPasskeyEnabled() {
+        try { return localStorage.getItem(STORAGE_KEY_PK_FLAG) === '1'; } catch(e) { return false; }
+    }
+    function hasPasskeyCredential() {
+        try { return localStorage.getItem(STORAGE_KEY_PK_ID) !== null; } catch(e) { return false; }
+    }
+    async function checkPasskeySupport() {
+        if (!window.PublicKeyCredential) return false;
+        if (!navigator.credentials || !navigator.credentials.create) return false;
+        try {
+            return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+        } catch(e) { return false; }
+    }
+    // PRF salt — deterministic string, same on every call
+    var _PK_PRF_SALT = new TextEncoder().encode('bitweb-wallet-v1');
+    // Convert rawId (ArrayBuffer) to base64 string for storage
+    function _credIdToB64(rawId) {
+        return btoa(String.fromCharCode.apply(null, new Uint8Array(rawId)));
+    }
+    function _b64ToCredId(b64) {
+        return Uint8Array.from(atob(b64), function(c) { return c.charCodeAt(0); });
+    }
+    // ── Enable passkey ────────────────────────────────────────────────────────
+    async function pkEnable() {
+        // 1. Confirm identity with PIN and decrypt current keys in one shot
+        var pin = await askPin(
+            getText('pin-title-default') || 'Wallet PIN',
+            (getText('passkey-confirm-pin') || 'Enter PIN to verify identity before setting up passkey'),
+            null, false
+        );
+        if (pin === null) return;
+        var privHex  = await loadEncrypted(STORAGE_KEY_PRIV, pin);
+        var pubHex   = await loadEncrypted(STORAGE_KEY_PUB,  pin);
+        if (!privHex || !pubHex) {
+            pin = null;
+            showMessage(getText('pin-login-error') || 'Wrong PIN');
+            return;
+        }
+        var seedPlain = await loadEncrypted(STORAGE_KEY_SEED, pin);
+        pin = null;
+        // 2. Register a new passkey with PRF extension
+        var challenge = crypto.getRandomValues(new Uint8Array(32));
+        var userId    = crypto.getRandomValues(new Uint8Array(16));
+        try {
+            var credential = await navigator.credentials.create({
+                publicKey: {
+                    challenge: challenge,
+                    rp:  {
+                        name: getConfig()['title'] || 'Bitweb Wallet',
+                        id:   window.location.hostname
+                    },
+                    user: {
+                        id:          userId,
+                        name:        'wallet',
+                        displayName: 'Bitweb Wallet'
+                    },
+                    pubKeyCredParams: [
+                        { type: 'public-key', alg: -7   },  // ES256
+                        { type: 'public-key', alg: -257 }   // RS256
+                    ],
+                    authenticatorSelection: {
+                        userVerification: 'required',
+                        residentKey:      'preferred'
+                    },
+                    extensions: {
+                        prf: { eval: { first: _PK_PRF_SALT } }
+                    }
+                }
+            });
+            var ext = credential.getClientExtensionResults();
+            if (!ext.prf || !ext.prf.results || !ext.prf.results.first) {
+                privHex = ''; pubHex = ''; seedPlain = '';
+                showMessage(getText('passkey-prf-unsupported') || 'This browser/device does not support the PRF extension required for passkey unlock. Use PIN instead.');
+                return;
+            }
+            var prfBytes = new Uint8Array(ext.prf.results.first);
+            // 3. Encrypt keys with PRF output
+            await saveEncryptedWithKey(STORAGE_KEY_PRIV_PK, privHex, prfBytes);
+            await saveEncryptedWithKey(STORAGE_KEY_PUB_PK,  pubHex,  prfBytes);
+            if (seedPlain) await saveEncryptedWithKey(STORAGE_KEY_SEED_PK, seedPlain, prfBytes);
+            prfBytes.fill(0);
+            privHex = ''; pubHex = ''; seedPlain = '';
+            // 4. Store credential ID and enable flag
+            localStorage.setItem(STORAGE_KEY_PK_ID,   _credIdToB64(credential.rawId));
+            localStorage.setItem(STORAGE_KEY_PK_FLAG, '1');
+            updatePasskeyUI();
+            showMessage(getText('passkey-enabled') || '🔐 Passkey enabled — you can now unlock with biometrics');
+        } catch(e) {
+            privHex = ''; pubHex = ''; seedPlain = '';
+            if (e.name === 'NotAllowedError') return;  // User cancelled — silent
+            showMessage((getText('passkey-error') || 'Passkey error: ') + e.message);
+        }
+    }
+    // ── Authenticate with passkey ──────────────────────────────────────────────
+    async function pkAuthenticate() {
+        var credIdStr = null;
+        try { credIdStr = localStorage.getItem(STORAGE_KEY_PK_ID); } catch(e) {}
+        if (!credIdStr) { showMessage(getText('passkey-not-setup') || 'Passkey not set up'); return; }
+        var credIdBytes = _b64ToCredId(credIdStr);
+        try {
+            var assertion = await navigator.credentials.get({
+                publicKey: {
+                    challenge:         crypto.getRandomValues(new Uint8Array(32)),
+                    rpId:              window.location.hostname,
+                    allowCredentials:  [{ type: 'public-key', id: credIdBytes }],
+                    userVerification:  'required',
+                    extensions: {
+                        prf: { eval: { first: _PK_PRF_SALT } }
+                    }
+                }
+            });
+            var ext = assertion.getClientExtensionResults();
+            if (!ext.prf || !ext.prf.results || !ext.prf.results.first) {
+                showMessage(getText('passkey-prf-unsupported') || 'PRF extension not available');
+                return;
+            }
+            var prfBytes = new Uint8Array(ext.prf.results.first);
+            var privHex  = await loadEncryptedWithKey(STORAGE_KEY_PRIV_PK, prfBytes);
+            var pubHex   = await loadEncryptedWithKey(STORAGE_KEY_PUB_PK,  prfBytes);
+            prfBytes.fill(0);
+            if (!privHex || !pubHex) {
+                showMessage(getText('passkey-decrypt-failed') || 'Passkey decryption failed — try PIN');
+                return;
+            }
+            var privBytes = new Uint8Array(bitcoin.Buffer.from(privHex, 'hex'));
+            Keystore.setKeyPair(
+                bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes), { network: getConfig()['network'] })
+            );
+            privBytes.fill(0);
+            globalData.pubKeyHex = pubHex;
+            globalData.pubKey    = new Uint8Array(bitcoin.Buffer.from(pubHex, 'hex'));
+            privHex = ''; pubHex = '';
+            openWallet(false);
+        } catch(e) {
+            if (e.name === 'NotAllowedError') return;  // User cancelled — silent
+            showMessage((getText('passkey-error') || 'Passkey error: ') + e.message);
+        }
+    }
+    // ── Disable passkey ────────────────────────────────────────────────────────
+    async function pkDisable() {
+        // Require PIN to confirm (prevents casual disabling if screen is unattended)
+        var pin = await askPin(
+            getText('pin-title-default') || 'Wallet PIN',
+            (getText('passkey-disable-confirm') || 'Enter PIN to disable passkey'),
+            null, false
+        );
+        if (pin === null) return;
+        var walletData = await loadWallet(pin);
+        pin = null;
+        if (!walletData) {
+            showMessage(getText('pin-login-error') || 'Wrong PIN');
+            return;
+        }
+        walletData = null;
+        [STORAGE_KEY_PRIV_PK, STORAGE_KEY_PUB_PK, STORAGE_KEY_SEED_PK, STORAGE_KEY_PK_ID].forEach(function(k) {
+            try { localStorage.removeItem(k); } catch(e) {}
+        });
+        try { localStorage.setItem(STORAGE_KEY_PK_FLAG, '0'); } catch(e) {}
+        updatePasskeyUI();
+        showMessage(getText('passkey-disabled') || 'Passkey disabled');
+    }
+    // ── Update all passkey-related UI ─────────────────────────────────────────
+    function updatePasskeyUI() {
+        updatePasskeyLoginUI();
+        updatePasskeySettingsUI();
+    }
+    function updatePasskeyLoginUI() {
+        if (isPasskeyEnabled() && hasPasskeyCredential()) {
+            $('#pk-login-wrapper').removeClass('d-none');
+        } else {
+            $('#pk-login-wrapper').addClass('d-none');
+        }
+    }
+    function updatePasskeySettingsUI() {
+        var $section = $('#passkey-settings-section');
+        if (!$section.length) return;
+        if (isPasskeyEnabled()) {
+            $('#passkey-settings-status').text(getText('passkey-status-enabled') || '✅ Enabled — biometric unlock active');
+            $('#passkey-settings-btn')
+                .text(getText('passkey-disable-btn') || 'Disable Passkey')
+                .removeClass('btn-outline-primary btn-success')
+                .addClass('btn-outline-danger');
+        } else {
+            $('#passkey-settings-status').text(getText('passkey-status-disabled') || '🔒 Disabled — PIN only');
+            $('#passkey-settings-btn')
+                .text(getText('passkey-enable-btn') || '🔐 Enable Passkey')
+                .removeClass('btn-outline-danger btn-success')
+                .addClass('btn-outline-primary');
+        }
+        // Show/hide section only when wallet is open (settings are inside wallet-block)
+        $section.removeClass('d-none');
+    }
+    // ─────────────────────────────────────────────────────────────────────────
     async function saveWalletWif(pin) {
         var pubkey  = globalData.pubKeyHex;
         var privHex = Keystore.getPrivKeyHex();
@@ -351,9 +583,11 @@
         _stopAutoLock();
         stopStream();
         wsDisconnect();
-        [STORAGE_KEY_PUB, STORAGE_KEY_PRIV, STORAGE_KEY_SEED, STORAGE_KEY_PATH].forEach(function(k) {
+        [STORAGE_KEY_PUB, STORAGE_KEY_PRIV, STORAGE_KEY_SEED, STORAGE_KEY_PATH,
+         STORAGE_KEY_PUB_PK, STORAGE_KEY_PRIV_PK, STORAGE_KEY_SEED_PK, STORAGE_KEY_PK_ID].forEach(function(k) {
             try { localStorage.removeItem(k); } catch(e) {}
         });
+        try { localStorage.setItem(STORAGE_KEY_PK_FLAG, '0'); } catch(e) {}
         try {
             Object.keys(localStorage).forEach(function(k) {
                 if (k.indexOf('bte_history_') === 0 || k.indexOf('bte_utxo_') === 0 || k.indexOf('bte_wallet_') === 0) {
@@ -388,6 +622,7 @@
             $('#open-block').removeClass('d-none')
             $('#forget-wallet-section').addClass('d-none')
         }
+        updatePasskeyLoginUI();
     }
     var _pinResolve   = null
     var _pinValidator = null
@@ -1394,6 +1629,26 @@
         }
         $('#pin-login-btn').click(doPinLogin)
         $('#pin-login-input').on('keydown', function(e) { if (e.key === 'Enter') doPinLogin() })
+        // ── Passkey login button ───────────────────────────────────────────────
+        $('#pk-login-btn').click(function(e) {
+            e.preventDefault();
+            pkAuthenticate();
+        });
+        // ── Passkey toggle in settings ─────────────────────────────────────────
+        $(document).on('click', '#passkey-settings-btn', function(e) {
+            e.preventDefault();
+            if (isPasskeyEnabled()) {
+                pkDisable();
+            } else {
+                checkPasskeySupport().then(function(supported) {
+                    if (!supported) {
+                        showMessage(getText('passkey-unsupported') || 'Passkey not supported on this device/browser');
+                        return;
+                    }
+                    pkEnable();
+                });
+            }
+        });
         $('#pin-login-forget').click(function(e) {
             e.preventDefault()
             forgetSavedWallet()
@@ -1424,6 +1679,7 @@
                 } else {
                     $('#forget-wallet-section').addClass('d-none')
                 }
+                updatePasskeySettingsUI();
             }
             e.preventDefault()
         })

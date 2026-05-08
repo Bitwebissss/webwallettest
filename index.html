@@ -127,6 +127,14 @@
                                                                     <button id="pin-login-btn" class="btn btn-primary b-width" tkey="pin-login-btn">Open</button>
                             </div>
                             <div id="pin-login-error" class="text-danger small mb-2 d-none" tkey="pin-login-error">Wrong PIN, try again.</div>
+                            <!-- Passkey login — shown only when passkey is enabled -->
+                            <div id="pk-login-wrapper" class="d-none">
+                                <div class="text-center text-muted small my-2">— or —</div>
+                                <button id="pk-login-btn" class="btn btn-outline-primary w-100" type="button">
+                                    <span class="fa-solid fa-fingerprint"></span>
+                                    <span tkey="passkey-login-btn">Unlock with Passkey</span>
+                                </button>
+                            </div>
                             <div class="text-center mt-2">
                                 <button id="pin-login-forget" class="btn btn-danger btn-sm" type="button" tkey="pin-login-forget">Forget saved wallet</button>
                             </div>
@@ -419,6 +427,13 @@
                                     </div>
                                     <div id="forget-wallet-section" class="d-none text-center mt-2">
                                         <button id="settings-forget-wallet" class="btn btn-danger" type="button" tkey="settings-forget-wallet">Forget saved wallet</button>
+                                    </div>
+                                    <!-- Passkey settings -->
+                                    <div id="passkey-settings-section" class="mb-3 d-none">
+                                        <hr class="my-2">
+                                        <label class="fw-semibold"><span class="fa-solid fa-fingerprint"></span> <span tkey="passkey-settings-label">Passkey (Biometric unlock)</span></label>
+                                        <div id="passkey-settings-status" class="text-muted small mb-2"></div>
+                                        <button id="passkey-settings-btn" class="btn btn-sm btn-outline-primary" type="button"></button>
                                     </div>
                                     <div class="text-muted small text-center mt-3">
                                         <span tkey="version"></span> <b id="wallet-version"></b>
