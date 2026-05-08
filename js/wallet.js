@@ -131,24 +131,7 @@
         }
         function signAllInputs(psbt) {
             if (!keyPair) throw new Error('Wallet locked');
-            // For taproot inputs: sign with tweaked key (BIP340 Schnorr).
-            // For all other inputs: use standard ECDSA via signAllInputs.
-            var hasTaproot = psbt.data.inputs.some(function(inp) {
-                return inp.tapInternalKey && inp.tapInternalKey.length === 32;
-            });
-            if (!hasTaproot) {
-                psbt.signAllInputs(keyPair);
-                return;
-            }
-            // Mixed or taproot-only: sign each input individually
-            psbt.data.inputs.forEach(function(inp, idx) {
-                if (inp.tapInternalKey && inp.tapInternalKey.length === 32) {
-                    // Taproot key-path spend — bitcoinjs-lib handles the tweak internally
-                    psbt.signInput(idx, keyPair);
-                } else {
-                    psbt.signInput(idx, keyPair);
-                }
-            });
+            psbt.signAllInputs(keyPair);
         }
         function deriveAddress(type, pubKey) {
             if (!keyPair || !pubKey) return '';
@@ -158,9 +141,6 @@
             } else if (type === 'segwit') {
                 var redeem = bitcoin.payments.p2wpkh({ pubkey: pubKey, network: network });
                 return bitcoin.payments.p2sh({ redeem: redeem, network: network }).address;
-            } else if (type === 'taproot') {
-                var xOnlyPub = pubKey.length === 33 ? pubKey.slice(1) : pubKey;
-                return bitcoin.payments.p2tr({ internalPubkey: xOnlyPub, network: network }).address;
             } else {
                 return bitcoin.payments.p2pkh({ pubkey: pubKey, network: network }).address;
             }
@@ -173,9 +153,6 @@
             } else if (type === 'segwit') {
                 var redeem = bitcoin.payments.p2wpkh({ pubkey: pubKey, network: network });
                 return bitcoin.Buffer.from(bitcoin.payments.p2sh({ redeem: redeem, network: network }).output).toString('hex');
-            } else if (type === 'taproot') {
-                var xOnlyPub = pubKey.length === 33 ? pubKey.slice(1) : pubKey;
-                return bitcoin.Buffer.from(bitcoin.payments.p2tr({ internalPubkey: xOnlyPub, network: network }).output).toString('hex');
             } else {
                 return bitcoin.Buffer.from(bitcoin.payments.p2pkh({ pubkey: pubKey, network: network }).output).toString('hex');
             }
@@ -188,10 +165,6 @@
             var redeem = bitcoin.payments.p2wpkh({ pubkey: pubKey, network: network });
             set.add(bitcoin.Buffer.from(bitcoin.payments.p2sh({ redeem: redeem, network: network }).output).toString('hex').toLowerCase());
             set.add(bitcoin.Buffer.from(bitcoin.payments.p2pkh({ pubkey: pubKey, network: network }).output).toString('hex').toLowerCase());
-            try {
-                var xOnlyPub = pubKey.length === 33 ? pubKey.slice(1) : pubKey;
-                set.add(bitcoin.Buffer.from(bitcoin.payments.p2tr({ internalPubkey: xOnlyPub, network: network }).output).toString('hex').toLowerCase());
-            } catch(e) {}
             return set;
         }
         function getAllAddresses(pubKey) {
@@ -204,10 +177,6 @@
                 set.add(bitcoin.payments.p2sh({ redeem: redeem, network: network }).address);
             } catch(e) {}
             try { set.add(bitcoin.payments.p2pkh({ pubkey: pubKey, network: network }).address); } catch(e) {}
-            try {
-                var xOnlyPub = pubKey.length === 33 ? pubKey.slice(1) : pubKey;
-                set.add(bitcoin.payments.p2tr({ internalPubkey: xOnlyPub, network: network }).address);
-            } catch(e) {}
             return set;
         }
         function isUnlocked() {
@@ -893,14 +862,14 @@
     }
     function getAddressType() {
         var type; try { type = localStorage.getItem('bte_cfg_type') } catch(e) {}
-        if (type == null || !['bech32', 'segwit', 'legacy', 'taproot'].includes(type)) {
-            type = 'taproot'
+        if (type == null || !['bech32', 'segwit', 'legacy'].includes(type)) {
+            type = 'bech32'
             try { localStorage.setItem('bte_cfg_type', type) } catch(e) {}
         }
         return type
     }
     function switchAddressType(type) {
-        if (['bech32', 'segwit', 'legacy', 'taproot'].includes(type)) try { localStorage.setItem('bte_cfg_type', type) } catch(e) {}
+        if (['bech32', 'segwit', 'legacy'].includes(type)) try { localStorage.setItem('bte_cfg_type', type) } catch(e) {}
     }
     function getBackend() {
         var backend; try { backend = localStorage.getItem('bte_cfg_backend') } catch(e) {}
@@ -1417,16 +1386,6 @@
                 } else if (type === 'legacy') {
                     psbt.addInput({ hash: u.txid, index: u.index });
                     inputMeta.push({ type: 'legacy', psbtIdx: inputMeta.length, txid: u.txid });
-                } else if (type === 'taproot') {
-                    var xOnlyPub = pubkey.length === 33 ? pubkey.slice(1) : pubkey;
-                    var p2tr = bitcoin.payments.p2tr({ internalPubkey: xOnlyPub, network: getConfig()['network'] });
-                    psbt.addInput({
-                        hash:         u.txid,
-                        index:        u.index,
-                        witnessUtxo:  { script: p2tr.output, value: BigInt(u.value) },
-                        tapInternalKey: xOnlyPub
-                    });
-                    inputMeta.push({ type: 'taproot' });
                 } else {
                     showSendError(messages.error['bad-utxo']);
                     return;
@@ -1498,7 +1457,6 @@
         if (script[0] == bitcoin.opcodes.OP_0 && script[1] == 20) return 'bech32'
         if (script[0] == bitcoin.opcodes.OP_HASH160 && script[1] == 20) return 'segwit'
         if (script[0] == bitcoin.opcodes.OP_DUP && script[1] == bitcoin.opcodes.OP_HASH160 && script[2] == 20) return 'legacy'
-        if (script[0] == 0x51 && script[1] == 32) return 'taproot'   // OP_1 <32-byte x-only pubkey>
         return undefined
     }
     function getP2SHScript(redeem) {
@@ -1511,7 +1469,6 @@
         var network = getConfig()['network']
         try { bitcoin.address.fromBase58Check(address, network); return true } catch(e) {}
         try { bitcoin.address.fromBech32(address, network); return true } catch(e) {}
-        try { bitcoin.address.fromBech32(address); if (address.toLowerCase().startsWith(network.bech32 + '1p')) return true } catch(e) {}
         return false
     }
     function stopStream() {
