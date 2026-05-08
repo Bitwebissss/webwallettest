@@ -1475,8 +1475,9 @@
             var pubkey    = globalData.pubKey;
             for (var i = 0; i < spendable.length; i++) {
                 var u      = spendable[i];
-                var script = bitcoin.Buffer.from(u.script, 'hex');
-                var type   = getScriptType(script);
+                var scriptHex = (typeof u.script === 'string' && u.script) ? u.script : globalData.scriptHex;
+                var script    = bitcoin.Buffer.from(scriptHex, 'hex');
+                var type      = getScriptType(script);
                 if (type === 'bech32') {
                     var p2wpkh = getP2WPKHScript(pubkey);
                     psbt.addInput({
