@@ -86,102 +86,7 @@
         'address': function(address) { return 'https://explorer.bitwebcore.net/address/' + address + '/' },
         'tx':      function(tx)      { return 'https://explorer.bitwebcore.net/tx/' + tx + '/' }
     }
-    function seedExportPNG(mnemonic, getText) {
-        if (!mnemonic) return
-        var words = mnemonic.split(' ')
-        var cols  = 4
-        var rows  = Math.ceil(words.length / cols)
-        var W       = 800
-        var padX    = 44
-        var padY    = 36
-        var headerH = 72
-        var warnH   = 46
-        var cellW   = Math.floor((W - padX * 2) / cols)
-        var cellH   = 40
-        var gridH   = rows * cellH
-        var pathH   = 36
-        var footerH = 38
-        var H       = padY + headerH + warnH + 16 + gridH + 16 + pathH + footerH + padY
-        var canvas = document.createElement('canvas')
-        var dpr    = Math.min(window.devicePixelRatio || 1, 2)
-        canvas.width  = W * dpr
-        canvas.height = H * dpr
-        var ctx = canvas.getContext('2d')
-        ctx.scale(dpr, dpr)
-        ctx.fillStyle = '#ffffff'
-        ctx.fillRect(0, 0, W, H)
-        ctx.fillStyle    = '#c0392b'
-        ctx.fillRect(0, padY, W, headerH)
-        ctx.fillStyle    = '#ffffff'
-        ctx.font         = 'bold 22px system-ui, sans-serif'
-        ctx.textAlign    = 'center'
-        ctx.textBaseline = 'middle'
-        ctx.fillText(getText('seed-print-secret'), W / 2, padY + headerH / 2)
-        ctx.fillStyle = '#7b1a12'
-        ctx.fillRect(0, padY + headerH, W, warnH)
-        ctx.fillStyle = '#fff3f3'
-        ctx.font      = '13px system-ui, sans-serif'
-        ctx.fillText(getText('seed-print-warning'), W / 2, padY + headerH + warnH / 2)
-        var gridTop = padY + headerH + warnH + 16
-        ctx.textBaseline = 'middle'
-        words.forEach(function(word, i) {
-            var col = i % cols
-            var row = Math.floor(i / cols)
-            var x   = padX + col * cellW
-            var y   = gridTop + row * cellH
-            var cx  = x + cellW / 2
-            var cy  = y + cellH / 2
-            ctx.fillStyle = (row + col) % 2 === 0 ? '#f7f8fa' : '#eef0f4'
-            if (ctx.roundRect) {
-                ctx.beginPath(); ctx.roundRect(x + 2, y + 2, cellW - 4, cellH - 4, 6); ctx.fill()
-            } else {
-                ctx.fillRect(x + 2, y + 2, cellW - 4, cellH - 4)
-            }
-            ctx.strokeStyle = '#d0d4dc'
-            ctx.lineWidth   = 1
-            if (ctx.roundRect) {
-                ctx.beginPath(); ctx.roundRect(x + 2, y + 2, cellW - 4, cellH - 4, 6); ctx.stroke()
-            } else {
-                ctx.strokeRect(x + 2, y + 2, cellW - 4, cellH - 4)
-            }
-            ctx.fillStyle = '#9ca3af'
-            ctx.font      = '11px system-ui, sans-serif'
-            ctx.textAlign = 'left'
-            ctx.fillText(i + 1, x + 10, cy)
-            ctx.fillStyle = '#1a1a2e'
-            ctx.font      = 'bold 15px system-ui, monospace'
-            ctx.textAlign = 'center'
-            ctx.fillText(word, cx + 8, cy)
-        })
-        var pathY = gridTop + gridH + 16
-        ctx.fillStyle    = '#f0f2f5'
-        ctx.fillRect(padX, pathY, W - padX * 2, pathH)
-        ctx.fillStyle    = '#374151'
-        ctx.font         = '12px system-ui, monospace'
-        ctx.textAlign    = 'left'
-        ctx.textBaseline = 'middle'
-        ctx.fillText(getText('seed-path-label') + "  m/84'/0'/0'/0/0  (BIP84 native SegWit)", padX + 12, pathY + pathH / 2)
-        var footerY = pathY + pathH
-        var now     = new Date()
-        var dateStr = now.getFullYear() + '-' +
-                      String(now.getMonth() + 1).padStart(2, '0') + '-' +
-                      String(now.getDate()).padStart(2, '0')
-        ctx.fillStyle    = '#9ca3af'
-        ctx.font         = '11px system-ui, sans-serif'
-        ctx.textAlign    = 'right'
-        ctx.textBaseline = 'middle'
-        ctx.fillText('Generated ' + dateStr, W - padX, footerY + footerH / 2)
-        try {
-            var link      = document.createElement('a')
-            link.href     = canvas.toDataURL('image/png')
-            link.download = 'seed-backup-' + dateStr + '.png'
-            document.body.appendChild(link)
-            link.click()
-            document.body.removeChild(link)
-        } catch (e) {
-            window.open(canvas.toDataURL('image/png'), '_blank')
-        }
-    }
+    // seedExportPNG → moved to seed-export.js (window.seedExportPNG)
     function destroyKeyMaterial(keyPair) {
         if (!keyPair) return;
         try {
@@ -220,7 +125,10 @@
         }
         function getPrivKeyHex() {
             if (!keyPair || !keyPair.privateKey) return null;
-            return bitcoin.Buffer.from(keyPair.privateKey).toString('hex');
+            var buf = bitcoin.Buffer.from(keyPair.privateKey);  // copy of key bytes
+            var hex = buf.toString('hex');
+            buf.fill(0);  // zero the intermediate Buffer copy before GC claims it
+            return hex;   // hex string itself is an immutable JS string — unavoidable
         }
         function signAllInputs(psbt) {
             if (!keyPair) throw new Error('Wallet locked');
@@ -510,6 +418,7 @@
             function(p) { return (p !== pin) ? getText('pin-mismatch') : null },
             false
         )
+        pin = null  // dereference first pin — string stays in heap, but closure ref removed
         return confirmed
     }
     function initMessages() {
@@ -836,169 +745,17 @@
         else setTitle(getText('open-wallet'))
     }
     var _seedState = { mnemonic: '', strength: 256, verifyPositions: [] }
-    var HISTORY_LIMIT = 10
-    function loadHistory() {
-        var key = 'bte_history_' + globalData.address
-        try { return JSON.parse(localStorage.getItem(key) || '[]') } catch (e) { return [] }
-    }
-    function saveHistory(txs) {
-        if (!globalData.address) return
-        try { localStorage.setItem('bte_history_' + globalData.address, JSON.stringify(txs)) } catch (e) {}
-    }
-    function annotateTx(txMeta, txDetail) {
-        var vin   = txDetail.vin  || []
-        var vout  = txDetail.vout || []
-        var myPub = (globalData.pubKeyHex || '').toLowerCase()
-        var weAreSender = vin.some(function(input) {
-            var wit = input.txinwitness || []
-            if (wit[1] && wit[1].toLowerCase() === myPub) return true
-            var sig = (input.scriptSig && input.scriptSig.hex)
-                ? input.scriptSig.hex.toLowerCase() : ''
-            if (sig.length >= 68 && sig.slice(-68) === '21' + myPub) return true
-            return false
-        })
-        var received = 0, sentToOthers = 0
-        vout.forEach(function(o) {
-            var sat = (o.value_sat != null)
-                ? o.value_sat
-                : Math.round((o.value || 0) * 1e8)
-            var hex = (o.scriptPubKey && o.scriptPubKey.hex)
-                ? o.scriptPubKey.hex.toLowerCase() : ''
-            var isOurs = hex
-                ? (globalData.allScriptHexes
-                    ? globalData.allScriptHexes.has(hex)
-                    : hex === (globalData.scriptHex || '').toLowerCase())
-                : false
-            if (!isOurs && o.scriptPubKey) {
-                var outAddr = o.scriptPubKey.address
-                    || (o.scriptPubKey.addresses && o.scriptPubKey.addresses[0])
-                    || ''
-                if (outAddr) {
-                    isOurs = globalData.allAddresses
-                        ? globalData.allAddresses.has(outAddr)
-                        : outAddr === (globalData.address || '')
-                }
-            }
-            if (isOurs) {
-                received += sat
-            } else {
-                sentToOthers += sat
-            }
-        })
-        var direction, amount
-        if (weAreSender) {
-            var isSelfSend = (sentToOthers === 0)
-            direction = isSelfSend ? 'self' : 'out'
-            amount    = isSelfSend ? received : sentToOthers
-        } else {
-            direction = 'in'
-            amount    = received
-        }
-        return {
-            tx_hash:   txMeta.tx_hash,
-            height:    txMeta.height,
-            direction: direction,
-            amount:    amount
-        }
-    }
-    function updateHistory() {
-        if (globalData.status !== 'unlocked') return
-        var requestedAddress = globalData.address
-        $('#history-list').html(
-            '<div class="text-muted text-center py-3 small">' +
-            escHtml(getText('history-loading')) + '</div>'
-        )
-        fetch(getBackend() + '/history/' + requestedAddress)
-        .then(function(r) { return r.json() })
-        .then(function(data) {
-            if (!data || data.error != null) {
-                $('#history-list').html(
-                    '<div class="text-danger text-center py-3 small">' +
-                    escHtml(getText('history-failed')) + '</div>'
-                )
-                return
-            }
-            var all    = data.result || []
-            var total  = all.length
-            var recent = all.slice(-HISTORY_LIMIT).reverse()
-            if (recent.length === 0) { renderHistory([], total); return }
-            var fetches = recent.map(function(txMeta) {
-                return fetch(getBackend() + '/tx/' + txMeta.tx_hash)
-                .then(function(r) { return r.json() })
-                .then(function(d) {
-                    var txDetail = (d.error == null && d.result) ? d.result : {}
-                    return annotateTx(txMeta, txDetail)
-                })
-                .catch(function() {
-                    return { tx_hash: txMeta.tx_hash, height: txMeta.height, direction: 'unknown', amount: null }
-                })
-            })
-            Promise.all(fetches).then(function(annotated) {
-                if (!globalData.address || globalData.address !== requestedAddress) return
-                saveHistory(annotated)
-                renderHistory(annotated, total)
-            })
-        })
-        .catch(function() {
-            $('#history-list').html(
-                '<div class="text-danger text-center py-3 small">' +
-                escHtml(getText('history-network-error')) + '</div>'
-            )
-        })
-    }
-    function renderHistory(txs, total) {
-        if (!txs || txs.length === 0) {
-            $('#history-list').html(
-                '<div class="text-muted text-center py-3 small">' +
-                escHtml(getText('no-transactions')) + '</div>'
-            )
-            return
-        }
-        var html   = ''
-        var ticker = getConfig()['ticker']
-        txs.forEach(function(tx) {
-            var confirmed = tx.height !== 0
-            var confs = confirmed
-                ? (globalData.height > 0
-                    ? (globalData.height - tx.height + 1) + ' ' + getText('history-conf')
-                    : getText('history-confirmed'))
-                : getText('history-pending')
-            var confBadge = confirmed
-                ? '<span class="badge text-bg-success ms-1">' + escHtml(confs) + '</span>'
-                : '<span class="badge text-bg-warning ms-1">' + escHtml(getText('history-pending')) + '</span>'
-            var dir = tx.direction || 'unknown'
-            var amt = (tx.amount != null) ? amountFormat(tx.amount) : '?'
-            var dirLabel
-            if (dir === 'in') {
-                dirLabel = '<span class="font-weight-bold text-success tx-dir-label">&#x2193; +' + escHtml(String(amt)) + ' ' + escHtml(ticker) + '</span>'
-            } else if (dir === 'out') {
-                dirLabel = '<span class="font-weight-bold text-danger tx-dir-label">&#x2191; -' + escHtml(String(amt)) + ' ' + escHtml(ticker) + '</span>'
-            } else if (dir === 'self') {
-                dirLabel = '<span class="font-weight-bold text-info tx-dir-label">&#x21C5; '  + escHtml(String(amt)) + ' ' + escHtml(ticker) + '</span>'
-            } else {
-                dirLabel = '<span class="text-muted tx-dir-label">— ? '       + escHtml(ticker) + '</span>'
-            }
-            var safeHash  = escHtml(tx.tx_hash || '')
-            var txUrl     = escHtml(blockExplorer.tx(tx.tx_hash || ''))
-            var shortHash = safeHash.substr(0, 10) + '…' + safeHash.substr(-6)
-            html += '<div class="history-item d-flex align-items-center border-bottom history-item-inner">' +
-                dirLabel +
-                '<div class="font-monospace text-truncate flex-grow-1 history-tx-hash">' +
-                    '<a href="' + txUrl + '" target="_blank" rel="noopener noreferrer">' + shortHash + '</a>' +
-                '</div>' +
-                '<div class="flex-shrink-0">' + confBadge + '</div>' +
-            '</div>'
-        })
-        if (total && total > HISTORY_LIMIT) {
-            var explorerUrl = escHtml(blockExplorer.address(globalData.address))
-            html += '<div class="text-center py-2"><small>' +
-                '<a href="' + explorerUrl + '" target="_blank" rel="noopener noreferrer">' +
-                escHtml(getText('history-view-all')) + ' ' + total + ' ' +
-                escHtml(getText('history-on-explorer')) + ' &#x2197;' +
-                '</a></small></div>'
-        }
-        $('#history-list').html(html)
-    }
+    // History functions → moved to tx-history.js (window.TxHistory)
+    // Injecting dependencies so TxHistory can access wallet internals:
+    TxHistory.init({
+        globalData:    globalData,
+        escHtml:       escHtml,
+        getText:       getText,
+        getBackend:    getBackend,
+        getConfig:     getConfig,
+        amountFormat:  amountFormat,
+        blockExplorer: blockExplorer
+    });
     function _hideSeedReveal() {
         $('#wallet-seed-hidden').removeClass('d-none')
         $('#wallet-seed-revealed').addClass('d-none')
@@ -1050,7 +807,7 @@
         $('#wallet-block').removeClass('d-none');
         $('#send-fee').attr('placeholder', getText('fee') + ' (' + getText('recommended') + ' ' + globalData.rfee + ' ' + getConfig()['ticker'] + ')');
         showQrAddress(getConfig()['uri'] + globalData.address);
-        renderHistory(loadHistory());
+        TxHistory.renderHistory(TxHistory.loadHistory());
         globalData.balance = 0;
         globalData.immatureBalance = 0;
         globalData.utxos = [];
@@ -1075,9 +832,11 @@
             } else {
                 await saveWalletWif(pin);
             }
+            pin = null;  // dereference — string immutable in JS, but remove our ref
             showMessage(getText('wallet-saved'));
             updateSavedWalletUI();
         }
+        bip39Mnemonic = null;  // dereference mnemonic param — already saved/encrypted above
         globalData.status         = 'unlocked';
         globalData.address        = Keystore.deriveAddress(getAddressType(), globalData.pubKey);
         globalData.scriptHex      = Keystore.getScriptHex(getAddressType(), globalData.pubKey);
@@ -1569,6 +1328,7 @@
                 walletData.privHex = '';
                 globalData.pubKeyHex = walletData.pubkey;
                 globalData.pubKey    = new Uint8Array(bitcoin.Buffer.from(walletData.pubkey, 'hex'));
+                walletData = null;  // dereference object — privHex string stays in heap (JS limit), but our ref is gone
                 pin = '';
                 openWallet(false);
             } catch (e) {
@@ -1600,7 +1360,7 @@
             $('#' + tabFamily + ' .card-header .card-header-tabs .nav-link').removeClass('active')
             $('#' + tabFamily + ' [data-tab=' + tabName + ']').removeClass('d-none')
             $(this).addClass('active')
-            if (tabName === 'wallet-history') updateHistory()
+            if (tabName === 'wallet-history') TxHistory.updateHistory()
             if (tabName === 'wallet-settings') {
                 $('#address-type-select select').val(getAddressType())
                 $('#wallet-backend input').val(getBackend())
@@ -1869,7 +1629,7 @@
             applyTheme(_ct || 'auto');
             if (Keystore.isUnlocked()) {
                 setHomeTitle();
-                renderHistory(loadHistory());
+                TxHistory.renderHistory(TxHistory.loadHistory());
                 if (!$('#coin-control-panel').hasClass('d-none')) renderCoinControl();
             }
         });
@@ -1916,7 +1676,7 @@
             seedRenderGrid(_seedState.mnemonic.split(' '), '#seed-word-grid')
         }
         $('#seed-btn-print').click(function() {
-            seedExportPNG(_seedState.mnemonic, getText)
+            window.seedExportPNG(_seedState.mnemonic, getText)
         })
         $('#seed-btn-copy').click(function() {
             if (_seedState.mnemonic) copyToClipboard(_seedState.mnemonic, $(this))
@@ -2003,9 +1763,11 @@
                 privBytes.fill(0);
                 Keystore.setKeyPair(keyPair);
                 await openWallet(true, raw);
+                raw = null;  // dereference mnemonic string — openWallet already saved+encrypted it
                 $('#restore-input').val('');
                 _seedState.mnemonic = '';
             } catch(err) {
+                raw = null;
                 $('#restore-word-error').text(getText('seed-deriv-error') + ' ' + err.message).removeClass('d-none');
             }
         });
@@ -2109,7 +1871,7 @@
                 _applyUtxoData();
             }
             if (globalData.height !== prevHeight && globalData.address) {
-                updateHistory();
+                TxHistory.updateHistory();
             }
         });
         _ws.on('balance_changed', function(data) {
@@ -2130,7 +1892,7 @@
                 saveUtxoCache(globalData.address, globalData.utxos, h);
                 _applyUtxoData();
                 if (globalData.balance !== prevBalance && globalData.address) {
-                    updateHistory();
+                    TxHistory.updateHistory();
                 }
             }
         });
