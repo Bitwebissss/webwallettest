@@ -1918,6 +1918,7 @@
                         privBytes.fill(0);
                         pass = '';
                         passConfirm = '';
+                        identity = '';
                         openWallet(true);
                     } else { showMessage(messages.error['pass-not-match']); pass = ''; passConfirm = ''; }
                 } else { showMessage(messages.error['pass-too-short']); pass = ''; passConfirm = ''; }
