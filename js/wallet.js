@@ -257,7 +257,7 @@
         _seedState.enc = null;
         _seedState.tempKey = null;
         _seedState.verifyHashes = [];
-        _seedState.strength = 256;
+        // strength is a UI preference — not reset here so word-count selection is preserved
     }
     async function saveEncrypted(storageKey, plaintext, pin) {
         var enc  = new TextEncoder();
@@ -786,6 +786,7 @@
         $('#seed-word-grid').empty()
         $('#seed-generate-warning, #seed-verify-error').addClass('d-none')
         $('#seed-verify-fields').empty()
+        $('#seed-btn-to-verify').prop('disabled', false)
         clearSensitiveInputs()
         $('#restore-word-error').addClass('d-none')
         $('#restore-path').val("m/84'/0'/0'/0/0")
@@ -1800,12 +1801,6 @@
                 $btn.prop('disabled', false);
                 alert('Crypto error: ' + (e.message || e));
             }
-        })
-        $('#seed-verify-back').click(function() {
-            $('#seed-create-step2').addClass('d-none')
-            $('#seed-create-step1').removeClass('d-none')
-            $('#seed-btn-to-verify').prop('disabled', false)
-            _seedDoGenerate()
         })
         $('#seed-verify-confirm').click(async function() {
             var $btn = $(this).prop('disabled', true);
