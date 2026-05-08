@@ -1030,8 +1030,15 @@
         }
     }
     function showQrAddress(text) {
-        $('#qr-code-addres').empty()
-        $('#qr-code-addres').qrcode(text)
+        var container = document.getElementById('qr-code-addres');
+        container.innerHTML = '';
+        var canvas = document.createElement('canvas');
+        container.appendChild(canvas);
+        QRCode.toCanvas(canvas, text, {
+            width: 256,
+            margin: 2,
+            color: { dark: '#000000', light: '#ffffff' }
+        });
     }
     function _renderBalanceDisplay() {
         var total    = globalData.balance
