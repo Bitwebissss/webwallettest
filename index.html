@@ -519,6 +519,11 @@
                         <input id="pin-input" type="password" class="form-control" tkey="pin-input-placeholder" placeholder="PIN (min 8 chars)" maxlength="64" autocomplete="current-password">
                         <div id="pin-caps-warning" class="text-warning small mt-1 d-none"><span class="fa-solid fa-triangle-exclamation"></span> CAPS LOCK!</div>
                         <div id="pin-error" class="text-danger small mt-1 d-none" tkey="pin-login-error">Wrong PIN, try again.</div>
+                        <!-- Passkey alternative — shown only when askPin is called with a passkey callback -->
+                        <button id="pin-modal-pk-btn" class="btn btn-outline-primary btn-sm w-100 mt-2 d-none" type="button">
+                            <span class="fa-solid fa-fingerprint"></span>
+                            <span tkey="passkey-use-instead">Use Passkey instead</span>
+                        </button>
                     </div>
                     <div class="modal-footer">
                         <button id="pin-cancel" type="button" class="btn btn-danger" data-bs-dismiss="modal" tkey="cancel">Cancel</button>

@@ -250,11 +250,12 @@
     var STORAGE_KEY_SEED = 'bte_wallet_seed';
     var STORAGE_KEY_PATH = 'bte_wallet_path';
     // Passkey (WebAuthn PRF) duplicates — encrypted with PRF output instead of PIN
+    // Passkey is considered ENABLED iff BOTH bte_pk_credential_id AND bte_wallet_privkey_pk exist.
+    // No separate flag — presence of encrypted data IS the indicator (tamper-proof by design).
     var STORAGE_KEY_PUB_PK   = 'bte_wallet_pubkey_pk';
     var STORAGE_KEY_PRIV_PK  = 'bte_wallet_privkey_pk';
     var STORAGE_KEY_SEED_PK  = 'bte_wallet_seed_pk';
     var STORAGE_KEY_PK_ID    = 'bte_pk_credential_id';
-    var STORAGE_KEY_PK_FLAG  = 'bte_pass_key';          // '0' disabled, '1' enabled
     var DEFAULT_DERIV_PATH = "m/84'/738'/0'/0/0";
     function hasSeedBackup() {
         return localStorage.getItem(STORAGE_KEY_SEED) !== null;
@@ -331,10 +332,18 @@
     }
     // ── Passkey state helpers ─────────────────────────────────────────────────
     function isPasskeyEnabled() {
-        try { return localStorage.getItem(STORAGE_KEY_PK_FLAG) === '1'; } catch(e) { return false; }
+        // Enabled iff BOTH credential ID and encrypted private key blob exist.
+        // No separate flag — setting bte_pass_key='1' in devtools does nothing without the blobs.
+        try {
+            return localStorage.getItem(STORAGE_KEY_PK_ID)   !== null &&
+                   localStorage.getItem(STORAGE_KEY_PRIV_PK) !== null;
+        } catch(e) { return false; }
     }
     function hasPasskeyCredential() {
-        try { return localStorage.getItem(STORAGE_KEY_PK_ID) !== null; } catch(e) { return false; }
+        return isPasskeyEnabled();
+    }
+    function hasSeedPkBackup() {
+        try { return localStorage.getItem(STORAGE_KEY_SEED_PK) !== null; } catch(e) { return false; }
     }
     async function checkPasskeySupport() {
         if (!window.PublicKeyCredential) return false;
@@ -412,9 +421,8 @@
             if (seedPlain) await saveEncryptedWithKey(STORAGE_KEY_SEED_PK, seedPlain, prfBytes);
             prfBytes.fill(0);
             privHex = ''; pubHex = ''; seedPlain = '';
-            // 4. Store credential ID and enable flag
+            // 4. Store credential ID — presence of this + PRIV_PK is the "enabled" signal
             localStorage.setItem(STORAGE_KEY_PK_ID,   _credIdToB64(credential.rawId));
-            localStorage.setItem(STORAGE_KEY_PK_FLAG, '1');
             updatePasskeyUI();
             showMessage(getText('passkey-enabled') || '🔐 Passkey enabled — you can now unlock with biometrics');
         } catch(e) {
@@ -468,15 +476,46 @@
             showMessage((getText('passkey-error') || 'Passkey error: ') + e.message);
         }
     }
-    // ── Disable passkey ────────────────────────────────────────────────────────
+    // ── Shared action: wipe PK records ────────────────────────────────────────
+    function _doPkDisable() {
+        [STORAGE_KEY_PRIV_PK, STORAGE_KEY_PUB_PK, STORAGE_KEY_SEED_PK, STORAGE_KEY_PK_ID].forEach(function(k) {
+            try { localStorage.removeItem(k); } catch(e) {}
+        });
+        updatePasskeyUI();
+        showMessage(getText('passkey-disabled') || 'Passkey disabled');
+    }
+    // ── Disable passkey — accepts passkey OR PIN ───────────────────────────────
     async function pkDisable() {
-        // Require PIN to confirm (prevents casual disabling if screen is unattended)
+        // Passkey callback: authenticate with passkey to prove identity, then disable
+        async function onPasskeyChosen() {
+            var credIdStr = null;
+            try { credIdStr = localStorage.getItem(STORAGE_KEY_PK_ID); } catch(e) {}
+            if (!credIdStr) return;
+            try {
+                await navigator.credentials.get({
+                    publicKey: {
+                        challenge:         crypto.getRandomValues(new Uint8Array(32)),
+                        rpId:              window.location.hostname,
+                        allowCredentials:  [{ type: 'public-key', id: _b64ToCredId(credIdStr) }],
+                        userVerification:  'required',
+                        extensions:        { prf: { eval: { first: _PK_PRF_SALT } } }
+                    }
+                });
+                _doPkDisable();
+            } catch(e) {
+                if (e.name !== 'NotAllowedError') {
+                    showMessage((getText('passkey-error') || 'Passkey error: ') + e.message);
+                }
+            }
+        }
         var pin = await askPin(
             getText('pin-title-default') || 'Wallet PIN',
-            (getText('passkey-disable-confirm') || 'Enter PIN to disable passkey'),
-            null, false
+            getText('passkey-disable-confirm') || 'Enter PIN (or use Passkey) to disable passkey',
+            null, false,
+            onPasskeyChosen  // shows "Use Passkey" button in modal
         );
-        if (pin === null) return;
+        if (pin === null) return;  // cancelled OR passkey path (passkey path is self-contained)
+        // PIN path
         var walletData = await loadWallet(pin);
         pin = null;
         if (!walletData) {
@@ -484,12 +523,7 @@
             return;
         }
         walletData = null;
-        [STORAGE_KEY_PRIV_PK, STORAGE_KEY_PUB_PK, STORAGE_KEY_SEED_PK, STORAGE_KEY_PK_ID].forEach(function(k) {
-            try { localStorage.removeItem(k); } catch(e) {}
-        });
-        try { localStorage.setItem(STORAGE_KEY_PK_FLAG, '0'); } catch(e) {}
-        updatePasskeyUI();
-        showMessage(getText('passkey-disabled') || 'Passkey disabled');
+        _doPkDisable();
     }
     // ── Update all passkey-related UI ─────────────────────────────────────────
     function updatePasskeyUI() {
@@ -587,7 +621,6 @@
          STORAGE_KEY_PUB_PK, STORAGE_KEY_PRIV_PK, STORAGE_KEY_SEED_PK, STORAGE_KEY_PK_ID].forEach(function(k) {
             try { localStorage.removeItem(k); } catch(e) {}
         });
-        try { localStorage.setItem(STORAGE_KEY_PK_FLAG, '0'); } catch(e) {}
         try {
             Object.keys(localStorage).forEach(function(k) {
                 if (k.indexOf('bte_history_') === 0 || k.indexOf('bte_utxo_') === 0 || k.indexOf('bte_wallet_') === 0) {
@@ -624,12 +657,26 @@
         }
         updatePasskeyLoginUI();
     }
-    var _pinResolve   = null
-    var _pinValidator = null
-    function askPin(title, desc, validator, mandatory) {
+    // ── Seed reveal helper (shared by PIN and passkey paths) ──────────────────
+    function _revealSeed(mnemonic) {
+        if (_revealedWords.length) _revealedWords.fill('');
+        _revealedWords = mnemonic.split(' ');
+        seedRenderGrid(_revealedWords, '#wallet-seed-grid');
+        $('#wallet-seed-hidden').addClass('d-none');
+        $('#wallet-seed-revealed').removeClass('d-none');
+        setTimeout(_hideSeedReveal, 60000);
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+    var _pinResolve          = null
+    var _pinValidator        = null
+    var _pinPasskeyCallback  = null   // set by askPin when a passkey option is provided
+    // askPin — optional 5th param: async fn called when user clicks "Use Passkey" in modal.
+    // When provided and isPasskeyEnabled(), shows the #pin-modal-pk-btn button.
+    function askPin(title, desc, validator, mandatory, onPasskeyClick) {
         return new Promise(function(resolve) {
-            _pinResolve   = resolve
-            _pinValidator = validator || null
+            _pinResolve          = resolve
+            _pinValidator        = validator || null
+            _pinPasskeyCallback  = null
             $('#pin-modal-title').text(title)
             $('#pin-modal-desc').text(desc)
             $('#pin-input').val('')
@@ -638,6 +685,13 @@
                 $('#pin-cancel').addClass('d-none')
             } else {
                 $('#pin-cancel').removeClass('d-none')
+            }
+            // Show passkey button only when a callback is provided and passkey is active
+            if (onPasskeyClick && isPasskeyEnabled()) {
+                _pinPasskeyCallback = onPasskeyClick;
+                $('#pin-modal-pk-btn').removeClass('d-none');
+            } else {
+                $('#pin-modal-pk-btn').addClass('d-none');
             }
             $('#pin-modal').modal({ backdrop: 'static', keyboard: false })
             $('#pin-modal').modal('show')
@@ -1543,12 +1597,11 @@
                 var pinValue = pin
                 pin = null
                 $('#pin-input').val('')
+                _pinPasskeyCallback = null
+                $('#pin-modal-pk-btn').addClass('d-none')
                 var resolve = _pinResolve
                 _pinResolve   = null
                 _pinValidator = null
-                // Resolve only AFTER modal is fully hidden —
-                // prevents Bootstrap race when askPinSetup calls modal('show')
-                // on the second step while the first modal is still animating closed.
                 var modalEl = document.getElementById('pin-modal')
                 function onHidden() {
                     modalEl.removeEventListener('hidden.bs.modal', onHidden)
@@ -1561,11 +1614,12 @@
         })
         $('#pin-cancel').click(function() {
             $('#pin-input').val('')
+            _pinPasskeyCallback = null
+            $('#pin-modal-pk-btn').addClass('d-none')
             if (_pinResolve) {
                 var resolve = _pinResolve
                 _pinResolve   = null
                 _pinValidator = null
-                // data-bs-dismiss triggers the hide; resolve after animation completes
                 var modalEl = document.getElementById('pin-modal')
                 function onHidden() {
                     modalEl.removeEventListener('hidden.bs.modal', onHidden)
@@ -1574,6 +1628,26 @@
                 modalEl.addEventListener('hidden.bs.modal', onHidden)
             }
         })
+        // ── Passkey button inside pin-modal ───────────────────────────────────
+        $('#pin-modal-pk-btn').click(function() {
+            var cb = _pinPasskeyCallback;
+            _pinPasskeyCallback = null;
+            $('#pin-modal-pk-btn').addClass('d-none');
+            $('#pin-input').val('');
+            if (_pinResolve) {
+                var resolve = _pinResolve;
+                _pinResolve   = null;
+                _pinValidator = null;
+                var modalEl   = document.getElementById('pin-modal');
+                function onHidden() {
+                    modalEl.removeEventListener('hidden.bs.modal', onHidden);
+                    resolve(null);   // resolve askPin promise as "cancelled"
+                    if (cb) cb();    // then fire passkey action (async, self-contained)
+                }
+                modalEl.addEventListener('hidden.bs.modal', onHidden);
+                $('#pin-modal').modal('hide');
+            }
+        });
         $('#pin-input').on('keydown', function(e) {
             if (e.key === 'Enter') $('#pin-confirm').click()
         })
@@ -2162,29 +2236,55 @@
         });
         $('#btn-show-seed').click(async function() {
             if (!hasSeedBackup()) return;
-            // Use askPin so we never touch the global pin-confirm handler.
-            // Previous implementation called .off('click') (no selector), which
-            // silently destroyed the global handler and caused all subsequent
-            // PIN dialogs to freeze.
+            // Passkey path for seed — decrypt from _pk record using PRF
+            async function onPasskeyChosen() {
+                var credIdStr = null;
+                try { credIdStr = localStorage.getItem(STORAGE_KEY_PK_ID); } catch(e) {}
+                if (!credIdStr) { showMessage(getText('passkey-not-setup') || 'Passkey not set up'); return; }
+                try {
+                    var assertion = await navigator.credentials.get({
+                        publicKey: {
+                            challenge:        crypto.getRandomValues(new Uint8Array(32)),
+                            rpId:             window.location.hostname,
+                            allowCredentials: [{ type: 'public-key', id: _b64ToCredId(credIdStr) }],
+                            userVerification: 'required',
+                            extensions:       { prf: { eval: { first: _PK_PRF_SALT } } }
+                        }
+                    });
+                    var ext = assertion.getClientExtensionResults();
+                    if (!ext.prf || !ext.prf.results || !ext.prf.results.first) {
+                        showMessage(getText('passkey-prf-unsupported') || 'PRF not available');
+                        return;
+                    }
+                    var prfBytes = new Uint8Array(ext.prf.results.first);
+                    var seedDecrypted = await loadEncryptedWithKey(STORAGE_KEY_SEED_PK, prfBytes);
+                    prfBytes.fill(0);
+                    if (!seedDecrypted) {
+                        showMessage(getText('passkey-decrypt-failed') || 'Seed not found via passkey — try PIN');
+                        return;
+                    }
+                    _revealSeed(seedDecrypted);
+                    seedDecrypted = '';
+                } catch(e) {
+                    if (e.name !== 'NotAllowedError') {
+                        showMessage((getText('passkey-error') || 'Passkey error: ') + e.message);
+                    }
+                }
+            }
             var title    = getText('seed-pin-modal-title');
             var desc     = getText('seed-pin-modal-desc');
             var mnemonic = null;
+            var canUsePasskey = isPasskeyEnabled() && hasSeedPkBackup();
             while (true) {
-                var pin = await askPin(title, desc, null, false);
-                if (pin === null) return;
+                var pin = await askPin(title, desc, null, false, canUsePasskey ? onPasskeyChosen : null);
+                if (pin === null) return;  // cancelled or passkey path handled itself
                 mnemonic = await loadEncrypted(STORAGE_KEY_SEED, pin);
                 pin = null;
                 if (mnemonic) break;
-                // Wrong PIN — show error as description on the next attempt
                 desc = getText('pin-login-error') || 'Wrong PIN, try again.';
             }
-            if (_revealedWords.length) _revealedWords.fill('');
-            _revealedWords = mnemonic.split(' ');
+            _revealSeed(mnemonic);
             mnemonic = '';
-            seedRenderGrid(_revealedWords, '#wallet-seed-grid');
-            $('#wallet-seed-hidden').addClass('d-none');
-            $('#wallet-seed-revealed').removeClass('d-none');
-            setTimeout(_hideSeedReveal, 60000);
         });
         $('#btn-hide-seed').click(_hideSeedReveal)
         $('#btn-save-seed-png').click(function() {
