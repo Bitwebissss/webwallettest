@@ -86,7 +86,6 @@
         'address': function(address) { return 'https://explorer.bitwebcore.net/address/' + address + '/' },
         'tx':      function(tx)      { return 'https://explorer.bitwebcore.net/tx/' + tx + '/' }
     }
-    // seedExportPNG → moved to seed-export.js (window.seedExportPNG)
     function destroyKeyMaterial(keyPair) {
         if (!keyPair) return;
         try {
@@ -125,10 +124,10 @@
         }
         function getPrivKeyHex() {
             if (!keyPair || !keyPair.privateKey) return null;
-            var buf = bitcoin.Buffer.from(keyPair.privateKey);  // copy of key bytes
+            var buf = bitcoin.Buffer.from(keyPair.privateKey);
             var hex = buf.toString('hex');
-            buf.fill(0);  // zero the intermediate Buffer copy before GC claims it
-            return hex;   // hex string itself is an immutable JS string — unavoidable
+            buf.fill(0);
+            return hex;
         }
         function signAllInputs(psbt) {
             if (!keyPair) throw new Error('Wallet locked');
@@ -421,7 +420,7 @@
             function(p) { return (p !== pin) ? getText('pin-mismatch') : null },
             false
         )
-        pin = null  // dereference first pin — string stays in heap, but closure ref removed
+        pin = null
         return confirmed
     }
     function initMessages() {
@@ -747,16 +746,14 @@
         if (Keystore.isUnlocked()) setTitle(getText('address') + ' ' + globalData.address)
         else setTitle(getText('open-wallet'))
     }
-    var _revealedWords = [];   // слова пока открыты в keys-вкладке; зануляются при hide
+    var _revealedWords = [];
     var _seedState = {
-        words: [],          // string[] — поэлементно обнуляем после использования
-        enc: null,          // { iv, data } — ephemeral зашифрованный блоб на время verify
-        tempKey: null,      // CryptoKey — эфемерный AES-GCM ключ
-        verifyHashes: [],   // [{pos, salt, hash}] — HMAC вместо plaintext при верификации
+        words: [],
+        enc: null,
+        tempKey: null,
+        verifyHashes: [],
         strength: 256
     }
-    // History functions → moved to tx-history.js (window.TxHistory)
-    // Injecting dependencies so TxHistory can access wallet internals:
     TxHistory.init({
         globalData:    globalData,
         escHtml:       escHtml,
@@ -843,11 +840,11 @@
             } else {
                 await saveWalletWif(pin);
             }
-            pin = null;  // dereference — string immutable in JS, but remove our ref
+            pin = null;
             showMessage(getText('wallet-saved'));
             updateSavedWalletUI();
         }
-        bip39Mnemonic = null;  // dereference mnemonic param — already saved/encrypted above
+        bip39Mnemonic = null;
         globalData.status         = 'unlocked';
         globalData.address        = Keystore.deriveAddress(getAddressType(), globalData.pubKey);
         globalData.scriptHex      = Keystore.getScriptHex(getAddressType(), globalData.pubKey);
@@ -1339,7 +1336,7 @@
                 walletData.privHex = '';
                 globalData.pubKeyHex = walletData.pubkey;
                 globalData.pubKey    = new Uint8Array(bitcoin.Buffer.from(walletData.pubkey, 'hex'));
-                walletData = null;  // dereference object — privHex string stays in heap (JS limit), but our ref is gone
+                walletData = null;
                 pin = '';
                 openWallet(false);
             } catch (e) {
@@ -1709,7 +1706,6 @@
             window.seedExportPNG(mn, getText);
             mn = '';
         })
-        // seed-btn-copy removed — clipboard exposure of full mnemonic eliminated
         $('#seed-btn-to-verify').click(async function() {
             if (!_seedState.words.length) return;
             var $btn = $(this).prop('disabled', true);
@@ -1724,7 +1720,6 @@
             var pos = [rnd(0, third - 1), rnd(third, third * 2 - 1), rnd(third * 2, len - 1)];
 
             try {
-                // Вычисляем HMAC для каждой позиции — plaintext слово не сохраняем
                 _seedState.verifyHashes = await Promise.all(pos.map(async function(p) {
                     var salt = crypto.getRandomValues(new Uint8Array(16));
                     var hmacKey = await crypto.subtle.importKey(
@@ -1735,8 +1730,6 @@
                     wordBytes.fill(0);
                     return { pos: p, salt: Array.from(salt), hash: Array.from(sig) };
                 }));
-
-                // Шифруем words эфемерным ключом, зачищаем plaintext массив
                 _seedState.tempKey = await crypto.subtle.generateKey(
                     { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
                 );
@@ -1745,12 +1738,8 @@
                 var ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, _seedState.tempKey, plain);
                 plain.fill(0);
                 _seedState.enc = { iv: Array.from(iv), data: Array.from(new Uint8Array(ct)) };
-
-                // Зачищаем plaintext слова из памяти
                 _seedState.words.fill('');
                 _seedState.words = [];
-
-                // Рендерим поля верификации
                 var $fields = $('#seed-verify-fields').empty();
                 pos.forEach(function(p) {
                     $fields.append(
@@ -1776,8 +1765,6 @@
         $('#seed-verify-confirm').click(async function() {
             var $btn = $(this).prop('disabled', true);
             var inputs = $('.seed-verify-word');
-
-            // Constant-time HMAC сравнение — без plaintext в памяти
             var ok = true;
             try {
                 for (var i = 0; i < _seedState.verifyHashes.length; i++) {
@@ -1790,7 +1777,6 @@
                     );
                     var sig = new Uint8Array(await crypto.subtle.sign('HMAC', hmacKey, enteredBytes));
                     enteredBytes.fill(0);
-                    // Constant-time compare
                     if (sig.length !== vh.hash.length) { ok = false; break; }
                     var diff = 0;
                     for (var j = 0; j < sig.length; j++) diff |= sig[j] ^ vh.hash[j];
@@ -1806,8 +1792,6 @@
                 return;
             }
             $('#seed-verify-error').addClass('d-none');
-
-            // Расшифровываем ephemeral блоб → получаем mnemonic
             try {
                 var iv = new Uint8Array(_seedState.enc.iv);
                 var ct = new Uint8Array(_seedState.enc.data);
@@ -1826,7 +1810,6 @@
                 Keystore.setKeyPair(keyPair);
                 await openWallet(true, mnemonic);
                 mnemonic = '';
-                // Если openWallet вернулся (PIN отменён) — снова включаем кнопку
                 $btn.prop('disabled', false);
             } catch(err) {
                 $btn.prop('disabled', false);
@@ -1861,7 +1844,7 @@
                 privBytes.fill(0);
                 Keystore.setKeyPair(keyPair);
                 await openWallet(true, raw);
-                raw = null;  // dereference mnemonic string — openWallet already saved+encrypted it
+                raw = null;
                 $('#restore-input').val('');
                 clearSeedState();
             } catch(err) {
@@ -1912,7 +1895,6 @@
             setTimeout(_hideSeedReveal, 60000);
         });
         $('#btn-hide-seed').click(_hideSeedReveal)
-        // btn-copy-seed removed — clipboard exposure eliminated
         $('#btn-save-seed-png').click(function() {
             if (!_revealedWords.length) return;
             var mn = _revealedWords.join(' ');
