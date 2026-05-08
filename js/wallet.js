@@ -2278,7 +2278,7 @@
                     $fields.append(
                         '<div class="input-group input-group-sm mb-2">' +
                         '<span class="input-group-text seed-verify-num">' + getText('seed-word-num') + ' ' + (p + 1) + '</span>' +
-                        '<input type="text" class="form-control font-monospace seed-verify-word" data-pos="' + p + '" autocomplete="one-time-code" autocorrect="off" autocapitalize="off" spellcheck="false">' +
+                        '<input type="text" class="form-control font-monospace seed-verify-word" data-pos="' + p + '" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">' +
                         '</div>'
                     );
                 });
