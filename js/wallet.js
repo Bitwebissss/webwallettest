@@ -1944,13 +1944,72 @@
             e.preventDefault();
         });
         $('#send-confirm').click(function(e) { sendTransaction(); e.preventDefault() })
-        $('#toggle-wallet-privkey').click(function() {
+        $('#toggle-wallet-privkey').click(async function() {
             if ($(this).text() == getText('show')) {
-                if (Keystore.isUnlocked()) {
-                    revealPrivKeyInput(Keystore.getWIF());
-                    $('#wallet-privkey-copy-btn').removeClass('d-none');
-                    $(this).text(getText('hide'));
+                if (!Keystore.isUnlocked()) return;
+                // ── Require PIN (or passkey) before revealing private key ──────
+                async function onPasskeyChosen(_retriesLeft) {
+                    if (_retriesLeft === undefined) _retriesLeft = 2;
+                    var credIdStr = null;
+                    try { credIdStr = localStorage.getItem(STORAGE_KEY_PK_ID); } catch(e) {}
+                    if (!credIdStr) return;
+                    try {
+                        var assertion = await navigator.credentials.get({
+                            publicKey: {
+                                challenge:        crypto.getRandomValues(new Uint8Array(32)),
+                                rpId:             window.location.hostname,
+                                allowCredentials: [{ type: 'public-key', id: _b64ToCredId(credIdStr) }],
+                                userVerification: 'required',
+                                extensions:       { prf: { eval: { first: _PK_PRF_SALT } } }
+                            }
+                        });
+                        var ext = assertion.getClientExtensionResults();
+                        if (!ext.prf || !ext.prf.results || !ext.prf.results.first) {
+                            showMessage(getText('passkey-prf-unsupported') || 'PRF not available');
+                            return;
+                        }
+                        // PRF succeeded — identity confirmed, show privkey
+                        revealPrivKeyInput(Keystore.getWIF());
+                        $('#wallet-privkey-copy-btn').removeClass('d-none');
+                        $('#toggle-wallet-privkey').text(getText('hide'));
+                        setTimeout(function() {
+                            clearPrivKeyInput();
+                            $('#wallet-privkey-copy-btn').addClass('d-none');
+                            $('#toggle-wallet-privkey').text(getText('show'));
+                        }, 60000);
+                    } catch(e) {
+                        if (e.name === 'NotAllowedError') return;
+                        if (_retriesLeft > 0 && _isTransientPasskeyError(e)) {
+                            await new Promise(function(r) { setTimeout(r, 300); });
+                            return onPasskeyChosen(_retriesLeft - 1);
+                        }
+                        showMessage((getText('passkey-error') || 'Passkey error: ') + e.message);
+                    }
                 }
+                var canUsePasskey = isPasskeyEnabled() && hasPasskeyCredential();
+                var pin = await askPin(
+                    getText('pin-title-default') || 'Wallet PIN',
+                    getText('privkey-pin-desc')  || 'Enter PIN to reveal private key',
+                    null, false,
+                    canUsePasskey ? onPasskeyChosen : null
+                );
+                if (pin === null) return;  // cancelled or passkey path handled itself
+                var walletData = await loadWallet(pin);
+                pin = null;
+                if (!walletData) {
+                    showMessage(getText('pin-login-error') || 'Wrong PIN');
+                    return;
+                }
+                walletData = null;
+                revealPrivKeyInput(Keystore.getWIF());
+                $('#wallet-privkey-copy-btn').removeClass('d-none');
+                $('#toggle-wallet-privkey').text(getText('hide'));
+                // Auto-hide after 60 s
+                setTimeout(function() {
+                    clearPrivKeyInput();
+                    $('#wallet-privkey-copy-btn').addClass('d-none');
+                    $('#toggle-wallet-privkey').text(getText('show'));
+                }, 60000);
             } else {
                 clearPrivKeyInput();
                 $('#wallet-privkey-copy-btn').addClass('d-none');
