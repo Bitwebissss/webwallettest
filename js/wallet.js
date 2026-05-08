@@ -406,11 +406,19 @@
             setTimeout(function() { $('#pin-input').focus() }, 400)
         })
     }
+    function validatePinStrength(p) {
+        if (!p || p.length < 8)          return getText('pin-too-short')   || 'Minimum 8 characters';
+        if (!/[A-Z]/.test(p))            return getText('pin-need-upper')  || 'Requires uppercase letter (A–Z)';
+        if (!/[a-z]/.test(p))            return getText('pin-need-lower')  || 'Requires lowercase letter (a–z)';
+        if (!/[0-9]/.test(p))            return getText('pin-need-digit')  || 'Requires a digit (0–9)';
+        if (!/[^A-Za-z0-9]/.test(p))     return getText('pin-need-special')|| 'Requires special character (!@#$…)';
+        return null;
+    }
     async function askPinSetup() {
         var pin = await askPin(
             getText('pin-create-title'),
             getText('pin-create-desc'),
-            function(p) { return (!p || p.length < 6) ? getText('pin-too-short') : null },
+            validatePinStrength,
             false
         )
         if (pin === null) return null
@@ -1294,20 +1302,51 @@
                 }
                 $('#pin-error').addClass('d-none')
                 var pinValue = pin
+                pin = null
                 $('#pin-input').val('')
-                $('#pin-modal').modal('hide')
                 var resolve = _pinResolve
                 _pinResolve   = null
                 _pinValidator = null
-                resolve(pinValue)
+                // Resolve only AFTER modal is fully hidden —
+                // prevents Bootstrap race when askPinSetup calls modal('show')
+                // on the second step while the first modal is still animating closed.
+                var modalEl = document.getElementById('pin-modal')
+                function onHidden() {
+                    modalEl.removeEventListener('hidden.bs.modal', onHidden)
+                    resolve(pinValue)
+                    pinValue = null
+                }
+                modalEl.addEventListener('hidden.bs.modal', onHidden)
+                $('#pin-modal').modal('hide')
             }
         })
         $('#pin-cancel').click(function() {
             $('#pin-input').val('')
-            if (_pinResolve) { _pinResolve(null); _pinResolve = null; _pinValidator = null }
+            if (_pinResolve) {
+                var resolve = _pinResolve
+                _pinResolve   = null
+                _pinValidator = null
+                // data-bs-dismiss triggers the hide; resolve after animation completes
+                var modalEl = document.getElementById('pin-modal')
+                function onHidden() {
+                    modalEl.removeEventListener('hidden.bs.modal', onHidden)
+                    resolve(null)
+                }
+                modalEl.addEventListener('hidden.bs.modal', onHidden)
+            }
         })
         $('#pin-input').on('keydown', function(e) {
             if (e.key === 'Enter') $('#pin-confirm').click()
+        })
+        // CapsLock warning — getModifierState not available on most mobile keyboards,
+        // graceful no-op in that case
+        $(document).on('keyup keydown', '#pin-input, #pin-login-input', function(e) {
+            var capsOn = (e.originalEvent && e.originalEvent.getModifierState)
+                ? e.originalEvent.getModifierState('CapsLock')
+                : false
+            var warnId = (this.id === 'pin-input') ? 'pin-caps-warning' : 'pin-login-caps-warning'
+            if (capsOn) { $('#' + warnId).removeClass('d-none') }
+            else        { $('#' + warnId).addClass('d-none') }
         })
         async function doPinLogin() {
             var pin = $('#pin-login-input').val();
@@ -1316,6 +1355,10 @@
                 return;
             }
             $('#pin-login-btn').prop('disabled', true).text(getText('loading'));
+            // Yield one frame so the browser repaints the disabled/loading state
+            // before PBKDF2 starts (even though WebCrypto is off-thread, the
+            // synchronous bookkeeping before it can delay the repaint).
+            await new Promise(function(r) { setTimeout(r, 50); });
             try {
                 var walletData = await loadWallet(pin);
                 $('#pin-login-btn').prop('disabled', false).text(getText('pin-login-btn'));
@@ -1854,41 +1897,25 @@
         });
         $('#btn-show-seed').click(async function() {
             if (!hasSeedBackup()) return;
-            var seedData = await new Promise(function(resolve) {
-                $('#pin-modal-title').text(getText('seed-pin-modal-title'));
-                $('#pin-modal-desc').text(getText('seed-pin-modal-desc'));
-                $('#pin-input').val('');
-                $('#pin-error').addClass('d-none');
-                var modal = new bootstrap.Modal(document.getElementById('pin-modal'), { keyboard: false });
-                modal.show();
-                function onConfirm() {
-                    var p = $('#pin-input').val();
-                    loadEncrypted(STORAGE_KEY_SEED, p).then(function(mnemonic) {
-                        if (!mnemonic) {
-                            $('#pin-error').removeClass('d-none');
-                            return;
-                        }
-                        var result = { mnemonic: mnemonic };
-                        mnemonic = '';
-                        modal.hide();
-                        $('#pin-confirm').off('click', onConfirm);
-                        resolve(result);
-                    });
-                }
-                function onCancel() {
-                    $('#pin-confirm').off('click', onConfirm);
-                    $('#pin-cancel').off('click', onCancel);
-                    modal.hide();
-                    resolve(null);
-                }
-                $('#pin-confirm').off('click').on('click', onConfirm);
-                $('#pin-cancel').off('click').on('click', onCancel);
-            });
-            if (!seedData) return;
+            // Use askPin so we never touch the global pin-confirm handler.
+            // Previous implementation called .off('click') (no selector), which
+            // silently destroyed the global handler and caused all subsequent
+            // PIN dialogs to freeze.
+            var title    = getText('seed-pin-modal-title');
+            var desc     = getText('seed-pin-modal-desc');
+            var mnemonic = null;
+            while (true) {
+                var pin = await askPin(title, desc, null, false);
+                if (pin === null) return;
+                mnemonic = await loadEncrypted(STORAGE_KEY_SEED, pin);
+                pin = null;
+                if (mnemonic) break;
+                // Wrong PIN — show error as description on the next attempt
+                desc = getText('pin-login-error') || 'Wrong PIN, try again.';
+            }
             if (_revealedWords.length) _revealedWords.fill('');
-            _revealedWords = seedData.mnemonic.split(' ');
-            seedData.mnemonic = '';
-            seedData = null;
+            _revealedWords = mnemonic.split(' ');
+            mnemonic = '';
             seedRenderGrid(_revealedWords, '#wallet-seed-grid');
             $('#wallet-seed-hidden').addClass('d-none');
             $('#wallet-seed-revealed').removeClass('d-none');

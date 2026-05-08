@@ -124,7 +124,8 @@
                         <div class="card-body">
                             <p class="pin-login-title"><span class="fa-solid fa-lock"></span> <span tkey="pin-login-title">Saved wallet found</span></p>
                             <div class="input-group mb-2">
-                                <input id="pin-login-input" type="password" class="form-control" tkey="pin-login-placeholder" placeholder="Enter PIN to open" maxlength="16" autocomplete="current-password">
+                                <input id="pin-login-input" type="password" class="form-control" tkey="pin-login-placeholder" placeholder="Enter PIN to open" maxlength="32" autocomplete="current-password">
+                                <div id="pin-login-caps-warning" class="text-warning small mt-1 d-none"><span class="fa-solid fa-triangle-exclamation"></span> CAPS LOCK!</div>
                                                                     <button id="pin-login-btn" class="btn btn-primary b-width" tkey="pin-login-btn">Open</button>
                             </div>
                             <div id="pin-login-error" class="text-danger small mb-2 d-none" tkey="pin-login-error">Wrong PIN, try again.</div>
@@ -502,7 +503,8 @@
                     </div>
                     <div class="modal-body">
                         <p id="pin-modal-desc" class="text-muted small"></p>
-                        <input id="pin-input" type="password" class="form-control" tkey="pin-input-placeholder" placeholder="PIN (min 6 digits)" maxlength="32">
+                        <input id="pin-input" type="password" class="form-control" tkey="pin-input-placeholder" placeholder="PIN (min 8 chars)" maxlength="64" autocomplete="current-password">
+                        <div id="pin-caps-warning" class="text-warning small mt-1 d-none"><span class="fa-solid fa-triangle-exclamation"></span> CAPS LOCK!</div>
                         <div id="pin-error" class="text-danger small mt-1 d-none" tkey="pin-login-error">Wrong PIN, try again.</div>
                     </div>
                     <div class="modal-footer">
