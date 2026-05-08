@@ -248,6 +248,8 @@
     var STORAGE_KEY_PUB  = 'bte_wallet_pubkey';
     var STORAGE_KEY_PRIV = 'bte_wallet_privkey';
     var STORAGE_KEY_SEED = 'bte_wallet_seed';
+    var STORAGE_KEY_PATH = 'bte_wallet_path';
+    var DEFAULT_DERIV_PATH = "m/84'/738'/0'/0/0";
     function hasSeedBackup() {
         return localStorage.getItem(STORAGE_KEY_SEED) !== null;
     }
@@ -257,7 +259,6 @@
         _seedState.enc = null;
         _seedState.tempKey = null;
         _seedState.verifyHashes = [];
-        // strength is a UI preference — not reset here so word-count selection is preserved
     }
     async function saveEncrypted(storageKey, plaintext, pin) {
         var enc  = new TextEncoder();
@@ -296,14 +297,16 @@
         await saveEncrypted(STORAGE_KEY_PUB,  pubkey,   pin);
         await saveEncrypted(STORAGE_KEY_PRIV, privHex,  pin);
         localStorage.removeItem(STORAGE_KEY_SEED);
+        localStorage.removeItem(STORAGE_KEY_PATH);
         privHex = '';
     }
-    async function saveWalletBip39(mnemonic, pin) {
+    async function saveWalletBip39(mnemonic, pin, path) {
         var pubkey  = globalData.pubKeyHex;
         var privHex = Keystore.getPrivKeyHex();
         await saveEncrypted(STORAGE_KEY_PUB,  pubkey,   pin);
         await saveEncrypted(STORAGE_KEY_PRIV, privHex,  pin);
         await saveEncrypted(STORAGE_KEY_SEED, mnemonic, pin);
+        try { localStorage.setItem(STORAGE_KEY_PATH, path || DEFAULT_DERIV_PATH); } catch(e) {}
         mnemonic = '';
         privHex  = '';
     }
@@ -348,7 +351,7 @@
         _stopAutoLock();
         stopStream();
         wsDisconnect();
-        [STORAGE_KEY_PUB, STORAGE_KEY_PRIV, STORAGE_KEY_SEED].forEach(function(k) {
+        [STORAGE_KEY_PUB, STORAGE_KEY_PRIV, STORAGE_KEY_SEED, STORAGE_KEY_PATH].forEach(function(k) {
             try { localStorage.removeItem(k); } catch(e) {}
         });
         try {
@@ -789,7 +792,7 @@
         $('#seed-btn-to-verify').prop('disabled', false)
         clearSensitiveInputs()
         $('#restore-word-error').addClass('d-none')
-        $('#restore-path').val("m/84'/0'/0'/0/0")
+        $('#restore-path').val(DEFAULT_DERIV_PATH)
         $('#restore-advanced').removeClass('show')
         clearSeedState();
     }
@@ -833,7 +836,7 @@
             _ws.emit('subscribe', { address: globalData.address });
         }
     }
-    async function openWallet(offerPin, bip39Mnemonic) {
+    async function openWallet(offerPin, bip39Mnemonic, derivPath) {
         if (offerPin && !hasSavedWallet()) {
             var pin = await askPinSetup();
             if (pin === null) {
@@ -845,7 +848,7 @@
             globalData.pubKey    = new Uint8Array(Keystore.getPublicKeyBytes());
 
             if (bip39Mnemonic) {
-                await saveWalletBip39(bip39Mnemonic, pin);
+                await saveWalletBip39(bip39Mnemonic, pin, derivPath);
             } else {
                 await saveWalletWif(pin);
             }
@@ -1747,7 +1750,7 @@
         $('#seed-btn-print').click(function() {
             if (!_seedState.words.length) return;
             var mn = _seedState.words.join(' ');
-            window.seedExportPNG(mn, getText);
+            window.seedExportPNG(mn, getText, DEFAULT_DERIV_PATH);
             mn = '';
         })
         $('#seed-btn-to-verify').click(async function() {
@@ -1802,6 +1805,14 @@
                 alert('Crypto error: ' + (e.message || e));
             }
         })
+        $('#seed-verify-back').click(function() {
+            // words are already zeroed after step-2 transition,
+            // so going back with an empty grid is a dead end.
+            // Regenerate a fresh mnemonic instead.
+            $('#seed-create-step2').addClass('d-none')
+            $('#seed-create-step1').removeClass('d-none')
+            _seedDoGenerate()
+        })
         $('#seed-verify-confirm').click(async function() {
             var $btn = $(this).prop('disabled', true);
             var inputs = $('.seed-verify-word');
@@ -1844,11 +1855,11 @@
                 var mnemonic = new TextDecoder().decode(pt);
                 pt.fill(0);
 
-                var privBytes = bip39Bundle.mnemonicToPrivKey(mnemonic, "m/84'/0'/0'/0/0");
+                var privBytes = bip39Bundle.mnemonicToPrivKey(mnemonic, DEFAULT_DERIV_PATH);
                 var keyPair = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes));
                 privBytes.fill(0);
                 Keystore.setKeyPair(keyPair);
-                await openWallet(true, mnemonic);
+                await openWallet(true, mnemonic, DEFAULT_DERIV_PATH);
                 mnemonic = '';
                 $btn.prop('disabled', false);
             } catch(err) {
@@ -1862,6 +1873,7 @@
             if (cnt === 12 && words.length > 12) {
                 $('#restore-input').val(words.slice(0, 12).join(' '))
             }
+            $('#restore-word-error').addClass('d-none')
         })
         $('#seed-restore-btn').click(async function() {
             if (typeof bip39Bundle === 'undefined') { alert('bip39-bundle.min.js not loaded'); return; }
@@ -1877,13 +1889,13 @@
                 $('#restore-word-error').text(getText('seed-invalid-phrase')).removeClass('d-none');
                 return;
             }
-            var path = ($('#restore-path').val().trim() || "m/84'/0'/0'/0/0");
+            var path = ($('#restore-path').val().trim() || DEFAULT_DERIV_PATH);
             try {
                 var privBytes = bip39Bundle.mnemonicToPrivKey(raw, path);
                 var keyPair = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes));
                 privBytes.fill(0);
                 Keystore.setKeyPair(keyPair);
-                await openWallet(true, raw);
+                await openWallet(true, raw, path);
                 raw = null;
                 $('#restore-input').val('');
                 clearSeedState();
@@ -1922,7 +1934,8 @@
         $('#btn-save-seed-png').click(function() {
             if (!_revealedWords.length) return;
             var mn = _revealedWords.join(' ');
-            window.seedExportPNG(mn, getText);
+            var savedPath; try { savedPath = localStorage.getItem(STORAGE_KEY_PATH); } catch(e) {}
+            window.seedExportPNG(mn, getText, savedPath || DEFAULT_DERIV_PATH);
             mn = '';
         })
         $('.tab-link').on('click', function() {

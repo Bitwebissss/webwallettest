@@ -180,6 +180,7 @@
                                         <div id="seed-verify-error" class="text-danger small mb-2 d-none" tkey="seed-verify-error-msg">Incorrect words. Please check your phrase.</div>
                                         <div class="d-flex gap-2 align-items-center">
                                             <button class="btn btn-sm btn-danger" id="seed-create-cancel2" type="button" tkey="cancel">Cancel</button>
+                                            <button class="btn btn-outline-secondary btn-sm" id="seed-verify-back" type="button" tkey="seed-back">← Back</button>
                                             <button class="btn btn-primary btn-sm ms-auto" id="seed-verify-confirm" type="button" tkey="seed-confirm-pin">Confirm &amp; Set PIN</button>
                                         </div>
                                     </div>
@@ -203,7 +204,7 @@
                                             <div class="border rounded p-2 mt-1 small">
                                                 <div class="mb-2">
                                                     <label class="form-label mb-1" tkey="seed-deriv-path">Derivation path</label>
-                                                    <input id="restore-path" type="text" class="form-control form-control-sm font-monospace" value="m/84'/0'/0'/0/0" placeholder="m/84'/0'/0'/0/0">
+                                                    <input id="restore-path" type="text" class="form-control form-control-sm font-monospace" value="m/84'/738'/0'/0/0" placeholder="m/84'/738'/0'/0/0">
                                                     <div class="form-text" tkey="seed-deriv-hint">Default: BIP84 native SegWit. Change for Electrum/Ledger compatibility.</div>
                                                 </div>
                                             </div>
@@ -240,7 +241,7 @@
                         </div>
                         <div class="card-footer">
                             <div class="footer-item tab-item" data-tab="open-seed">
-                                <small class="text-muted">BIP39 / BIP84 · m/84'/0'/0'/0/0 · Entropy: OS CSPRNG (crypto.getRandomValues)</small>
+                                <small class="text-muted">BIP39 / BIP84 · m/84'/738'/0'/0/0 · Entropy: OS CSPRNG (crypto.getRandomValues)</small>
                             </div>
                             <div class="footer-item tab-item d-none" data-tab="open-regular" tkey="open-reminder"></div>
                         </div>

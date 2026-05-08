@@ -1,7 +1,8 @@
 (function () {
     'use strict';
-    function seedExportPNG(mnemonic, getText) {
+    function seedExportPNG(mnemonic, getText, path) {
         if (!mnemonic) return;
+        var displayPath = path || "m/84'/738'/0'/0/0";
         var words = mnemonic.split(' ');
         var cols  = 4;
         var rows  = Math.ceil(words.length / cols);
@@ -74,7 +75,8 @@
         ctx.font         = '12px system-ui, monospace';
         ctx.textAlign    = 'left';
         ctx.textBaseline = 'middle';
-        ctx.fillText(getText('seed-path-label') + "  m/84'/0'/0'/0/0  (BIP84 native SegWit)", padX + 12, pathY + pathH / 2);
+        var pathSuffix = displayPath === "m/84'/738'/0'/0/0" ? '  (BIP84 native SegWit, BTE)' : '';
+        ctx.fillText(getText('seed-path-label') + '  ' + displayPath + pathSuffix, padX + 12, pathY + pathH / 2);
         var footerY = pathY + pathH;
         var now     = new Date();
         var dateStr = now.getFullYear() + '-' +
