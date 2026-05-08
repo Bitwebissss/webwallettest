@@ -1802,11 +1802,9 @@
             }
         })
         $('#seed-verify-back').click(function() {
-            // words are already zeroed after step-2 transition,
-            // so going back with an empty grid is a dead end.
-            // Regenerate a fresh mnemonic instead.
             $('#seed-create-step2').addClass('d-none')
             $('#seed-create-step1').removeClass('d-none')
+            $('#seed-btn-to-verify').prop('disabled', false)
             _seedDoGenerate()
         })
         $('#seed-verify-confirm').click(async function() {
