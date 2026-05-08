@@ -7,16 +7,16 @@
         <meta name="referrer" content="no-referrer">
         <meta http-equiv="Content-Security-Policy" content="
             default-src 'self';
-            script-src  'self' 'unsafe-inline';
-            style-src   'self' 'unsafe-inline';
+            script-src 'self';
+            style-src 'self' 'unsafe-inline';
             connect-src 'self' https://api.bitwebcore.net wss://api.bitwebcore.net;
-            img-src     'self' data: blob:;
-            media-src   blob:;
-            font-src    'self';
-            frame-src   'none';
-            object-src  'none';
-            base-uri    'self';
-            form-action 'self'
+            img-src 'self' data: blob:;
+            media-src blob:;
+            font-src 'self';
+            frame-src 'none';
+            object-src 'none';
+            base-uri 'self';
+            form-action 'self';
         ">
         <!-- https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css -->
         <link rel="stylesheet" href="css/all.min.css"
@@ -27,7 +27,9 @@
                 integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
                 crossorigin="anonymous">
         <link rel="icon" type="image/svg+xml" href="images/logo.svg">
-        <script src="js/theme.js"></script>
+        <script src="js/theme.js"
+                integrity="sha512-rLNSBJSTNM7q2CdI2d2OYJUTZtn3jUW1w+UhLqE892oNT8YD7prSNOQ69QZLKp3inAL6GiSW8jyXTzG2E5yDdA==" 
+                crossorigin="anonymous"></script>
         <!-- https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js -->
         <script src="js/jquery.min.js"
                 integrity="sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs"
@@ -48,7 +50,9 @@
         <script src="js/jsQR.min.js"
                 integrity="sha512-KbmR1Et+8VJSKLeI7vJKCWY9q5ZrdU21KcHFG8OUSeI0NPQK+dkABkTs1WUYWVINZwgv8ePueskqbquPjrQNVw==" 
                 crossorigin="anonymous"></script>
-		<script src="js/qrcode-patch.js"></script>
+		<script src="js/qrcode-patch.js"
+                integrity="sha512-cd96MwJwgCLXgCRbx2dME4hfc1dJwCE9jQilPJ6FLZ70QltD6yhwEqJ8N70Bm4FQejE0aQaseVCmlJBSyE7L7Q==" 
+                crossorigin="anonymous"></script>
         <script src="js/multilang.js"
                 integrity="sha512-JGI1qSxw/rrJrAhpKQxa5c/rhfxjlFtktrF9bC4bKCxk+jT0yqo/V+bnJN1bIVMJAF1E7dhOnnpXl+MoZCBd1Q==" 
                 crossorigin="anonymous"></script>
@@ -65,7 +69,7 @@
         <script src="js/socket.io.min.js"
                 integrity="sha512-8ExARjWWkIllMlNzVg7JKq9RKWPlJABQUNq6YvAjE/HobctjH/NA+bSiDMDvouBVjp4Wwnf1VP1OEv7Zgjtuxw==" 
                 crossorigin="anonymous"></script>
-		<script src="js/wallet.js" defer></script>
+
         <title>Wallet</title>
         <meta name="description" content="Bitweb Web Wallet">
     </head>
@@ -516,5 +520,8 @@
                 <span class="fa-brands fa-github"></span> <a target="_blank" rel="noopener noreferrer" href="https://github.com/bitweb-project/web-wallet">Bitweb</a>
             </div>
         </footer>
+        <script src="js/wallet.js"
+            integrity="sha512-b8+GcBUyexOhAeZSpBxSC66y+zowrcl5vU7vyToWQ/u/vZwpWWtQqnO8tQ1gE+jHMM+dVH12bKvSVlXfKFpQ9g==" 
+            crossorigin="anonymous"></script>
     </body>
 </html>
