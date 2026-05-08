@@ -8,7 +8,7 @@
         <meta http-equiv="Content-Security-Policy" content="
             default-src 'self';
             script-src 'self';
-            style-src 'self' 'unsafe-inline';
+            style-src 'self';
             connect-src 'self' https://api.bitwebcore.net wss://api.bitwebcore.net;
             img-src 'self' data: blob:;
             media-src blob:;
@@ -67,7 +67,7 @@
         <link rel="stylesheet" href="css/style.css"/>
         <!-- https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js -->
         <script src="js/socket.io.min.js"
-                integrity="sha512-8ExARjWWkIllMlNzVg7JKq9RKWPlJABQUNq6YvAjE/HobctjH/NA+bSiDMDvouBVjp4Wwnf1VP1OEv7Zgjtuxw=="
+                integrity="sha512-T+uLXT2URMI6pgBMVWQEq3Hu2Lpojs4FPJ05AUpDmL3wnvMIZjMn+dpr0LN6vgb7hGZ5soKffe//enOv/7zNyA=="
                 crossorigin="anonymous"></script>
         <title>Wallet</title>
         <meta name="description" content="Bitweb Web Wallet">
@@ -162,7 +162,7 @@
                                                 <button class="btn btn-outline-secondary seed-wlen-btn" data-len="128" type="button">12 words</button>
                                             </div>
                                         </div>
-                                        <div id="seed-word-grid" class="mb-2 p-2 border rounded bg-body-secondary" style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;font-size:13px"></div>
+                                        <div id="seed-word-grid" class="mb-2 p-2 border rounded bg-body-secondary"></div>
                                         <div class="alert alert-warning small py-2 mb-2" id="seed-generate-warning" tkey="seed-write-warning">⚠️ Write these words down in order and store them safely. Anyone with these words controls your funds.</div>
                                         <div class="d-flex gap-2 align-items-center">
                                             <button class="btn btn-sm btn-danger" id="seed-create-cancel1" type="button" tkey="cancel">Cancel</button>
@@ -187,7 +187,7 @@
                                     <small class="text-muted fw-semibold d-block mb-2" tkey="seed-restore-title">Restore from Seed Phrase</small>
                                     <div class="d-flex align-items-center gap-2 mb-2">
                                         <label class="small text-nowrap mb-0" tkey="seed-word-count">Word count:</label>
-                                        <select id="restore-wordcount" class="form-select form-select-sm" style="max-width:100px">
+                                        <select id="restore-wordcount" class="form-select form-select-sm">
                                             <option value="24">24 words</option>
                                             <option value="12">12 words</option>
                                         </select>
@@ -270,9 +270,9 @@
                             <div class="text-center">
                                 <div class="tab-item" data-tab="wallet-balance">
                                     <div id="qr-code-addres" class="qr-code"></div>
-                                    <div class="d-inline-flex align-items-center justify-content-center" style="gap:5px;max-width:100%">
-                                        <div id="wallet-address" class="break-word" style="font-size:13px;word-break:break-all"></div>
-                                        <button id="copy-address-btn" class="btn btn-sm btn-outline-secondary flex-shrink-0" data-tkey-title="copy-address" title="Copy address" style="padding:1px 7px;font-size:12px;line-height:1.6">
+                                    <div class="d-inline-flex align-items-center justify-content-center address-display-wrapper">
+                                        <div id="wallet-address" class="break-word"></div>
+                                        <button id="copy-address-btn" class="btn btn-sm btn-outline-secondary flex-shrink-0" data-tkey-title="copy-address" title="Copy address">
                                             <span class="fa-solid fa-copy"></span>
                                         </button>
                                     </div>
@@ -299,7 +299,7 @@
                                         </b>
                                     </span>
                                     <div id="immature-balance-row" class="d-none mt-1">
-                                        <span class="text-warning" style="font-size:12px">
+                                        <span class="text-warning immature-balance-label">
                                             <span class="fa-solid fa-lock"></span>
                                             <span tkey="immature-mining">Immature (mining):</span>
                                             <b class="immature-amount"></b>
@@ -330,12 +330,12 @@
                                                                             <button class="btn btn-primary b-width" type="submit" id="send-tx" tkey="send" disabled></button>
                                 </div>
                                 <div class="mt-2">
-                                    <a href="#" id="coin-control-toggle" class="text-muted small" style="text-decoration:none">
+                                    <a href="#" id="coin-control-toggle" class="text-muted small">
                                         <span class="fa-solid fa-sliders"></span>
                                         <span id="coin-control-toggle-text" tkey="coin-control">Coin Control</span>
                                     </a>
                                 </div>
-                                <div id="coin-control-panel" class="d-none mt-2 border rounded p-2" style="font-size:12px">
+                                <div id="coin-control-panel" class="d-none mt-2 border rounded p-2">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                         <div>
                                             <input type="checkbox" id="coin-control-enable">
@@ -343,11 +343,11 @@
                                         </div>
                                         <a href="#" id="coin-control-select-all" class="text-primary small" tkey="coin-control-select-all">Select all mature</a>
                                     </div>
-                                    <div id="coin-control-list" class="table-responsive" style="max-height:200px;overflow-y:auto">
+                                    <div id="coin-control-list" class="table-responsive">
                                         <table class="table table-sm table-borderless mb-0" id="coin-control-table">
                                             <thead>
                                                 <tr>
-                                                    <th style="width:28px"></th>
+                                                    <th class="cc-th-check"></th>
                                                     <th tkey="amount">Amount</th>
                                                     <th tkey="coin-control-confs">Confs</th>
                                                     <th tkey="coin-control-type">Type</th>
@@ -370,8 +370,8 @@
                                     </div>
                                     <div id="wallet-keys-privkey">
                                         <label tkey="private-key"></label>
-                                        <div class="d-flex align-items-center pb-2" style="gap:4px">
-                                            <input id="wallet-privkey-input" type="password" readonly autocomplete="off" class="form-control font-monospace" style="flex:1 1 auto">
+                                        <div class="d-flex align-items-center pb-2 privkey-row">
+                                            <input id="wallet-privkey-input" type="password" readonly autocomplete="off" class="form-control font-monospace">
                                             <button id="wallet-privkey-copy-btn" class="btn btn-outline-secondary flex-shrink-0 d-none" type="button" title="Copy"><span class="fa-solid fa-copy"></span></button>
                                             <button id="toggle-wallet-privkey" class="btn btn-primary flex-shrink-0 b-width" type="button" tkey="show"></button>
                                         </div>
@@ -388,7 +388,7 @@
                                             <button id="btn-show-seed" class="btn btn-outline-warning btn-sm w-100" type="button" tkey="seed-show-btn">🌱 Show Seed Phrase (requires PIN)</button>
                                         </div>
                                         <div id="wallet-seed-revealed" class="d-none">
-                                            <div id="wallet-seed-grid" class="p-2 border rounded bg-body-secondary mb-2" style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;font-size:13px"></div>
+                                            <div id="wallet-seed-grid" class="p-2 border rounded bg-body-secondary mb-2"></div>
                                             <div class="d-flex gap-2">
                                                 <button id="btn-copy-seed" class="btn btn-sm btn-outline-secondary" type="button"><span class="fa-solid fa-clipboard"></span> <span tkey="seed-copy">Copy</span></button>
                                                 <button id="btn-hide-seed" class="btn btn-sm btn-outline-secondary ms-auto" type="button" tkey="seed-hide-btn">🔒 Hide</button>
@@ -423,7 +423,7 @@
                                     </div>
                                 </div>
                             <div class="tab-item d-none" data-tab="wallet-history">
-                                <div style="overflow:hidden">
+                                <div class="history-overflow">
                                     <div id="history-list">
                                         <div class="text-muted text-center py-3 small" tkey="history-loading">Loading history…</div>
                                     </div>
@@ -511,7 +511,7 @@
         </div>
         <div class="disclaimer mb-3">
             <div class="container text-center">
-                <small class="text-muted" style="max-width: 1100px;" tkey="disclaimer"></small>
+                <small class="text-muted" tkey="disclaimer"></small>
             </div>
         </div>
         <footer class="mb-3">
@@ -520,7 +520,7 @@
             </div>
         </footer>
         <script src="js/wallet.js"
-                integrity="sha512-VF+1lj3SFDJHv92IyJQKnL06yTmCH7OVqH5BKKVcbh+5h8Q5zqSi2gR2aGhJepExqGGo1EggDm0mkKSrNBaQ8Q=="
+                integrity="sha512-83m65i0itNwMrobEtefUchAEO2kBDIRxP6W7fT6pLaxd/0v9iSUtHho5Pm+IPz3P9qZhzzEFX93pj4bYksVKzQ=="
                 crossorigin="anonymous"></script>
     </body>
 </html>

@@ -970,20 +970,20 @@
             var amt = (tx.amount != null) ? amountFormat(tx.amount) : '?'
             var dirLabel
             if (dir === 'in') {
-                dirLabel = '<span class="font-weight-bold text-success" style="min-width:110px;display:inline-block">&#x2193; +' + escHtml(String(amt)) + ' ' + escHtml(ticker) + '</span>'
+                dirLabel = '<span class="font-weight-bold text-success tx-dir-label">&#x2193; +' + escHtml(String(amt)) + ' ' + escHtml(ticker) + '</span>'
             } else if (dir === 'out') {
-                dirLabel = '<span class="font-weight-bold text-danger"  style="min-width:110px;display:inline-block">&#x2191; -' + escHtml(String(amt)) + ' ' + escHtml(ticker) + '</span>'
+                dirLabel = '<span class="font-weight-bold text-danger tx-dir-label">&#x2191; -' + escHtml(String(amt)) + ' ' + escHtml(ticker) + '</span>'
             } else if (dir === 'self') {
-                dirLabel = '<span class="font-weight-bold text-info"    style="min-width:110px;display:inline-block">&#x21C5; '  + escHtml(String(amt)) + ' ' + escHtml(ticker) + '</span>'
+                dirLabel = '<span class="font-weight-bold text-info tx-dir-label">&#x21C5; '  + escHtml(String(amt)) + ' ' + escHtml(ticker) + '</span>'
             } else {
-                dirLabel = '<span class="text-muted"                    style="min-width:110px;display:inline-block">— ? '       + escHtml(ticker) + '</span>'
+                dirLabel = '<span class="text-muted tx-dir-label">— ? '       + escHtml(ticker) + '</span>'
             }
             var safeHash  = escHtml(tx.tx_hash || '')
             var txUrl     = escHtml(blockExplorer.tx(tx.tx_hash || ''))
             var shortHash = safeHash.substr(0, 10) + '…' + safeHash.substr(-6)
-            html += '<div class="history-item d-flex align-items-center border-bottom" style="gap:6px">' +
+            html += '<div class="history-item d-flex align-items-center border-bottom history-item-inner">' +
                 dirLabel +
-                '<div class="font-monospace text-truncate flex-grow-1" style="font-size:11px">' +
+                '<div class="font-monospace text-truncate flex-grow-1 history-tx-hash">' +
                     '<a href="' + txUrl + '" target="_blank" rel="noopener noreferrer">' + shortHash + '</a>' +
                 '</div>' +
                 '<div class="flex-shrink-0">' + confBadge + '</div>' +
@@ -1886,8 +1886,8 @@
             words.forEach(function(w, i) {
                 $g.append(
                     '<div class="border rounded px-1 py-1 text-center">' +
-                    '<span class="text-muted d-block" style="font-size:10px;line-height:1">' + (i + 1) + '</span>' +
-                    '<strong style="font-size:12px">' + escHtml(w) + '</strong></div>'
+                    '<span class="text-muted d-block seed-word-num-label">' + (i + 1) + '</span>' +
+                    '<strong class="seed-word-text">' + escHtml(w) + '</strong></div>'
                 )
             })
         }
@@ -1937,7 +1937,7 @@
             pos.forEach(function(p) {
                 $fields.append(
                     '<div class="input-group input-group-sm mb-2">' +
-                    '<span class="input-group-text" style="min-width:3rem">' + getText('seed-word-num') + ' ' + (p + 1) + '</span>' +
+                    '<span class="input-group-text seed-verify-num">' + getText('seed-word-num') + ' ' + (p + 1) + '</span>' +
                     '<input type="text" class="form-control font-monospace seed-verify-word" data-pos="' + p + '" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">' +
                     '</div>'
                 )
