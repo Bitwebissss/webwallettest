@@ -129,20 +129,6 @@
             buf.fill(0);
             return hex;
         }
-        // BIP341 key-path signer.
-        // Returns { signer, _rawD, _effectiveD, _tweakedD } — caller MUST wipe _* fields
-        // in a finally-block regardless of success/failure.
-        //
-        // Algorithm (BIP341 §4.4):
-        //   1. xOnlyPub  = pubkey[1..33]  (drop 0x02/0x03 prefix)
-        //   2. tweak     = taggedHash('TapTweak', xOnlyPub)
-        //   3. effectiveD = (y(P) is odd) ? privateNegate(d) : d   — lift to even-y point
-        //   4. tweakedD  = privateAdd(effectiveD, tweak) mod n
-        //   5. signer.publicKey = xOnlyPub  — matches tapInternalKey stored in PSBT input
-        //   6. signer.signSchnorr(hash) signs with tweakedD  (BIP340 Schnorr)
-        //
-        // Source of public key: keyPair.publicKey (33-byte compressed, from Keystore closure).
-        // The x-only form is always pubkey.slice(1) — prefix byte carries only parity info.
         function _makeTaprootSigner() {
             var ecc = bitcoin.ecc;
             if (!ecc || typeof ecc.privateAdd !== 'function' ||
@@ -151,66 +137,36 @@
                         typeof ecc.xOnlyPointAddTweak !== 'function') {
                 throw new Error('bitcoin.ecc unavailable — rebuild bundle (see BUILDBitcoinjs.md)');
             }
-
-            // x-only internal key = drop parity prefix byte (32 bytes)
             var xOnlyPub = keyPair.publicKey.slice(1);
-
-            // TapTweak = taggedHash('TapTweak', xOnlyPub)  — pure function, no key material
             var tweak = bitcoin.crypto.taggedHash('TapTweak', xOnlyPub);
-
-            // Copies of sensitive material — zeroed in finally of every call-site
-            var rawD      = new Uint8Array(keyPair.privateKey);  // copy, never a reference
+            var rawD      = new Uint8Array(keyPair.privateKey);
             var effectiveD = null;
             var tweakedD   = null;
-
             try {
-                // BIP341: parity of y(P) determines whether to negate before adding tweak.
-                // Compressed pubkey prefix 0x03 = odd y  →  negate d.
                 var oddY = (keyPair.publicKey[0] === 0x03);
                 effectiveD = oddY ? ecc.privateNegate(rawD) : new Uint8Array(rawD);
-
-                // tweakedD = (effectiveD + tweak) mod n
                 tweakedD = ecc.privateAdd(effectiveD, tweak);
                 if (!tweakedD) throw new Error('Taproot tweak produced an invalid private key');
-
-                // Compute tweaked OUTPUT public key (32-byte x-only).
-                // bitcoinjs-lib v7 PSBT signInput() calls tapKeyPubkeyValidator (bip371.ts)
-                // which computes xOnlyPointAddTweak(tapInternalKey) and compares it to
-                // signer.publicKey. If we pass the raw internal key here, the comparison
-                // fails, signInput() skips signing, tapKeySig is never set, and
-                // finalizeAllInputs() throws — which the caller's .catch shows as bad-utxo.
                 var tweakedPubResult = ecc.xOnlyPointAddTweak(xOnlyPub, tweak);
                 if (!tweakedPubResult) throw new Error('Taproot xOnlyPointAddTweak failed');
                 var tweakedXOnly = tweakedPubResult.xOnlyPubkey;
-
-                // Capture in local var so the closure cannot be confused by re-assignment
                 var _td = tweakedD;
-
                 var signer = {
-                    // Must be the tweaked OUTPUT x-only key (32 bytes), NOT the internal key.
-                    // v7 PSBT matches this against xOnlyPointAddTweak(tapInternalKey).
                     publicKey: tweakedXOnly,
-
-                    // Called by psbt.signInput for taproot key-path inputs (BIP340 Schnorr).
                     signSchnorr: function(hash) {
                         return ecc.signSchnorr(hash, _td);
                     }
                 };
-
                 return { signer: signer, _rawD: rawD, _effectiveD: effectiveD, _tweakedD: tweakedD };
             } catch (e) {
-                // Wipe on construction error before re-throwing
                 if (rawD)      rawD.fill(0);
                 if (effectiveD) effectiveD.fill(0);
                 if (tweakedD)  tweakedD.fill(0);
                 throw e;
             }
         }
-
         function signAllInputs(psbt) {
             if (!keyPair) throw new Error('Wallet locked');
-
-            // Fast path: no taproot inputs — plain ECDSA, no extra key material needed.
             var hasTaproot = psbt.data.inputs.some(function(inp) {
                 return inp.tapInternalKey && inp.tapInternalKey.length === 32;
             });
@@ -218,8 +174,6 @@
                 psbt.signAllInputs(keyPair);
                 return;
             }
-
-            // Taproot present: build tweaked signer once, wipe in finally no matter what.
             var tapMaterial = null;
             try {
                 tapMaterial = _makeTaprootSigner();
@@ -227,15 +181,12 @@
 
                 psbt.data.inputs.forEach(function(inp, idx) {
                     if (inp.tapInternalKey && inp.tapInternalKey.length === 32) {
-                        // Key-path spend: tweaked Schnorr signer
                         psbt.signInput(idx, tapSigner);
                     } else {
-                        // Legacy / SegWit input in mixed transaction: plain ECDSA
                         psbt.signInput(idx, keyPair);
                     }
                 });
             } finally {
-                // Zero all intermediate private key copies regardless of success/failure.
                 if (tapMaterial) {
                     if (tapMaterial._rawD)       tapMaterial._rawD.fill(0);
                     if (tapMaterial._effectiveD) tapMaterial._effectiveD.fill(0);
@@ -373,9 +324,6 @@
     var STORAGE_KEY_PRIV = 'bte_wallet_privkey';
     var STORAGE_KEY_SEED = 'bte_wallet_seed';
     var STORAGE_KEY_PATH = 'bte_wallet_path';
-    // Passkey (WebAuthn PRF) duplicates — encrypted with PRF output instead of PIN
-    // Passkey is considered ENABLED iff BOTH bte_pk_credential_id AND bte_wallet_privkey_pk exist.
-    // No separate flag — presence of encrypted data IS the indicator (tamper-proof by design).
     var STORAGE_KEY_PUB_PK   = 'bte_wallet_pubkey_pk';
     var STORAGE_KEY_PRIV_PK  = 'bte_wallet_privkey_pk';
     var STORAGE_KEY_SEED_PK  = 'bte_wallet_seed_pk';
@@ -422,8 +370,6 @@
             return null;
         }
     }
-    // ── Passkey helpers: encrypt / decrypt using raw 32-byte PRF key ────────────
-    // No PBKDF2 needed — PRF output is already full-entropy.
     async function saveEncryptedWithKey(storageKey, plaintext, keyBytes) {
         var iv  = crypto.getRandomValues(new Uint8Array(12));
         var key = await crypto.subtle.importKey(
@@ -454,8 +400,6 @@
             return result;
         } catch(e) { return null; }
     }
-    // ── Bytes-only variants — NO TextDecoder, NO hex strings in memory ───────
-    // Returns raw decrypted bytes (Uint8Array). Caller MUST .fill(0) after use.
     async function loadEncryptedBytes(storageKey, pin) {
         var raw = localStorage.getItem(storageKey);
         if (!raw) return null;
@@ -467,11 +411,9 @@
                 key,
                 new Uint8Array(blob.data)
             );
-            return new Uint8Array(pt);  // caller must .fill(0)
+            return new Uint8Array(pt);
         } catch(e) { return null; }
     }
-    // Encrypt raw bytes (Uint8Array) with PRF key — no string encoding.
-    // Data format identical to saveEncryptedWithKey, fully backward-compatible.
     async function saveEncryptedWithKeyBytes(storageKey, plaintextBytes, keyBytes) {
         var iv  = crypto.getRandomValues(new Uint8Array(12));
         var key = await crypto.subtle.importKey(
@@ -483,7 +425,6 @@
             data: Array.from(new Uint8Array(ct))
         }));
     }
-    // Returns raw decrypted bytes (Uint8Array) via PRF key. Caller MUST .fill(0) after use.
     async function loadEncryptedBytesWithKey(storageKey, keyBytes) {
         var raw = localStorage.getItem(storageKey);
         if (!raw) return null;
@@ -495,11 +436,9 @@
             var pt = await crypto.subtle.decrypt(
                 { name: 'AES-GCM', iv: new Uint8Array(blob.iv) }, key, new Uint8Array(blob.data)
             );
-            return new Uint8Array(pt);  // caller must .fill(0)
+            return new Uint8Array(pt);
         } catch(e) { return null; }
     }
-    // Hex-decode ASCII bytes (Uint8Array of hex char codes) → raw bytes without creating a string.
-    // Input must be even-length ASCII hex. Caller must .fill(0) both arrays.
     function _hexBytesToRaw(hexBytes) {
         function nibble(c) {
             if (c >= 48 && c <= 57)  return c - 48;        // '0'–'9'
@@ -513,10 +452,7 @@
         }
         return out;
     }
-    // ── Passkey state helpers ─────────────────────────────────────────────────
     function isPasskeyEnabled() {
-        // Enabled iff BOTH credential ID and encrypted private key blob exist.
-        // No separate flag — setting bte_pass_key='1' in devtools does nothing without the blobs.
         try {
             return localStorage.getItem(STORAGE_KEY_PK_ID)   !== null &&
                    localStorage.getItem(STORAGE_KEY_PRIV_PK) !== null;
@@ -532,18 +468,14 @@
         if (!window.PublicKeyCredential) return false;
         return !!(navigator.credentials && navigator.credentials.create);
     }
-    // PRF salt — deterministic string, same on every call
     var _PK_PRF_SALT = new TextEncoder().encode('bitweb-wallet-v1');
-    // Convert rawId (ArrayBuffer) to base64 string for storage
     function _credIdToB64(rawId) {
         return btoa(String.fromCharCode.apply(null, new Uint8Array(rawId)));
     }
     function _b64ToCredId(b64) {
         return Uint8Array.from(atob(b64), function(c) { return c.charCodeAt(0); });
     }
-    // ── Enable passkey ────────────────────────────────────────────────────────
     async function pkEnable() {
-        // 1. Confirm identity with PIN: decrypt only pub key (single PBKDF2), error in #pin-error
         var pkEnableValidator = async function(candidate) {
             var pub = await loadEncrypted(STORAGE_KEY_PUB, candidate);
             if (!pub) return getText('pin-login-error') || 'Wrong PIN';
@@ -555,7 +487,6 @@
             pkEnableValidator, false
         );
         if (pin === null) return;
-        // PIN confirmed — load all three as raw bytes, no hex strings created in memory
         var privBytes = await loadEncryptedBytes(STORAGE_KEY_PRIV, pin);
         var pubBytes  = await loadEncryptedBytes(STORAGE_KEY_PUB,  pin);
         if (!privBytes || !pubBytes) {
@@ -566,7 +497,6 @@
         }
         var seedBytes = await loadEncryptedBytes(STORAGE_KEY_SEED, pin);
         pin = null;
-        // 2. Register a new passkey with PRF extension
         var challenge = crypto.getRandomValues(new Uint8Array(32));
         var userId    = crypto.getRandomValues(new Uint8Array(16));
         try {
@@ -602,13 +532,11 @@
                 return;
             }
             var prfBytes = new Uint8Array(ext.prf.results.first);
-            // 3. Encrypt key bytes with PRF output — no hex strings, proper fill(0) after
             await saveEncryptedWithKeyBytes(STORAGE_KEY_PRIV_PK, privBytes, prfBytes);
             await saveEncryptedWithKeyBytes(STORAGE_KEY_PUB_PK,  pubBytes,  prfBytes);
             if (seedBytes) await saveEncryptedWithKeyBytes(STORAGE_KEY_SEED_PK, seedBytes, prfBytes);
             prfBytes.fill(0);
             privBytes.fill(0); pubBytes.fill(0); if (seedBytes) seedBytes.fill(0);
-            // 4. Store credential ID — presence of this + PRIV_PK is the "enabled" signal
             localStorage.setItem(STORAGE_KEY_PK_ID, _credIdToB64(credential.rawId));
             updatePasskeyUI();
             showMessage(getText('passkey-enabled') || '🔐 Passkey enabled — you can now unlock with biometrics');
@@ -616,11 +544,10 @@
             if (privBytes) privBytes.fill(0);
             if (pubBytes)  pubBytes.fill(0);
             if (seedBytes) seedBytes.fill(0);
-            if (e.name === 'NotAllowedError') return;  // User cancelled — silent
+            if (e.name === 'NotAllowedError') return;
             showMessage((getText('passkey-error') || 'Passkey error: ') + e.message);
         }
     }
-    // ── Authenticate with passkey ──────────────────────────────────────────────
     function _isTransientPasskeyError(e) {
         if (!e || !e.message) return false;
         var m = e.message.toLowerCase();
@@ -659,9 +586,7 @@
                 showMessage(getText('passkey-decrypt-failed') || 'Passkey decryption failed — try PIN');
                 return;
             }
-            // Decode private key bytes without creating a hex string
             var privBytes = _hexBytesToRaw(privUtf8); privUtf8.fill(0);
-            // Public key: not secret — string is fine
             var pubHex = new TextDecoder().decode(pubUtf8); pubUtf8.fill(0);
             Keystore.setKeyPair(
                 bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes), { network: getConfig()['network'] })
@@ -672,8 +597,7 @@
             pubHex = '';
             openWallet(false);
         } catch(e) {
-            if (e.name === 'NotAllowedError') return;  // User cancelled — silent
-            // Auto-retry on transient platform-authenticator errors (common in Chrome/Windows Hello)
+            if (e.name === 'NotAllowedError') return;
             if (_retriesLeft > 0 && _isTransientPasskeyError(e)) {
                 await new Promise(function(r) { setTimeout(r, 300); });
                 return pkAuthenticate(_retriesLeft - 1);
@@ -681,7 +605,6 @@
             showMessage((getText('passkey-error') || 'Passkey error: ') + e.message);
         }
     }
-    // ── Shared action: wipe PK records ────────────────────────────────────────
     function _doPkDisable() {
         [STORAGE_KEY_PRIV_PK, STORAGE_KEY_PUB_PK, STORAGE_KEY_SEED_PK, STORAGE_KEY_PK_ID].forEach(function(k) {
             try { localStorage.removeItem(k); } catch(e) {}
@@ -689,9 +612,7 @@
         updatePasskeyUI();
         showMessage(getText('passkey-disabled') || 'Passkey disabled');
     }
-    // ── Disable passkey — accepts passkey OR PIN ───────────────────────────────
     async function pkDisable() {
-        // Passkey callback: authenticate with passkey to prove identity, then disable
         async function onPasskeyChosen(_retriesLeft) {
             if (_retriesLeft === undefined) _retriesLeft = 2;
             var credIdStr = null;
@@ -726,13 +647,12 @@
             getText('pin-title-default') || 'Wallet PIN',
             getText('passkey-disable-confirm') || 'Enter PIN (or use Passkey) to disable passkey',
             pkDisableValidator, false,
-            onPasskeyChosen  // shows "Use Passkey" button in modal
+            onPasskeyChosen
         );
-        if (pin === null) return;  // cancelled OR passkey path (passkey path is self-contained)
+        if (pin === null) return;
         pin = null;
         _doPkDisable();
     }
-    // ── Update all passkey-related UI ─────────────────────────────────────────
     function updatePasskeyUI() {
         updatePasskeyLoginUI();
         updatePasskeySettingsUI();
@@ -760,14 +680,12 @@
                 .removeClass('btn-outline-danger btn-success')
                 .addClass('btn-outline-primary');
         }
-        // Show/hide section only when wallet is open (settings are inside wallet-block)
         $section.removeClass('d-none');
     }
     // ─────────────────────────────────────────────────────────────────────────
     async function saveWalletWif(pin) {
         var pubkey  = globalData.pubKeyHex;
         var privHex = Keystore.getPrivKeyHex();
-        // Encrypt both in parallel — independent blobs, each gets its own salt/iv.
         await Promise.all([
             saveEncrypted(STORAGE_KEY_PUB,  pubkey,  pin),
             saveEncrypted(STORAGE_KEY_PRIV, privHex, pin)
@@ -781,7 +699,6 @@
         var privHex    = Keystore.getPrivKeyHex();
         var entropyHex = _mnemonicToEntropyHex(mnemonic);
         mnemonic = '';
-        // Encrypt all three in parallel — independent blobs.
         await Promise.all([
             saveEncrypted(STORAGE_KEY_PUB,  pubkey,     pin),
             saveEncrypted(STORAGE_KEY_PRIV, privHex,    pin),
@@ -792,7 +709,6 @@
         entropyHex = '';
     }
     async function loadWallet(pin) {
-        // Decrypt both keys in parallel — each blob has its own salt, no dependency.
         var results = await Promise.all([
             loadEncrypted(STORAGE_KEY_PUB,  pin),
             loadEncrypted(STORAGE_KEY_PRIV, pin)
@@ -829,9 +745,6 @@
             ['encrypt', 'decrypt']
         )
     }
-    // ── Entropy helpers — store seed as hex bytes, not mnemonic words ─────────
-    // Converts mnemonic string → compact hex (e.g. "abandon ability..." → "0c1e3a...")
-    // Caller must zero the mnemonic string reference after calling.
     function _mnemonicToEntropyHex(mnemonic) {
         var bytes = bip39Bundle.mnemonicToEntropy(mnemonic);
         var hex   = Array.from(bytes).map(function(b) {
@@ -840,8 +753,6 @@
         bytes.fill(0);
         return hex;
     }
-    // Converts entropyHex back → mnemonic string for display or key derivation.
-    // Caller must zero both entropyHex reference and returned mnemonic after use.
     function _entropyHexToMnemonic(entropyHex) {
         var bytes    = new Uint8Array(entropyHex.match(/../g).map(function(h) {
             return parseInt(h, 16);
@@ -911,11 +822,8 @@
         $('#wallet-seed-revealed').removeClass('d-none');
         setTimeout(_hideSeedReveal, 60000);
     }
-    // Bytes variant: entropyBytes = raw decrypted bytes (UTF-8 of entropyHex).
-    // Hex-decodes without creating a string, then fills(0) all intermediate buffers.
     function _revealSeedFromBytes(entropyBytes) {
         if (_revealedWords.length) _revealedWords.fill('');
-        // entropyBytes = UTF-8 bytes of hex string → hex-decode to raw entropy
         var rawEntropy = _hexBytesToRaw(entropyBytes);
         entropyBytes.fill(0);
         var mnemonic = bip39Bundle.entropyToMnemonic(rawEntropy);
@@ -927,12 +835,9 @@
         $('#wallet-seed-revealed').removeClass('d-none');
         setTimeout(_hideSeedReveal, 60000);
     }
-    // ─────────────────────────────────────────────────────────────────────────
     var _pinResolve          = null
     var _pinValidator        = null
-    var _pinPasskeyCallback  = null   // set by askPin when a passkey option is provided
-    // askPin — optional 5th param: async fn called when user clicks "Use Passkey" in modal.
-    // When provided and isPasskeyEnabled(), shows the #pin-modal-pk-btn button.
+    var _pinPasskeyCallback  = null
     function askPin(title, desc, validator, mandatory, onPasskeyClick) {
         return new Promise(function(resolve) {
             _pinResolve          = resolve
@@ -947,7 +852,6 @@
             } else {
                 $('#pin-cancel').removeClass('d-none')
             }
-            // Show passkey button only when a callback is provided and passkey is active
             if (onPasskeyClick && isPasskeyEnabled()) {
                 _pinPasskeyCallback = onPasskeyClick;
                 $('#pin-modal-pk-btn').removeClass('d-none');
@@ -975,9 +879,6 @@
             false
         )
         if (pin === null) return null
-
-        // Encrypt a random sentinel with the pin — blob lives only in memory.
-        // Verification on step 2 is done by decryption, never by string comparison.
         var sentinel = crypto.getRandomValues(new Uint8Array(32))
         var salt     = crypto.getRandomValues(new Uint8Array(16))
         var iv       = crypto.getRandomValues(new Uint8Array(12))
@@ -985,10 +886,7 @@
         var ct       = new Uint8Array(await crypto.subtle.encrypt(
             { name: 'AES-GCM', iv: iv }, key1, sentinel
         ))
-        pin = null  // drop reference — no pin string kept in memory beyond this point
-
-        // Async validator: tries to decrypt the sentinel — error shown INSIDE the modal,
-        // modal stays open until PIN matches or user explicitly cancels.
+        pin = null
         var confirmValidator = async function(candidate) {
             try {
                 var key2 = await deriveKey(candidate, salt)
@@ -996,21 +894,19 @@
                     { name: 'AES-GCM', iv: iv }, key2, ct
                 ))
                 pt.fill(0)
-                return null  // null = valid, modal will close
+                return null
             } catch(e) {
                 return getText('pin-mismatch') || 'PIN does not match — please try again'
             }
         }
-
         var confirmed = await askPin(
             getText('pin-confirm-title'),
             getText('pin-confirm-desc'),
             confirmValidator,
             false
         )
-
         sentinel.fill(0); ct.fill(0)
-        return confirmed  // null = user cancelled, string = confirmed PIN for wallet encryption
+        return confirmed
     }
     function initMessages() {
         return {
@@ -1360,7 +1256,6 @@
         $('#wallet-seed-revealed').addClass('d-none')
         $('#wallet-seed-grid').empty()
     }
-    // ── Render seed words as canvas cells (used by both new-seed flow and _revealSeed) ──
     function seedRenderGrid(words, containerId) {
         var $g = $(containerId).empty();
         var cs       = getComputedStyle(document.body);
@@ -1433,9 +1328,6 @@
         $('#send-fee').attr('placeholder', getText('fee') + ' (' + getText('recommended') + ' ' + globalData.rfee + ' ' + getConfig()['ticker'] + ')');
         showQrAddress(getConfig()['uri'] + globalData.address);
         TxHistory.renderHistory(TxHistory.loadHistory());
-        // Show cached UTXO data immediately so the user never sees "0" while
-        // the WebSocket connection is being established (~1 s round-trip).
-        // The live balance_changed event will overwrite this as soon as it arrives.
         var _cached = loadUtxoCache(globalData.address);
         if (_cached && Array.isArray(_cached.utxos)) {
             var _ch = _cached.height || 0;
@@ -1446,7 +1338,6 @@
                     blocksLeft: blocksToMature(u, _ch)
                 });
             });
-            // Use the stored balance if available, otherwise sum UTXOs
             globalData.balance = _cached.balance != null
                 ? _cached.balance
                 : globalData.utxos.reduce(function(s, u) { return s + u.value; }, 0);
@@ -1473,7 +1364,6 @@
             }
             globalData.pubKeyHex = Keystore.getPublicKeyHex();
             globalData.pubKey    = new Uint8Array(Keystore.getPublicKeyBytes());
-
             if (bip39Mnemonic) {
                 await saveWalletBip39(bip39Mnemonic, pin, derivPath);
             } else {
@@ -1489,7 +1379,6 @@
         globalData.scriptHex      = Keystore.getScriptHex(getAddressType(), globalData.pubKey);
         globalData.allScriptHexes = Keystore.getAllScriptHexes(globalData.pubKey);
         globalData.allAddresses   = Keystore.getAllAddresses(globalData.pubKey);
-
         _showWalletUI();
         wsConnect();
         setHomeTitle();
@@ -1883,13 +1772,18 @@
         var outputsSats = 0
         var allFilled   = true
         var allAmtOk    = true
+        var allAddrOk   = true
         $.each($('#send-outputs .send-outputs-item'), function(_, item) {
-            var address = $('[name="send-address"]', item).val().trim()
-            var amtStr  = $('[name="send-ammount"]', item).val().trim()
-            var amtSats = parseAmountSats(amtStr)
+            var $addrInput = $('[name="send-address"]', item)
+            var address    = $addrInput.val().trim()
+            var amtStr     = $('[name="send-ammount"]', item).val().trim()
+            var amtSats    = parseAmountSats(amtStr)
+            var addrOk     = address !== '' && validateAddress(address)
             if (!address || !amtStr) allFilled = false
             if (!amtSats || amtSats <= 0) allAmtOk = false
+            if (address !== '' && !addrOk) allAddrOk = false
             if (amtSats && amtSats > 0) outputsSats += amtSats
+            $addrInput.toggleClass('is-invalid', address !== '' && !addrOk)
         })
         var feeOk     = feeSats !== null && feeSats > 0 && feeSats >= (minFeeSats || 0)
         var totalSats = outputsSats + (feeSats || 0)
@@ -1904,7 +1798,7 @@
             spendableSats = globalData.balance - globalData.immatureBalance
         }
         var overLimit = totalSats > spendableSats && totalSats > 0
-        var canSend   = allFilled && allAmtOk && feeOk && !overLimit && totalSats > 0
+        var canSend   = allFilled && allAmtOk && allAddrOk && feeOk && !overLimit && totalSats > 0
         $('#send-tx').prop('disabled', !canSend)
         $('#wallet-send .wallet-balance').toggleClass('text-danger', overLimit)
         var feeTyped = $('#send-fee').val() !== ''
@@ -1915,7 +1809,6 @@
             $(this).toggleClass('is-invalid', typed && (!amtSats || amtSats <= 0 || overLimit))
         })
     }
-    // ─────────────────────────────────────────────────────────────────────
     $(document).ready(function() {
         initLang()
         $(document).on('click', '.theme-option', function(e) {
@@ -1978,12 +1871,8 @@
                 }
                 modalEl.addEventListener('hidden.bs.modal', onHidden)
             }
-            // Must call hide AFTER registering the hidden.bs.modal listener,
-            // otherwise the event fires before the listener is attached and
-            // the promise never resolves (button stays disabled indefinitely).
             $('#pin-modal').modal('hide')
         })
-        // ── Passkey button inside pin-modal ───────────────────────────────────
         $('#pin-modal-pk-btn').click(function() {
             var cb = _pinPasskeyCallback;
             _pinPasskeyCallback = null;
@@ -1996,8 +1885,8 @@
                 var modalEl   = document.getElementById('pin-modal');
                 function onHidden() {
                     modalEl.removeEventListener('hidden.bs.modal', onHidden);
-                    resolve(null);   // resolve askPin promise as "cancelled"
-                    if (cb) cb();    // then fire passkey action (async, self-contained)
+                    resolve(null);
+                    if (cb) cb();
                 }
                 modalEl.addEventListener('hidden.bs.modal', onHidden);
                 $('#pin-modal').modal('hide');
@@ -2006,8 +1895,6 @@
         $('#pin-input').on('keydown', function(e) {
             if (e.key === 'Enter') $('#pin-confirm').click()
         })
-        // CapsLock warning — getModifierState not available on most mobile keyboards,
-        // graceful no-op in that case
         $(document).on('keyup keydown', '#pin-input, #pin-login-input', function(e) {
             var capsOn = (e.originalEvent && e.originalEvent.getModifierState)
                 ? e.originalEvent.getModifierState('CapsLock')
@@ -2023,12 +1910,8 @@
                 return;
             }
             $('#pin-login-btn').prop('disabled', true).text(getText('loading'));
-            // Yield one frame so the browser repaints the disabled/loading state
-            // before PBKDF2 starts (even though WebCrypto is off-thread, the
-            // synchronous bookkeeping before it can delay the repaint).
             await new Promise(function(r) { setTimeout(r, 50); });
             try {
-                // Decrypt pub (for address) and priv (for Keystore) as raw bytes — no hex string
                 var pubHex      = await loadEncrypted(STORAGE_KEY_PUB, pin);
                 var privRawBytes = await loadEncryptedBytes(STORAGE_KEY_PRIV, pin);
                 $('#pin-login-btn').prop('disabled', false).text(getText('pin-login-btn'));
@@ -2041,7 +1924,6 @@
                 }
                 $('#pin-login-error').addClass('d-none');
                 $('#pin-login-input').val('');
-                // privRawBytes = UTF-8 bytes of privHex → decode to actual key bytes without string
                 var privBytes = _hexBytesToRaw(privRawBytes); privRawBytes.fill(0);
                 Keystore.setKeyPair(
                     bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes), { network: getConfig()['network'] })
@@ -2060,12 +1942,10 @@
         }
         $('#pin-login-btn').click(doPinLogin)
         $('#pin-login-input').on('keydown', function(e) { if (e.key === 'Enter') doPinLogin() })
-        // ── Passkey login button ───────────────────────────────────────────────
         $('#pk-login-btn').click(function(e) {
             e.preventDefault();
             pkAuthenticate();
         });
-        // ── Passkey toggle in settings ─────────────────────────────────────────
         $(document).on('click', '#passkey-settings-btn', function(e) {
             e.preventDefault();
             if (isPasskeyEnabled()) {
@@ -2181,7 +2061,6 @@
                 validateSendForm()
             }, 0)
         })
-        // ─────────────────────────────────────────────────────────────────────
         $('#open-key-form').submit(function(e) {
             var wif = $('#passphrase').val().trim();
             if ([51, 52].includes(wif.length)) {
@@ -2238,7 +2117,6 @@
         $('#toggle-wallet-privkey').click(async function() {
             if ($(this).text() == getText('show')) {
                 if (!Keystore.isUnlocked()) return;
-                // ── Require PIN (or passkey) before revealing private key ──────
                 async function onPasskeyChosen(_retriesLeft) {
                     if (_retriesLeft === undefined) _retriesLeft = 2;
                     var credIdStr = null;
@@ -2259,7 +2137,6 @@
                             showMessage(getText('passkey-prf-unsupported') || 'PRF not available');
                             return;
                         }
-                        // PRF succeeded — identity confirmed, show privkey
                         revealPrivKeyInput(Keystore.getWIF());
                         $('#wallet-privkey-copy-btn').removeClass('d-none');
                         $('#toggle-wallet-privkey').text(getText('hide'));
@@ -2294,7 +2171,6 @@
                 revealPrivKeyInput(Keystore.getWIF());
                 $('#wallet-privkey-copy-btn').removeClass('d-none');
                 $('#toggle-wallet-privkey').text(getText('hide'));
-                // Auto-hide after 60 s
                 setTimeout(function() {
                     clearPrivKeyInput();
                     $('#wallet-privkey-copy-btn').addClass('d-none');
@@ -2427,24 +2303,20 @@
             initLang();
             var _ct; try { _ct = localStorage.getItem('bte_cfg_theme'); } catch(e) {}
             applyTheme(_ct || 'auto');
-            // Re-translate any live dynamic UI that isn't covered by tkey attributes
             updatePasskeyUI();
             updateSavedWalletUI();
             if (Keystore.isUnlocked()) {
                 setHomeTitle();
                 TxHistory.renderHistory(TxHistory.loadHistory());
                 if (!$('#coin-control-panel').hasClass('d-none')) renderCoinControl();
-                // Re-translate toggle-wallet-privkey button text based on current state
                 var $togBtn = $('#toggle-wallet-privkey');
                 if ($togBtn.length) {
                     var isShowing = $('#wallet-privkey-input').attr('type') === 'text';
                     $togBtn.text(isShowing ? getText('hide') : getText('show'));
                 }
-                // Re-translate fee placeholder (#send-fee has no tkey -- set programmatically)
                 $('#send-fee').attr('placeholder',
                     getText('fee') + ' (' + getText('recommended') + ' ' + globalData.rfee + ' ' + getConfig()['ticker'] + ')'
                 );
-                // Re-translate coin-control toggle: initLang() strips the open-state suffix '▲'
                 var _ccOpen = !$('#coin-control-panel').hasClass('d-none');
                 if (_ccOpen) $('#coin-control-toggle-text').text(getText('coin-control') + ' ▲');
             }
@@ -2457,7 +2329,6 @@
         $('#copy-address-btn').click(function() {
             if (globalData.address) copyToClipboard(globalData.address, $(this))
         })
-        // seedRenderGrid is defined at module scope — accessible here too
         $('#seed-btn-create').click(function() {
             $('#seed-entry').addClass('d-none')
             $('#seed-create').removeClass('d-none')
@@ -2503,7 +2374,6 @@
             }
             var third = Math.floor(len / 3);
             var pos = [rnd(0, third - 1), rnd(third, third * 2 - 1), rnd(third * 2, len - 1)];
-
             try {
                 _seedState.verifyHashes = await Promise.all(pos.map(async function(p) {
                     var salt = crypto.getRandomValues(new Uint8Array(16));
@@ -2546,16 +2416,11 @@
         $('#seed-verify-confirm').click(async function() {
             var $btn = $(this).prop('disabled', true);
             var inputs = $('.seed-verify-word');
-
-            // Guard: verifyHashes must be non-empty. An empty array means either
-            // clearSeedState() was called or a previous failed attempt already zeroed
-            // them (old bug). Either way, verification cannot proceed.
             if (!_seedState.verifyHashes.length) {
                 $('#seed-verify-error').removeClass('d-none');
                 $btn.prop('disabled', false);
                 return;
             }
-
             var ok = true;
             try {
                 for (var i = 0; i < _seedState.verifyHashes.length; i++) {
@@ -2574,16 +2439,11 @@
                     if (diff !== 0) { ok = false; break; }
                 }
             } catch(e) { ok = false; }
-
-            // Do NOT zero verifyHashes on failure — user must be able to retry
-            // with the correct words. Hashes are zeroed below only on success.
             if (!ok) {
                 $('#seed-verify-error').removeClass('d-none');
                 $btn.prop('disabled', false);
                 return;
             }
-
-            // Verification passed — zero hashes now, before any async work.
             _seedState.verifyHashes = [];
             $('#seed-verify-error').addClass('d-none');
             try {
@@ -2594,18 +2454,14 @@
                 ));
                 _seedState.enc = null;
                 _seedState.tempKey = null;
-
                 var mnemonic = new TextDecoder().decode(pt);
                 pt.fill(0);
-
                 var privBytes = bip39Bundle.mnemonicToPrivKey(mnemonic, DEFAULT_DERIV_PATH);
                 var keyPair = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes));
                 privBytes.fill(0);
                 Keystore.setKeyPair(keyPair);
                 await openWallet(true, mnemonic, DEFAULT_DERIV_PATH);
                 mnemonic = '';
-                // Immediately zero entered verify-words and remove them from DOM.
-                // Must happen here — do not rely on closeWallet/forgetSavedWallet.
                 inputs.each(function() { this.value = ''; });
                 seedReset();
                 $btn.prop('disabled', false);
@@ -2652,7 +2508,6 @@
         });
         $('#btn-show-seed').click(async function() {
             if (!hasSeedBackup()) return;
-            // Passkey path for seed — decrypt from _pk record using PRF
             async function onPasskeyChosen(_retriesLeft) {
                 if (_retriesLeft === undefined) _retriesLeft = 2;
                 var credIdStr = null;
@@ -2681,10 +2536,8 @@
                         return;
                     }
                     _revealSeedFromBytes(seedBytes);
-                    // seedBytes.fill(0) done inside _revealSeedFromBytes
                 } catch(e) {
                     if (e.name === 'NotAllowedError') return;
-                    // Auto-retry on transient platform-authenticator errors
                     if (_retriesLeft > 0 && _isTransientPasskeyError(e)) {
                         await new Promise(function(r) { setTimeout(r, 300); });
                         return onPasskeyChosen(_retriesLeft - 1);
@@ -2695,7 +2548,6 @@
             var title         = getText('seed-pin-modal-title');
             var desc          = getText('seed-pin-modal-desc');
             var canUsePasskey = isPasskeyEnabled() && hasSeedPkBackup();
-            // Validator: check PIN via pub key only (single PBKDF2), error in modal
             var seedPinValidator = async function(candidate) {
                 var pub = await loadEncrypted(STORAGE_KEY_PUB, candidate);
                 if (!pub) return getText('pin-login-error') || 'Wrong PIN';
@@ -2703,12 +2555,10 @@
             };
             var pin = await askPin(title, desc, seedPinValidator, false, canUsePasskey ? onPasskeyChosen : null);
             if (pin === null) return;
-            // PIN confirmed valid — decrypt seed as raw bytes, no hex string in memory
             var entropyBytes = await loadEncryptedBytes(STORAGE_KEY_SEED, pin);
             pin = null;
             if (!entropyBytes) return;
             _revealSeedFromBytes(entropyBytes);
-            // entropyBytes.fill(0) done inside _revealSeedFromBytes
         });
         $('#btn-hide-seed').click(_hideSeedReveal)
         $('#btn-save-seed-png').click(function() {

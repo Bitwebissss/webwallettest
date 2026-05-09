@@ -28,7 +28,7 @@
                 crossorigin="anonymous">
         <link rel="icon" type="image/svg+xml" href="images/logo.svg">
         <script src="js/theme.js"
-                integrity="sha512-7EC8JYJXPc5DVcifur4GFry/0ntkhdUAr3EEvYOuM8PMC8EWqUbRQoqVbbE8jeZYk8Hb/mMr2prPGGeQ0zn+2w=="
+                integrity="sha512-hEUJWgrKAwqazvtnI5LrSziAPwPjbjzgVKR7rpSnV0AfrifdvbJulOK0ctHyCPDCGUtsxxoFDrSxY0krSs1WHw=="
                 crossorigin="anonymous"></script>
         <!-- https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js -->
         <script src="js/jquery.min.js"
@@ -51,14 +51,16 @@
                 integrity="sha512-KbmR1Et+8VJSKLeI7vJKCWY9q5ZrdU21KcHFG8OUSeI0NPQK+dkABkTs1WUYWVINZwgv8ePueskqbquPjrQNVw=="
                 crossorigin="anonymous"></script>
         <script src="js/multilang.js"
-                integrity="sha512-eaFUuTvG1X08kry9619yS/Jr7DGUbeRdnlSb/TLjIlH8M0rVXVqvoAkaacL/g9jrpGJIt7/id6hbOSF/GNfviA=="
+                integrity="sha512-u/ol4SShJrp76uRoeNnlWrw+aN34lUVR1evptsPgKQpUT34caBWNQr0OPYm3jvQaq0aUltkrBRJJqXAxIMm2WA=="
                 crossorigin="anonymous"></script>
         <!-- Self build see BUILD4_bip39.md -->
         <script src="js/bip39-bundle.min.js"
                 integrity="sha512-Eqmu8JX1xEMIil/VEQbRb+7nReRQk5nUiGIa68/RxUKfE7KJW+QmINIGYxzoc9yPfvruhw+CbMxXYFQmKZ+JxQ=="
                 crossorigin="anonymous"></script>
         <!-- Self build see https://github.com/bitweb-project/bitcoin-bundle-v7 -->
-        <script src="js/bitcoin-bundle-v7.min.js"></script>
+        <script src="js/bitcoin-bundle-v7.min.js"
+                integrity="sha512-tHiUwjZ7E2a/zTil4RbIeBCVHHVcyvcXcj1cuC/fzn4qvnZ0nc0LJkg0yifWnvTP1CEakabPJSwe22f3mOYp1g=="
+                crossorigin="anonymous"></script>
         <link rel="stylesheet" href="css/style.css"
                 integrity="sha512-Of5cW6JbTgKfWWJOWipwumdmUi8++ZpYCqwiY9vUEgGW9p86d+ydshg8iAQWctep268vLtZcKxkCccmefICqZg=="
                 crossorigin="anonymous"></script>
@@ -128,7 +130,6 @@
                                                                     <button id="pin-login-btn" class="btn btn-primary b-width" tkey="pin-login-btn">Open</button>
                             </div>
                             <div id="pin-login-error" class="text-danger small mb-2 d-none" tkey="pin-login-error">Wrong PIN, try again.</div>
-                            <!-- Passkey login — shown only when passkey is enabled -->
                             <div id="pk-login-wrapper" class="d-none">
                                 <div class="text-center text-muted small my-2">— or —</div>
                                 <button id="pk-login-btn" class="btn btn-outline-primary w-100" type="button">
@@ -429,7 +430,6 @@
                                     <div id="forget-wallet-section" class="d-none text-center mt-2">
                                         <button id="settings-forget-wallet" class="btn btn-danger" type="button" tkey="settings-forget-wallet">Forget saved wallet</button>
                                     </div>
-                                    <!-- Passkey settings -->
                                     <div id="passkey-settings-section" class="mb-3 d-none">
                                         <hr class="my-2">
                                         <label class="fw-semibold"><span class="fa-solid fa-fingerprint"></span> <span tkey="passkey-settings-label">Passkey (Biometric unlock)</span></label>
@@ -520,7 +520,6 @@
                         <input id="pin-input" type="password" class="form-control" tkey="pin-input-placeholder" placeholder="PIN (min 8 chars)" maxlength="64" autocomplete="current-password">
                         <div id="pin-caps-warning" class="text-warning small mt-1 d-none"><span class="fa-solid fa-triangle-exclamation"></span> CAPS LOCK!</div>
                         <div id="pin-error" class="text-danger small mt-1 d-none" tkey="pin-login-error">Wrong PIN, try again.</div>
-                        <!-- Passkey alternative — shown only when askPin is called with a passkey callback -->
                         <button id="pin-modal-pk-btn" class="btn btn-outline-primary btn-sm w-100 mt-2 d-none" type="button">
                             <span class="fa-solid fa-fingerprint"></span>
                             <span tkey="passkey-use-instead">Use Passkey instead</span>
@@ -543,6 +542,8 @@
                 <span class="fa-brands fa-github"></span> <a target="_blank" rel="noopener noreferrer" href="https://github.com/bitweb-project/web-wallet">Bitweb</a>
             </div>
         </footer>
-        <script src="js/wallet.js"></script>
+        <script src="js/wallet.js"
+                integrity="sha512-a4Yw5yO4Zbjfnb/cc3RdGCE+v21XTbC1hXDgaBFtpgUW09lYweDMqFLuyggFVcS/baUv6GSXyvrX5hkgZWIzQA=="
+                crossorigin="anonymous"></script>
     </body>
 </html>
