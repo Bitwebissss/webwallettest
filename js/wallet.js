@@ -2604,6 +2604,10 @@
                 Keystore.setKeyPair(keyPair);
                 await openWallet(true, mnemonic, DEFAULT_DERIV_PATH);
                 mnemonic = '';
+                // Immediately zero entered verify-words and remove them from DOM.
+                // Must happen here — do not rely on closeWallet/forgetSavedWallet.
+                inputs.each(function() { this.value = ''; });
+                seedReset();
                 $btn.prop('disabled', false);
             } catch(err) {
                 $btn.prop('disabled', false);
@@ -2640,8 +2644,7 @@
                 Keystore.setKeyPair(keyPair);
                 await openWallet(true, raw, path, true);
                 raw = null;
-                $('#restore-input').val('');
-                clearSeedState();
+                seedReset();
             } catch(err) {
                 raw = null;
                 $('#restore-word-error').text(getText('seed-deriv-error') + ' ' + err.message).removeClass('d-none');
