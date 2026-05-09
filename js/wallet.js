@@ -892,13 +892,45 @@
             false
         )
         if (pin === null) return null
+
+        // Encrypt a random sentinel with the pin — blob lives only in memory.
+        // Verification on step 2 is done by decryption, never by string comparison.
+        var sentinel = crypto.getRandomValues(new Uint8Array(32))
+        var salt     = crypto.getRandomValues(new Uint8Array(16))
+        var iv       = crypto.getRandomValues(new Uint8Array(12))
+        var key1     = await deriveKey(pin, salt)
+        var ct       = new Uint8Array(await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv: iv }, key1, sentinel
+        ))
+        pin = null  // drop reference — no pin string kept in memory beyond this point
+
         var confirmed = await askPin(
             getText('pin-confirm-title'),
             getText('pin-confirm-desc'),
-            function(p) { return (p !== pin) ? getText('pin-mismatch') : null },
+            null,
             false
         )
-        pin = null
+        if (confirmed === null) {
+            sentinel.fill(0); ct.fill(0)
+            return null
+        }
+
+        var ok = false
+        try {
+            var key2 = await deriveKey(confirmed, salt)
+            var pt   = new Uint8Array(await crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv: iv }, key2, ct
+            ))
+            ok = true
+            pt.fill(0)
+        } catch(e) { ok = false }
+
+        sentinel.fill(0); ct.fill(0)
+
+        if (!ok) {
+            showMessage(getText('pin-mismatch') || 'PIN does not match — please try again')
+            confirmed = null
+        }
         return confirmed
     }
     function initMessages() {
@@ -1349,13 +1381,15 @@
             _ws.emit('subscribe', { address: globalData.address });
         }
     }
-    async function openWallet(offerPin, bip39Mnemonic, derivPath) {
+    async function openWallet(offerPin, bip39Mnemonic, derivPath, isRestore) {
         if (offerPin && !hasSavedWallet()) {
             var pin = await askPinSetup();
             if (pin === null) {
                 Keystore.clear();
-                seedReset();
-                showMessage(getText('seed-pin-cancel') || 'Due to cancellation, the seed has been regenerated for security.');
+                if (bip39Mnemonic && !isRestore) {
+                    seedReset();
+                    showMessage(getText('seed-pin-cancel') || 'Due to cancellation, the seed has been regenerated for security.');
+                }
                 return;
             }
             globalData.pubKeyHex = Keystore.getPublicKeyHex();
@@ -2517,7 +2551,7 @@
                 var keyPair = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes));
                 privBytes.fill(0);
                 Keystore.setKeyPair(keyPair);
-                await openWallet(true, raw, path);
+                await openWallet(true, raw, path, true);
                 raw = null;
                 $('#restore-input').val('');
                 clearSeedState();
