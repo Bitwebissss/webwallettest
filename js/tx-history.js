@@ -104,17 +104,22 @@
                 });
             }
 
+            // Explorer возвращает суммы в монетах (BTE), конвертируем в сатоши
+            var factor = Math.pow(10, _getConfig()['decimals'] || 8);
+            function coinsToSats(v) { return Math.round((v || 0) * factor); }
+
             var annotated = recent.map(function (item) {
                 var ex = explorerMap[item.tx_hash];
                 if (ex) {
-                    // Подтверждённая — direction из sent/received обозревателя
+                    var sentSats = coinsToSats(ex.sent);
+                    var recvSats = coinsToSats(ex.received);
                     var dir, amt;
-                    if (ex.sent === 0) {
+                    if (sentSats === 0) {
                         dir = 'in';
-                        amt = ex.received;
+                        amt = recvSats;
                     } else {
-                        var net = ex.sent - ex.received;
-                        if (net <= 0) { dir = 'self'; amt = ex.received; }
+                        var net = sentSats - recvSats;
+                        if (net <= 0) { dir = 'self'; amt = recvSats; }
                         else          { dir = 'out';  amt = net; }
                     }
                     return { tx_hash: item.tx_hash, height: item.height, direction: dir, amount: amt, timestamp: ex.timestamp };
