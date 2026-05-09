@@ -454,6 +454,65 @@
             return result;
         } catch(e) { return null; }
     }
+    // ── Bytes-only variants — NO TextDecoder, NO hex strings in memory ───────
+    // Returns raw decrypted bytes (Uint8Array). Caller MUST .fill(0) after use.
+    async function loadEncryptedBytes(storageKey, pin) {
+        var raw = localStorage.getItem(storageKey);
+        if (!raw) return null;
+        var blob = JSON.parse(raw);
+        var key  = await deriveKey(pin, new Uint8Array(blob.salt));
+        try {
+            var pt = await crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv: new Uint8Array(blob.iv) },
+                key,
+                new Uint8Array(blob.data)
+            );
+            return new Uint8Array(pt);  // caller must .fill(0)
+        } catch(e) { return null; }
+    }
+    // Encrypt raw bytes (Uint8Array) with PRF key — no string encoding.
+    // Data format identical to saveEncryptedWithKey, fully backward-compatible.
+    async function saveEncryptedWithKeyBytes(storageKey, plaintextBytes, keyBytes) {
+        var iv  = crypto.getRandomValues(new Uint8Array(12));
+        var key = await crypto.subtle.importKey(
+            'raw', keyBytes, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+        );
+        var ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, plaintextBytes);
+        localStorage.setItem(storageKey, JSON.stringify({
+            iv:   Array.from(iv),
+            data: Array.from(new Uint8Array(ct))
+        }));
+    }
+    // Returns raw decrypted bytes (Uint8Array) via PRF key. Caller MUST .fill(0) after use.
+    async function loadEncryptedBytesWithKey(storageKey, keyBytes) {
+        var raw = localStorage.getItem(storageKey);
+        if (!raw) return null;
+        var blob = JSON.parse(raw);
+        var key  = await crypto.subtle.importKey(
+            'raw', keyBytes, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+        );
+        try {
+            var pt = await crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv: new Uint8Array(blob.iv) }, key, new Uint8Array(blob.data)
+            );
+            return new Uint8Array(pt);  // caller must .fill(0)
+        } catch(e) { return null; }
+    }
+    // Hex-decode ASCII bytes (Uint8Array of hex char codes) → raw bytes without creating a string.
+    // Input must be even-length ASCII hex. Caller must .fill(0) both arrays.
+    function _hexBytesToRaw(hexBytes) {
+        function nibble(c) {
+            if (c >= 48 && c <= 57)  return c - 48;        // '0'–'9'
+            if (c >= 97 && c <= 102) return c - 97 + 10;   // 'a'–'f'
+            if (c >= 65 && c <= 70)  return c - 65 + 10;   // 'A'–'F'
+            return 0;
+        }
+        var out = new Uint8Array(hexBytes.length >>> 1);
+        for (var i = 0; i < out.length; i++) {
+            out[i] = (nibble(hexBytes[i * 2]) << 4) | nibble(hexBytes[i * 2 + 1]);
+        }
+        return out;
+    }
     // ── Passkey state helpers ─────────────────────────────────────────────────
     function isPasskeyEnabled() {
         // Enabled iff BOTH credential ID and encrypted private key blob exist.
@@ -484,25 +543,28 @@
     }
     // ── Enable passkey ────────────────────────────────────────────────────────
     async function pkEnable() {
-        // 1. Confirm identity with PIN and decrypt current keys in one shot
+        // 1. Confirm identity with PIN: decrypt only pub key (single PBKDF2), error in #pin-error
+        var pkEnableValidator = async function(candidate) {
+            var pub = await loadEncrypted(STORAGE_KEY_PUB, candidate);
+            if (!pub) return getText('pin-login-error') || 'Wrong PIN';
+            return null;
+        };
         var pin = await askPin(
             getText('pin-title-default') || 'Wallet PIN',
             (getText('passkey-confirm-pin') || 'Enter PIN to verify identity before setting up passkey'),
-            null, false
+            pkEnableValidator, false
         );
         if (pin === null) return;
-        // Decrypt all stored keys in parallel — each blob is independent.
-        var pkResults = await Promise.all([
-            loadEncrypted(STORAGE_KEY_PRIV, pin),
-            loadEncrypted(STORAGE_KEY_PUB,  pin),
-            loadEncrypted(STORAGE_KEY_SEED, pin)
-        ]);
-        var privHex = pkResults[0], pubHex = pkResults[1], seedEntropyHex = pkResults[2];
-        if (!privHex || !pubHex) {
+        // PIN confirmed — load all three as raw bytes, no hex strings created in memory
+        var privBytes = await loadEncryptedBytes(STORAGE_KEY_PRIV, pin);
+        var pubBytes  = await loadEncryptedBytes(STORAGE_KEY_PUB,  pin);
+        if (!privBytes || !pubBytes) {
+            if (privBytes) privBytes.fill(0);
+            if (pubBytes)  pubBytes.fill(0);
             pin = null;
-            showMessage(getText('pin-login-error') || 'Wrong PIN');
             return;
         }
+        var seedBytes = await loadEncryptedBytes(STORAGE_KEY_SEED, pin);
         pin = null;
         // 2. Register a new passkey with PRF extension
         var challenge = crypto.getRandomValues(new Uint8Array(32));
@@ -535,23 +597,25 @@
             });
             var ext = credential.getClientExtensionResults();
             if (!ext.prf || !ext.prf.results || !ext.prf.results.first) {
-                privHex = ''; pubHex = ''; seedEntropyHex = '';
+                privBytes.fill(0); pubBytes.fill(0); if (seedBytes) seedBytes.fill(0);
                 showMessage(getText('passkey-prf-unsupported') || 'This browser/device does not support the PRF extension required for passkey unlock. Use PIN instead.');
                 return;
             }
             var prfBytes = new Uint8Array(ext.prf.results.first);
-            // 3. Encrypt keys with PRF output
-            await saveEncryptedWithKey(STORAGE_KEY_PRIV_PK, privHex, prfBytes);
-            await saveEncryptedWithKey(STORAGE_KEY_PUB_PK,  pubHex,  prfBytes);
-            if (seedEntropyHex) await saveEncryptedWithKey(STORAGE_KEY_SEED_PK, seedEntropyHex, prfBytes);
+            // 3. Encrypt key bytes with PRF output — no hex strings, proper fill(0) after
+            await saveEncryptedWithKeyBytes(STORAGE_KEY_PRIV_PK, privBytes, prfBytes);
+            await saveEncryptedWithKeyBytes(STORAGE_KEY_PUB_PK,  pubBytes,  prfBytes);
+            if (seedBytes) await saveEncryptedWithKeyBytes(STORAGE_KEY_SEED_PK, seedBytes, prfBytes);
             prfBytes.fill(0);
-            privHex = ''; pubHex = ''; seedEntropyHex = '';
+            privBytes.fill(0); pubBytes.fill(0); if (seedBytes) seedBytes.fill(0);
             // 4. Store credential ID — presence of this + PRIV_PK is the "enabled" signal
-            localStorage.setItem(STORAGE_KEY_PK_ID,   _credIdToB64(credential.rawId));
+            localStorage.setItem(STORAGE_KEY_PK_ID, _credIdToB64(credential.rawId));
             updatePasskeyUI();
             showMessage(getText('passkey-enabled') || '🔐 Passkey enabled — you can now unlock with biometrics');
         } catch(e) {
-            privHex = ''; pubHex = ''; seedEntropyHex = '';
+            if (privBytes) privBytes.fill(0);
+            if (pubBytes)  pubBytes.fill(0);
+            if (seedBytes) seedBytes.fill(0);
             if (e.name === 'NotAllowedError') return;  // User cancelled — silent
             showMessage((getText('passkey-error') || 'Passkey error: ') + e.message);
         }
@@ -585,22 +649,27 @@
                 showMessage(getText('passkey-prf-unsupported') || 'PRF extension not available');
                 return;
             }
-            var prfBytes = new Uint8Array(ext.prf.results.first);
-            var privHex  = await loadEncryptedWithKey(STORAGE_KEY_PRIV_PK, prfBytes);
-            var pubHex   = await loadEncryptedWithKey(STORAGE_KEY_PUB_PK,  prfBytes);
+            var prfBytes  = new Uint8Array(ext.prf.results.first);
+            var privUtf8  = await loadEncryptedBytesWithKey(STORAGE_KEY_PRIV_PK, prfBytes);
+            var pubUtf8   = await loadEncryptedBytesWithKey(STORAGE_KEY_PUB_PK,  prfBytes);
             prfBytes.fill(0);
-            if (!privHex || !pubHex) {
+            if (!privUtf8 || !pubUtf8) {
+                if (privUtf8) privUtf8.fill(0);
+                if (pubUtf8)  pubUtf8.fill(0);
                 showMessage(getText('passkey-decrypt-failed') || 'Passkey decryption failed — try PIN');
                 return;
             }
-            var privBytes = new Uint8Array(bitcoin.Buffer.from(privHex, 'hex'));
+            // Decode private key bytes without creating a hex string
+            var privBytes = _hexBytesToRaw(privUtf8); privUtf8.fill(0);
+            // Public key: not secret — string is fine
+            var pubHex = new TextDecoder().decode(pubUtf8); pubUtf8.fill(0);
             Keystore.setKeyPair(
                 bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes), { network: getConfig()['network'] })
             );
             privBytes.fill(0);
             globalData.pubKeyHex = pubHex;
             globalData.pubKey    = new Uint8Array(bitcoin.Buffer.from(pubHex, 'hex'));
-            privHex = ''; pubHex = '';
+            pubHex = '';
             openWallet(false);
         } catch(e) {
             if (e.name === 'NotAllowedError') return;  // User cancelled — silent
@@ -648,21 +717,19 @@
                 showMessage((getText('passkey-error') || 'Passkey error: ') + e.message);
             }
         }
+        var pkDisableValidator = async function(candidate) {
+            var pub = await loadEncrypted(STORAGE_KEY_PUB, candidate);
+            if (!pub) return getText('pin-login-error') || 'Wrong PIN';
+            return null;
+        };
         var pin = await askPin(
             getText('pin-title-default') || 'Wallet PIN',
             getText('passkey-disable-confirm') || 'Enter PIN (or use Passkey) to disable passkey',
-            null, false,
+            pkDisableValidator, false,
             onPasskeyChosen  // shows "Use Passkey" button in modal
         );
         if (pin === null) return;  // cancelled OR passkey path (passkey path is self-contained)
-        // PIN path
-        var walletData = await loadWallet(pin);
         pin = null;
-        if (!walletData) {
-            showMessage(getText('pin-login-error') || 'Wrong PIN');
-            return;
-        }
-        walletData = null;
         _doPkDisable();
     }
     // ── Update all passkey-related UI ─────────────────────────────────────────
@@ -839,6 +906,22 @@
         entropyHex     = '';
         _revealedWords = mnemonic.split(' ');
         mnemonic       = '';
+        seedRenderGrid(_revealedWords, '#wallet-seed-grid');
+        $('#wallet-seed-hidden').addClass('d-none');
+        $('#wallet-seed-revealed').removeClass('d-none');
+        setTimeout(_hideSeedReveal, 60000);
+    }
+    // Bytes variant: entropyBytes = raw decrypted bytes (UTF-8 of entropyHex).
+    // Hex-decodes without creating a string, then fills(0) all intermediate buffers.
+    function _revealSeedFromBytes(entropyBytes) {
+        if (_revealedWords.length) _revealedWords.fill('');
+        // entropyBytes = UTF-8 bytes of hex string → hex-decode to raw entropy
+        var rawEntropy = _hexBytesToRaw(entropyBytes);
+        entropyBytes.fill(0);
+        var mnemonic = bip39Bundle.entropyToMnemonic(rawEntropy);
+        rawEntropy.fill(0);
+        _revealedWords = mnemonic.split(' ');
+        mnemonic = '';
         seedRenderGrid(_revealedWords, '#wallet-seed-grid');
         $('#wallet-seed-hidden').addClass('d-none');
         $('#wallet-seed-revealed').removeClass('d-none');
@@ -1945,9 +2028,12 @@
             // synchronous bookkeeping before it can delay the repaint).
             await new Promise(function(r) { setTimeout(r, 50); });
             try {
-                var walletData = await loadWallet(pin);
+                // Decrypt pub (for address) and priv (for Keystore) as raw bytes — no hex string
+                var pubHex      = await loadEncrypted(STORAGE_KEY_PUB, pin);
+                var privRawBytes = await loadEncryptedBytes(STORAGE_KEY_PRIV, pin);
                 $('#pin-login-btn').prop('disabled', false).text(getText('pin-login-btn'));
-                if (!walletData) {
+                if (!pubHex || !privRawBytes) {
+                    if (privRawBytes) privRawBytes.fill(0);
                     $('#pin-login-error').text(getText('pin-login-error')).removeClass('d-none');
                     $('#pin-login-input').val('').focus();
                     pin = '';
@@ -1955,16 +2041,15 @@
                 }
                 $('#pin-login-error').addClass('d-none');
                 $('#pin-login-input').val('');
-
-                var privBytes = new Uint8Array(bitcoin.Buffer.from(walletData.privHex, 'hex'));
+                // privRawBytes = UTF-8 bytes of privHex → decode to actual key bytes without string
+                var privBytes = _hexBytesToRaw(privRawBytes); privRawBytes.fill(0);
                 Keystore.setKeyPair(
                     bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes), { network: getConfig()['network'] })
                 );
                 privBytes.fill(0);
-                walletData.privHex = '';
-                globalData.pubKeyHex = walletData.pubkey;
-                globalData.pubKey    = new Uint8Array(bitcoin.Buffer.from(walletData.pubkey, 'hex'));
-                walletData = null;
+                globalData.pubKeyHex = pubHex;
+                globalData.pubKey    = new Uint8Array(bitcoin.Buffer.from(pubHex, 'hex'));
+                pubHex = '';
                 pin = '';
                 openWallet(false);
             } catch (e) {
@@ -2193,20 +2278,19 @@
                     }
                 }
                 var canUsePasskey = isPasskeyEnabled() && hasPasskeyCredential();
+                var privKeyValidator = async function(candidate) {
+                    var pub = await loadEncrypted(STORAGE_KEY_PUB, candidate);
+                    if (!pub) return getText('pin-login-error') || 'Wrong PIN';
+                    return null;
+                };
                 var pin = await askPin(
                     getText('pin-title-default') || 'Wallet PIN',
                     getText('privkey-pin-desc')  || 'Enter PIN to reveal private key',
-                    null, false,
+                    privKeyValidator, false,
                     canUsePasskey ? onPasskeyChosen : null
                 );
                 if (pin === null) return;  // cancelled or passkey path handled itself
-                var walletData = await loadWallet(pin);
                 pin = null;
-                if (!walletData) {
-                    showMessage(getText('pin-login-error') || 'Wrong PIN');
-                    return;
-                }
-                walletData = null;
                 revealPrivKeyInput(Keystore.getWIF());
                 $('#wallet-privkey-copy-btn').removeClass('d-none');
                 $('#toggle-wallet-privkey').text(getText('hide'));
@@ -2579,15 +2663,15 @@
                         showMessage(getText('passkey-prf-unsupported') || 'PRF not available');
                         return;
                     }
-                    var prfBytes = new Uint8Array(ext.prf.results.first);
-                    var seedEntropyHex = await loadEncryptedWithKey(STORAGE_KEY_SEED_PK, prfBytes);
+                    var prfBytes  = new Uint8Array(ext.prf.results.first);
+                    var seedBytes = await loadEncryptedBytesWithKey(STORAGE_KEY_SEED_PK, prfBytes);
                     prfBytes.fill(0);
-                    if (!seedEntropyHex) {
+                    if (!seedBytes) {
                         showMessage(getText('passkey-decrypt-failed') || 'Seed not found via passkey — try PIN');
                         return;
                     }
-                    _revealSeed(seedEntropyHex);
-                    seedEntropyHex = '';
+                    _revealSeedFromBytes(seedBytes);
+                    // seedBytes.fill(0) done inside _revealSeedFromBytes
                 } catch(e) {
                     if (e.name === 'NotAllowedError') return;
                     // Auto-retry on transient platform-authenticator errors
@@ -2600,18 +2684,21 @@
             }
             var title         = getText('seed-pin-modal-title');
             var desc          = getText('seed-pin-modal-desc');
-            var entropyHex    = null;
             var canUsePasskey = isPasskeyEnabled() && hasSeedPkBackup();
-            while (true) {
-                var pin = await askPin(title, desc, null, false, canUsePasskey ? onPasskeyChosen : null);
-                if (pin === null) return;  // cancelled or passkey path handled itself
-                entropyHex = await loadEncrypted(STORAGE_KEY_SEED, pin);
-                pin = null;
-                if (entropyHex) break;
-                desc = getText('pin-login-error') || 'Wrong PIN, try again.';
-            }
-            _revealSeed(entropyHex);
-            entropyHex = '';
+            // Validator: check PIN via pub key only (single PBKDF2), error in modal
+            var seedPinValidator = async function(candidate) {
+                var pub = await loadEncrypted(STORAGE_KEY_PUB, candidate);
+                if (!pub) return getText('pin-login-error') || 'Wrong PIN';
+                return null;
+            };
+            var pin = await askPin(title, desc, seedPinValidator, false, canUsePasskey ? onPasskeyChosen : null);
+            if (pin === null) return;
+            // PIN confirmed valid — decrypt seed as raw bytes, no hex string in memory
+            var entropyBytes = await loadEncryptedBytes(STORAGE_KEY_SEED, pin);
+            pin = null;
+            if (!entropyBytes) return;
+            _revealSeedFromBytes(entropyBytes);
+            // entropyBytes.fill(0) done inside _revealSeedFromBytes
         });
         $('#btn-hide-seed').click(_hideSeedReveal)
         $('#btn-save-seed-png').click(function() {
