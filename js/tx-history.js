@@ -30,26 +30,19 @@
     function annotateTx(txMeta, txDetail) {
         var vin   = txDetail.vin  || [];
         var vout  = txDetail.vout || [];
-        var myPub = (_globalData.pubKey instanceof Uint8Array
-            ? Array.prototype.map.call(_globalData.pubKey, function(b) {
-                return ('0' + b.toString(16)).slice(-2);
-              }).join('')
-            : '').toLowerCase();
+        // Определяем отправителя через prevout.scriptPubKey потраченного UTXO.
+        // Бэкенд всегда обогащает каждый vin полем prevout, что покрывает
+        // все типы адресов: P2PKH, P2SH-P2WPKH, P2WPKH и P2TR.
+        // (P2TR witness содержит только Schnorr-подпись — pubkey там отсутствует,
+        // поэтому проверка по witness/scriptSig невозможна и не нужна.)
         var weAreSender = vin.some(function (input) {
-            var wit = input.txinwitness || [];
-            if (wit[1] && wit[1].toLowerCase() === myPub) return true;
-            var sig = (input.scriptSig && input.scriptSig.hex)
-                ? input.scriptSig.hex.toLowerCase() : '';
-            if (sig.length >= 68 && sig.slice(-68) === '21' + myPub) return true;
-            if (input.prevout && input.prevout.scriptPubKey) {
-                var prevHex = (input.prevout.scriptPubKey.hex || '').toLowerCase();
-                if (prevHex && _globalData.allScriptHexes && _globalData.allScriptHexes.has(prevHex)) return true;
-                var prevAddr = input.prevout.scriptPubKey.address
-                    || (input.prevout.scriptPubKey.addresses && input.prevout.scriptPubKey.addresses[0])
-                    || '';
-                if (prevAddr && _globalData.allAddresses && _globalData.allAddresses.has(prevAddr)) return true;
-            }
-            return false;
+            if (!input.prevout || !input.prevout.scriptPubKey) return false;
+            var prevHex = (input.prevout.scriptPubKey.hex || '').toLowerCase();
+            if (prevHex && _globalData.allScriptHexes && _globalData.allScriptHexes.has(prevHex)) return true;
+            var prevAddr = input.prevout.scriptPubKey.address
+                || (input.prevout.scriptPubKey.addresses && input.prevout.scriptPubKey.addresses[0])
+                || '';
+            return !!(prevAddr && _globalData.allAddresses && _globalData.allAddresses.has(prevAddr));
         });
         var received = 0, sentToOthers = 0;
         vout.forEach(function (o) {
