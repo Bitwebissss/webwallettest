@@ -1577,11 +1577,41 @@
         }
     }
     function getScriptType(script) {
-        if (script[0] == bitcoin.opcodes.OP_0 && script[1] == 20) return 'bech32'
-        if (script[0] == bitcoin.opcodes.OP_HASH160 && script[1] == 20) return 'segwit'
-        if (script[0] == bitcoin.opcodes.OP_DUP && script[1] == bitcoin.opcodes.OP_HASH160 && script[2] == 20) return 'legacy'
-        if (script[0] == 0x51 && script[1] == 32) return 'taproot'   // OP_1 <32-byte x-only pubkey>
-        return undefined
+        if (!script || script.length < 2) return undefined;
+    
+        // P2WPKH: 00 14 <20>
+        if (script.length === 22 &&
+            script[0] === bitcoin.opcodes.OP_0 &&
+            script[1] === 0x14) {
+            return 'bech32';
+        }
+    
+        // P2SH: a9 14 <20> 87
+        if (script.length === 23 &&
+            script[0] === bitcoin.opcodes.OP_HASH160 &&
+            script[1] === 0x14 &&
+            script[22] === bitcoin.opcodes.OP_EQUAL) {
+            return 'segwit';
+        }
+    
+        // P2PKH: 76 a9 14 <20> 88 ac
+        if (script.length === 25 &&
+            script[0] === bitcoin.opcodes.OP_DUP &&
+            script[1] === bitcoin.opcodes.OP_HASH160 &&
+            script[2] === 0x14 &&
+            script[23] === bitcoin.opcodes.OP_EQUALVERIFY &&
+            script[24] === bitcoin.opcodes.OP_CHECKSIG) {
+            return 'legacy';
+        }
+    
+        // P2TR: 51 20 <32>
+        if (script.length === 34 &&
+            script[0] === bitcoin.opcodes.OP_1 &&
+            script[1] === 0x20) {
+            return 'taproot';
+        }
+    
+        return undefined;
     }
     function getP2SHScript(redeem) {
         return bitcoin.payments.p2sh({ 'redeem': redeem, 'network': getConfig()['network'] })
