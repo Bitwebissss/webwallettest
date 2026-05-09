@@ -149,6 +149,14 @@
                     '</div>';
         });
 
+        if (txs.length >= HISTORY_LIMIT) {
+            var explorerUrl = _escHtml(_blockExplorer.address(_globalData.address));
+            html += '<div class="text-center py-2"><small>' +
+                    '<a href="' + explorerUrl + '" target="_blank" rel="noopener noreferrer">' +
+                    _escHtml(_getText('history-view-all')) + ' &#x2197;' +
+                    '</a></small></div>';
+        }
+
         $('#history-list').html(html);
     }
 
