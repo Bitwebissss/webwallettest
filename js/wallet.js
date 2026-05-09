@@ -112,22 +112,15 @@
     }
     var Keystore = (function() {
         var keyPair = null;
-        function getPublicKeyHex() {
-            if (!keyPair) return '';
-            return bitcoin.Buffer.from(keyPair.publicKey).toString('hex');
-        }
         function getPublicKeyBytes() {
             return keyPair ? keyPair.publicKey : null;
         }
+        function getPrivKeyBytes() {
+            if (!keyPair || !keyPair.privateKey) return null;
+            return new Uint8Array(keyPair.privateKey);
+        }
         function getWIF() {
             return keyPair ? keyPair.toWIF() : null;
-        }
-        function getPrivKeyHex() {
-            if (!keyPair || !keyPair.privateKey) return null;
-            var buf = bitcoin.Buffer.from(keyPair.privateKey);
-            var hex = buf.toString('hex');
-            buf.fill(0);
-            return hex;
         }
         function _makeTaprootSigner() {
             var ecc = bitcoin.ecc;
@@ -268,10 +261,9 @@
             }
         }
         return {
-            getPublicKeyHex: getPublicKeyHex,
             getPublicKeyBytes: getPublicKeyBytes,
+            getPrivKeyBytes: getPrivKeyBytes,
             getWIF: getWIF,
-            getPrivKeyHex: getPrivKeyHex,
             signAllInputs: signAllInputs,
             deriveAddress: deriveAddress,
             getScriptHex: getScriptHex,
@@ -289,7 +281,6 @@
         height:          0,
         address:         undefined,
         scriptHex:       undefined,
-        pubKeyHex:       undefined,
         pubKey:          null,
         rfee:            getConfig()['fee'],
         utxos:           [],
@@ -304,7 +295,6 @@
             this.status          = 'locked';
             this.address         = '';
             this.scriptHex       = undefined;
-            this.pubKeyHex       = undefined;
             if (this.pubKey instanceof Uint8Array) this.pubKey.fill(0);
             this.pubKey          = null;
             this.allScriptHexes  = null;
@@ -339,66 +329,16 @@
         _seedState.tempKey = null;
         _seedState.verifyHashes = [];
     }
-    async function saveEncrypted(storageKey, plaintext, pin) {
-        var enc  = new TextEncoder();
+    async function saveEncryptedBytes(storageKey, plainBytes, pin) {
         var salt = crypto.getRandomValues(new Uint8Array(16));
         var iv   = crypto.getRandomValues(new Uint8Array(12));
         var key  = await deriveKey(pin, salt);
-        var ct   = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, enc.encode(plaintext));
+        var ct   = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, plainBytes);
         localStorage.setItem(storageKey, JSON.stringify({
             salt: Array.from(salt),
             iv:   Array.from(iv),
             data: Array.from(new Uint8Array(ct))
         }));
-    }
-    async function loadEncrypted(storageKey, pin) {
-        var raw = localStorage.getItem(storageKey);
-        if (!raw) return null;
-        var blob = JSON.parse(raw);
-        var key  = await deriveKey(pin, new Uint8Array(blob.salt));
-        try {
-            var pt = await crypto.subtle.decrypt(
-                { name: 'AES-GCM', iv: new Uint8Array(blob.iv) },
-                key,
-                new Uint8Array(blob.data)
-            );
-            var ptView  = new Uint8Array(pt);
-            var decoded = new TextDecoder().decode(pt);
-            ptView.fill(0);
-            return decoded;
-        } catch(e) {
-            return null;
-        }
-    }
-    async function saveEncryptedWithKey(storageKey, plaintext, keyBytes) {
-        var iv  = crypto.getRandomValues(new Uint8Array(12));
-        var key = await crypto.subtle.importKey(
-            'raw', keyBytes, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
-        );
-        var ct = await crypto.subtle.encrypt(
-            { name: 'AES-GCM', iv: iv }, key, new TextEncoder().encode(plaintext)
-        );
-        localStorage.setItem(storageKey, JSON.stringify({
-            iv:   Array.from(iv),
-            data: Array.from(new Uint8Array(ct))
-        }));
-    }
-    async function loadEncryptedWithKey(storageKey, keyBytes) {
-        var raw = localStorage.getItem(storageKey);
-        if (!raw) return null;
-        var blob = JSON.parse(raw);
-        var key  = await crypto.subtle.importKey(
-            'raw', keyBytes, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
-        );
-        try {
-            var pt     = await crypto.subtle.decrypt(
-                { name: 'AES-GCM', iv: new Uint8Array(blob.iv) }, key, new Uint8Array(blob.data)
-            );
-            var view   = new Uint8Array(pt);
-            var result = new TextDecoder().decode(pt);
-            view.fill(0);
-            return result;
-        } catch(e) { return null; }
     }
     async function loadEncryptedBytes(storageKey, pin) {
         var raw = localStorage.getItem(storageKey);
@@ -439,19 +379,6 @@
             return new Uint8Array(pt);
         } catch(e) { return null; }
     }
-    function _hexBytesToRaw(hexBytes) {
-        function nibble(c) {
-            if (c >= 48 && c <= 57)  return c - 48;        // '0'–'9'
-            if (c >= 97 && c <= 102) return c - 97 + 10;   // 'a'–'f'
-            if (c >= 65 && c <= 70)  return c - 65 + 10;   // 'A'–'F'
-            return 0;
-        }
-        var out = new Uint8Array(hexBytes.length >>> 1);
-        for (var i = 0; i < out.length; i++) {
-            out[i] = (nibble(hexBytes[i * 2]) << 4) | nibble(hexBytes[i * 2 + 1]);
-        }
-        return out;
-    }
     function isPasskeyEnabled() {
         try {
             return localStorage.getItem(STORAGE_KEY_PK_ID)   !== null &&
@@ -477,8 +404,9 @@
     }
     async function pkEnable() {
         var pkEnableValidator = async function(candidate) {
-            var pub = await loadEncrypted(STORAGE_KEY_PUB, candidate);
+            var pub = await loadEncryptedBytes(STORAGE_KEY_PUB, candidate);
             if (!pub) return getText('pin-login-error') || 'Wrong PIN';
+            pub.fill(0);
             return null;
         };
         var pin = await askPin(
@@ -577,24 +505,20 @@
                 return;
             }
             var prfBytes  = new Uint8Array(ext.prf.results.first);
-            var privUtf8  = await loadEncryptedBytesWithKey(STORAGE_KEY_PRIV_PK, prfBytes);
-            var pubUtf8   = await loadEncryptedBytesWithKey(STORAGE_KEY_PUB_PK,  prfBytes);
+            var privBytes = await loadEncryptedBytesWithKey(STORAGE_KEY_PRIV_PK, prfBytes);
+            var pubBytes  = await loadEncryptedBytesWithKey(STORAGE_KEY_PUB_PK,  prfBytes);
             prfBytes.fill(0);
-            if (!privUtf8 || !pubUtf8) {
-                if (privUtf8) privUtf8.fill(0);
-                if (pubUtf8)  pubUtf8.fill(0);
+            if (!privBytes || !pubBytes) {
+                if (privBytes) privBytes.fill(0);
+                if (pubBytes)  pubBytes.fill(0);
                 showMessage(getText('passkey-decrypt-failed') || 'Passkey decryption failed — try PIN');
                 return;
             }
-            var privBytes = _hexBytesToRaw(privUtf8); privUtf8.fill(0);
-            var pubHex = new TextDecoder().decode(pubUtf8); pubUtf8.fill(0);
             Keystore.setKeyPair(
                 bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes), { network: getConfig()['network'] })
             );
             privBytes.fill(0);
-            globalData.pubKeyHex = pubHex;
-            globalData.pubKey    = new Uint8Array(bitcoin.Buffer.from(pubHex, 'hex'));
-            pubHex = '';
+            globalData.pubKey = pubBytes;
             openWallet(false);
         } catch(e) {
             if (e.name === 'NotAllowedError') return;
@@ -639,8 +563,9 @@
             }
         }
         var pkDisableValidator = async function(candidate) {
-            var pub = await loadEncrypted(STORAGE_KEY_PUB, candidate);
+            var pub = await loadEncryptedBytes(STORAGE_KEY_PUB, candidate);
             if (!pub) return getText('pin-login-error') || 'Wrong PIN';
+            pub.fill(0);
             return null;
         };
         var pin = await askPin(
@@ -684,38 +609,31 @@
     }
     // ─────────────────────────────────────────────────────────────────────────
     async function saveWalletWif(pin) {
-        var pubkey  = globalData.pubKeyHex;
-        var privHex = Keystore.getPrivKeyHex();
+        var privBytes = Keystore.getPrivKeyBytes();
+        var pubCopy   = new Uint8Array(globalData.pubKey);
         await Promise.all([
-            saveEncrypted(STORAGE_KEY_PUB,  pubkey,  pin),
-            saveEncrypted(STORAGE_KEY_PRIV, privHex, pin)
+            saveEncryptedBytes(STORAGE_KEY_PUB,  pubCopy,   pin),
+            saveEncryptedBytes(STORAGE_KEY_PRIV, privBytes, pin)
         ]);
+        pubCopy.fill(0);
+        privBytes.fill(0);
         localStorage.removeItem(STORAGE_KEY_SEED);
         localStorage.removeItem(STORAGE_KEY_PATH);
-        privHex = '';
     }
     async function saveWalletBip39(mnemonic, pin, path) {
-        var pubkey     = globalData.pubKeyHex;
-        var privHex    = Keystore.getPrivKeyHex();
-        var entropyHex = _mnemonicToEntropyHex(mnemonic);
-        mnemonic = '';
+        var privBytes    = Keystore.getPrivKeyBytes();
+        var pubCopy      = new Uint8Array(globalData.pubKey);
+        var entropyBytes = _mnemonicToEntropyBytes(mnemonic);
+        mnemonic = null;
         await Promise.all([
-            saveEncrypted(STORAGE_KEY_PUB,  pubkey,     pin),
-            saveEncrypted(STORAGE_KEY_PRIV, privHex,    pin),
-            saveEncrypted(STORAGE_KEY_SEED, entropyHex, pin)
+            saveEncryptedBytes(STORAGE_KEY_PUB,  pubCopy,      pin),
+            saveEncryptedBytes(STORAGE_KEY_PRIV, privBytes,    pin),
+            saveEncryptedBytes(STORAGE_KEY_SEED, entropyBytes, pin)
         ]);
         try { localStorage.setItem(STORAGE_KEY_PATH, path || DEFAULT_DERIV_PATH); } catch(e) {}
-        privHex    = '';
-        entropyHex = '';
-    }
-    async function loadWallet(pin) {
-        var results = await Promise.all([
-            loadEncrypted(STORAGE_KEY_PUB,  pin),
-            loadEncrypted(STORAGE_KEY_PRIV, pin)
-        ]);
-        var pubHex = results[0], privHex = results[1];
-        if (!pubHex || !privHex) return null;
-        return { pubkey: pubHex, privHex: privHex };
+        pubCopy.fill(0);
+        privBytes.fill(0);
+        entropyBytes.fill(0);
     }
     var AUTO_LOCK_MS   = 20 * 60 * 1000
     var _autoLockTimer = null
@@ -745,21 +663,8 @@
             ['encrypt', 'decrypt']
         )
     }
-    function _mnemonicToEntropyHex(mnemonic) {
-        var bytes = bip39Bundle.mnemonicToEntropy(mnemonic);
-        var hex   = Array.from(bytes).map(function(b) {
-            return b.toString(16).padStart(2, '0');
-        }).join('');
-        bytes.fill(0);
-        return hex;
-    }
-    function _entropyHexToMnemonic(entropyHex) {
-        var bytes    = new Uint8Array(entropyHex.match(/../g).map(function(h) {
-            return parseInt(h, 16);
-        }));
-        var mnemonic = bip39Bundle.entropyToMnemonic(bytes);
-        bytes.fill(0);
-        return mnemonic;
+    function _mnemonicToEntropyBytes(mnemonic) {
+        return bip39Bundle.mnemonicToEntropy(mnemonic);
     }
     function hasSavedWallet() {
         return localStorage.getItem(STORAGE_KEY_PRIV) !== null;
@@ -811,23 +716,10 @@
         }
         updatePasskeyLoginUI();
     }
-    function _revealSeed(entropyHex) {
-        if (_revealedWords.length) _revealedWords.fill('');
-        var mnemonic   = _entropyHexToMnemonic(entropyHex);
-        entropyHex     = '';
-        _revealedWords = mnemonic.split(' ');
-        mnemonic       = '';
-        seedRenderGrid(_revealedWords, '#wallet-seed-grid');
-        $('#wallet-seed-hidden').addClass('d-none');
-        $('#wallet-seed-revealed').removeClass('d-none');
-        setTimeout(_hideSeedReveal, 60000);
-    }
     function _revealSeedFromBytes(entropyBytes) {
         if (_revealedWords.length) _revealedWords.fill('');
-        var rawEntropy = _hexBytesToRaw(entropyBytes);
+        var mnemonic = bip39Bundle.entropyToMnemonic(entropyBytes);
         entropyBytes.fill(0);
-        var mnemonic = bip39Bundle.entropyToMnemonic(rawEntropy);
-        rawEntropy.fill(0);
         _revealedWords = mnemonic.split(' ');
         mnemonic = '';
         seedRenderGrid(_revealedWords, '#wallet-seed-grid');
@@ -1297,7 +1189,11 @@
         clearSeedState();
     }
     function _showWalletUI() {
-        var pubkey = globalData.pubKeyHex;
+        var pubBytes = globalData.pubKey;
+        var pubkeyDisplay = '';
+        if (pubBytes) {
+            for (var _i = 0; _i < pubBytes.length; _i++) pubkeyDisplay += pubBytes[_i].toString(16).padStart(2, '0');
+        }
         var addressType = getAddressType();
         var redeem = '';
         if (addressType !== 'legacy') {
@@ -1305,7 +1201,7 @@
                 bitcoin.payments.p2wpkh({ pubkey: globalData.pubKey, network: getConfig()['network'] }).hash
             ).toString('hex');
         }
-        $('#wallet-keys-pubkey input').val(pubkey);
+        $('#wallet-keys-pubkey input').val(pubkeyDisplay);
         clearPrivKeyInput();
         $('#wallet-privkey-copy-btn').addClass('d-none');
         $('#toggle-wallet-privkey').text(getText('show'));
@@ -1362,7 +1258,6 @@
                 }
                 return;
             }
-            globalData.pubKeyHex = Keystore.getPublicKeyHex();
             globalData.pubKey    = new Uint8Array(Keystore.getPublicKeyBytes());
             if (bip39Mnemonic) {
                 await saveWalletBip39(bip39Mnemonic, pin, derivPath);
@@ -1912,11 +1807,12 @@
             $('#pin-login-btn').prop('disabled', true).text(getText('loading'));
             await new Promise(function(r) { setTimeout(r, 50); });
             try {
-                var pubHex      = await loadEncrypted(STORAGE_KEY_PUB, pin);
-                var privRawBytes = await loadEncryptedBytes(STORAGE_KEY_PRIV, pin);
+                var pubBytes  = await loadEncryptedBytes(STORAGE_KEY_PUB,  pin);
+                var privBytes = await loadEncryptedBytes(STORAGE_KEY_PRIV, pin);
                 $('#pin-login-btn').prop('disabled', false).text(getText('pin-login-btn'));
-                if (!pubHex || !privRawBytes) {
-                    if (privRawBytes) privRawBytes.fill(0);
+                if (!pubBytes || !privBytes) {
+                    if (pubBytes)  pubBytes.fill(0);
+                    if (privBytes) privBytes.fill(0);
                     $('#pin-login-error').text(getText('pin-login-error')).removeClass('d-none');
                     $('#pin-login-input').val('').focus();
                     pin = '';
@@ -1924,14 +1820,11 @@
                 }
                 $('#pin-login-error').addClass('d-none');
                 $('#pin-login-input').val('');
-                var privBytes = _hexBytesToRaw(privRawBytes); privRawBytes.fill(0);
                 Keystore.setKeyPair(
                     bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes), { network: getConfig()['network'] })
                 );
                 privBytes.fill(0);
-                globalData.pubKeyHex = pubHex;
-                globalData.pubKey    = new Uint8Array(bitcoin.Buffer.from(pubHex, 'hex'));
-                pubHex = '';
+                globalData.pubKey = pubBytes;
                 pin = '';
                 openWallet(false);
             } catch (e) {
@@ -2156,8 +2049,9 @@
                 }
                 var canUsePasskey = isPasskeyEnabled() && hasPasskeyCredential();
                 var privKeyValidator = async function(candidate) {
-                    var pub = await loadEncrypted(STORAGE_KEY_PUB, candidate);
+                    var pub = await loadEncryptedBytes(STORAGE_KEY_PUB, candidate);
                     if (!pub) return getText('pin-login-error') || 'Wrong PIN';
+                    pub.fill(0);
                     return null;
                 };
                 var pin = await askPin(
@@ -2275,7 +2169,10 @@
             }
             $('#wallet-address').text(globalData.address);
             showQrAddress(getConfig()['uri'] + globalData.address);
-            $('#wallet-keys-pubkey input').val(globalData.pubKeyHex);
+            var _pb = globalData.pubKey;
+            var _phex = '';
+            if (_pb) { for (var _j = 0; _j < _pb.length; _j++) _phex += _pb[_j].toString(16).padStart(2, '0'); }
+            $('#wallet-keys-pubkey input').val(_phex);
             clearPrivKeyInput();
             $('#wallet-privkey-copy-btn').addClass('d-none');
             $('#toggle-wallet-privkey').text(getText('show'));
@@ -2550,8 +2447,9 @@
             var desc          = getText('seed-pin-modal-desc');
             var canUsePasskey = isPasskeyEnabled() && hasSeedPkBackup();
             var seedPinValidator = async function(candidate) {
-                var pub = await loadEncrypted(STORAGE_KEY_PUB, candidate);
+                var pub = await loadEncryptedBytes(STORAGE_KEY_PUB, candidate);
                 if (!pub) return getText('pin-login-error') || 'Wrong PIN';
+                pub.fill(0);
                 return null;
             };
             var pin = await askPin(title, desc, seedPinValidator, false, canUsePasskey ? onPasskeyChosen : null);
