@@ -2440,6 +2440,13 @@
                     var isShowing = $('#wallet-privkey-input').attr('type') === 'text';
                     $togBtn.text(isShowing ? getText('hide') : getText('show'));
                 }
+                // Re-translate fee placeholder (#send-fee has no tkey -- set programmatically)
+                $('#send-fee').attr('placeholder',
+                    getText('fee') + ' (' + getText('recommended') + ' ' + globalData.rfee + ' ' + getConfig()['ticker'] + ')'
+                );
+                // Re-translate coin-control toggle: initLang() strips the open-state suffix '▲'
+                var _ccOpen = !$('#coin-control-panel').hasClass('d-none');
+                if (_ccOpen) $('#coin-control-toggle-text').text(getText('coin-control') + ' ▲');
             }
         });
         estimateFee().then(function(data) {
