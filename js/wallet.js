@@ -1470,14 +1470,15 @@
             } else {
                 spendable = utxos.filter(function(u) { return u.mature; });
             }
-            var value     = 0;
-            var inputMeta = [];
-            var pubkey    = globalData.pubKey;
+            var value      = 0;
+            var inputMeta  = [];
+            var pubkey     = globalData.pubKey;
+            var walletType = getAddressType();
+
             for (var i = 0; i < spendable.length; i++) {
-                var u      = spendable[i];
-                var scriptHex = (typeof u.script === 'string' && u.script) ? u.script : globalData.scriptHex;
-                var script    = bitcoin.Buffer.from(scriptHex, 'hex');
-                var type      = getScriptType(script);
+                var u = spendable[i];
+                var type = walletType;
+
                 if (type === 'bech32') {
                     var p2wpkh = getP2WPKHScript(pubkey);
                     psbt.addInput({
@@ -1486,6 +1487,7 @@
                         witnessUtxo: { script: p2wpkh.output, value: BigInt(u.value) }
                     });
                     inputMeta.push({ type: 'bech32' });
+
                 } else if (type === 'segwit') {
                     var p2wpkh2 = getP2WPKHScript(pubkey);
                     var p2sh2   = getP2SHScript(p2wpkh2);
@@ -1496,12 +1498,17 @@
                         redeemScript: p2wpkh2.output
                     });
                     inputMeta.push({ type: 'segwit' });
+
                 } else if (type === 'legacy') {
                     psbt.addInput({ hash: u.txid, index: u.index });
                     inputMeta.push({ type: 'legacy', psbtIdx: inputMeta.length, txid: u.txid });
+
                 } else if (type === 'taproot') {
                     var xOnlyPub = pubkey.length === 33 ? pubkey.slice(1) : pubkey;
-                    var p2tr = bitcoin.payments.p2tr({ internalPubkey: xOnlyPub, network: getConfig()['network'] });
+                    var p2tr = bitcoin.payments.p2tr({
+                        internalPubkey: xOnlyPub,
+                        network: getConfig()['network']
+                    });
                     psbt.addInput({
                         hash:         u.txid,
                         index:        u.index,
@@ -1509,10 +1516,12 @@
                         tapInternalKey: xOnlyPub
                     });
                     inputMeta.push({ type: 'taproot' });
+
                 } else {
                     showSendError(messages.error['bad-utxo']);
                     return;
                 }
+
                 value += u.value;
                 if (value >= amount) break;
             }
