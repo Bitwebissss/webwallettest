@@ -1533,7 +1533,12 @@
                 var change = value - amount;
                 if (change > 0) psbt.addOutput({ address: address, value: BigInt(change) });
                 Keystore.signAllInputs(psbt);
-                psbt.finalizeAllInputs();
+                try {
+                    psbt.finalizeAllInputs();
+                } catch(finalizeErr) {
+                    console.error('finalizeAllInputs failed:', finalizeErr);
+                    throw finalizeErr;
+                }
                 var tx = psbt.extractTransaction();
                 transactionBroadcast(tx.toHex()).then(function(data) {
                     if (data.error == null) {
@@ -1554,8 +1559,10 @@
                 $('#send-cancel').addClass('d-none');
                 $('#send-confirm').addClass('d-none');
                 $('#send-close-footer').removeClass('d-none disabled');
-            }).catch(function() {
-                showSendError(messages.error['bad-utxo']);
+            }).catch(function(err) {
+                console.error('send failed:', err);
+                var msg = (err && err.message) ? err.message : messages.error['bad-utxo'];
+                showSendError(msg);
             });
         };
         if (globalData.utxos.length > 0) {
