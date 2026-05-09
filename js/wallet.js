@@ -147,7 +147,8 @@
             var ecc = bitcoin.ecc;
             if (!ecc || typeof ecc.privateAdd !== 'function' ||
                         typeof ecc.privateNegate !== 'function' ||
-                        typeof ecc.signSchnorr !== 'function') {
+                        typeof ecc.signSchnorr !== 'function' ||
+                        typeof ecc.xOnlyPointAddTweak !== 'function') {
                 throw new Error('bitcoin.ecc unavailable — rebuild bundle (see BUILDBitcoinjs.md)');
             }
 
@@ -172,13 +173,23 @@
                 tweakedD = ecc.privateAdd(effectiveD, tweak);
                 if (!tweakedD) throw new Error('Taproot tweak produced an invalid private key');
 
+                // Compute tweaked OUTPUT public key (32-byte x-only).
+                // bitcoinjs-lib v7 PSBT signInput() calls tapKeyPubkeyValidator (bip371.ts)
+                // which computes xOnlyPointAddTweak(tapInternalKey) and compares it to
+                // signer.publicKey. If we pass the raw internal key here, the comparison
+                // fails, signInput() skips signing, tapKeySig is never set, and
+                // finalizeAllInputs() throws — which the caller's .catch shows as bad-utxo.
+                var tweakedPubResult = ecc.xOnlyPointAddTweak(xOnlyPub, tweak);
+                if (!tweakedPubResult) throw new Error('Taproot xOnlyPointAddTweak failed');
+                var tweakedXOnly = tweakedPubResult.xOnlyPubkey;
+
                 // Capture in local var so the closure cannot be confused by re-assignment
                 var _td = tweakedD;
 
                 var signer = {
-                    // Must be 32-byte x-only to match tapInternalKey in the PSBT input.
-                    // bitcoinjs-lib v7 uses this to locate the correct signer for the input.
-                    publicKey: xOnlyPub,
+                    // Must be the tweaked OUTPUT x-only key (32 bytes), NOT the internal key.
+                    // v7 PSBT matches this against xOnlyPointAddTweak(tapInternalKey).
+                    publicKey: tweakedXOnly,
 
                     // Called by psbt.signInput for taproot key-path inputs (BIP340 Schnorr).
                     signSchnorr: function(hash) {
