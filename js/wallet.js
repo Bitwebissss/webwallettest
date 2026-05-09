@@ -1082,10 +1082,10 @@
             return c
         } catch(e) { return null }
     }
-    function saveUtxoCache(address, utxos, height) {
+    function saveUtxoCache(address, utxos, height, balance) {
         try {
             localStorage.setItem('bte_utxo_' + address, JSON.stringify({
-                utxos: utxos, height: height, ts: Date.now()
+                utxos: utxos, height: height, balance: balance || 0, ts: Date.now()
             }))
         } catch(e) {}
     }
@@ -1158,8 +1158,7 @@
         while (sats.length <= decimals) sats = '0' + sats
         var intPart  = sats.slice(0, sats.length - decimals) || '0'
         var fracPart = sats.slice(sats.length - decimals)
-        fracPart = fracPart.replace(/0+$/, '')
-        return fracPart.length > 0 ? intPart + '.' + fracPart : intPart
+        return intPart + '.' + fracPart
     }
     function showMessage(message) {
         $('#error-message').html(message)
@@ -1309,10 +1308,29 @@
         $('#send-fee').attr('placeholder', getText('fee') + ' (' + getText('recommended') + ' ' + globalData.rfee + ' ' + getConfig()['ticker'] + ')');
         showQrAddress(getConfig()['uri'] + globalData.address);
         TxHistory.renderHistory(TxHistory.loadHistory());
-        globalData.balance = 0;
-        globalData.immatureBalance = 0;
-        globalData.utxos = [];
-        _renderBalanceDisplay();
+        // Show cached UTXO data immediately so the user never sees "0" while
+        // the WebSocket connection is being established (~1 s round-trip).
+        // The live balance_changed event will overwrite this as soon as it arrives.
+        var _cached = loadUtxoCache(globalData.address);
+        if (_cached && Array.isArray(_cached.utxos)) {
+            var _ch = _cached.height || 0;
+            globalData.height  = _ch;
+            globalData.utxos   = _cached.utxos.map(function(u) {
+                return Object.assign({}, u, {
+                    mature:     isUtxoMature(u, _ch),
+                    blocksLeft: blocksToMature(u, _ch)
+                });
+            });
+            // Use the stored balance if available, otherwise sum UTXOs
+            globalData.balance = _cached.balance != null
+                ? _cached.balance
+                : globalData.utxos.reduce(function(s, u) { return s + u.value; }, 0);
+        } else {
+            globalData.balance         = 0;
+            globalData.immatureBalance = 0;
+            globalData.utxos           = [];
+        }
+        _applyUtxoData();
         if (_ws && _wsActive) {
             _ws.emit('subscribe', { address: globalData.address });
         }
@@ -2612,7 +2630,7 @@
                         blocksLeft: blocksToMature(u, h)
                     });
                 });
-                saveUtxoCache(globalData.address, globalData.utxos, h);
+                saveUtxoCache(globalData.address, globalData.utxos, h, data.balance);
                 _applyUtxoData();
                 if (globalData.balance !== prevBalance && globalData.address) {
                     TxHistory.updateHistory();
