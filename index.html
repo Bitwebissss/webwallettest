@@ -229,11 +229,11 @@
                                     <span tkey="legacy-warn-password">⚠️ <strong>Not recommended.</strong> This method derives a key from a password hash and is kept for backward compatibility only. Please migrate your funds to a Seed Phrase wallet.</span>
                                 </div>
                                 <div class="input-group pb-2">
-                                    <input id="open-email" name="open-email" class="form-control" type="text" tkey="email-address">
+                                    <input id="open-email" class="form-control" type="text" autocomplete="off" tkey="email-address">
                                 </div>
                                 <div class="input-group">
-                                    <input id="open-password" name="open-password" class="form-control" type="password" tkey="password">
-                                    <input id="open-password-confirm" name="open-password-confirm" class="form-control" type="password" tkey="password-confirm">
+                                    <input id="open-password" class="form-control" type="password" autocomplete="new-password" tkey="password">
+                                    <input id="open-password-confirm" class="form-control" type="password" autocomplete="new-password" tkey="password-confirm">
                                     <button class="btn btn-primary b-width" type="submit" id="open-regular-wallet" tkey="open"></button>
                                 </div>
                             </form>
@@ -242,7 +242,7 @@
                                     <span tkey="legacy-warn-key">⚠️ <strong>Not recommended.</strong> Raw private key import is provided for compatibility only. Use a Seed Phrase wallet for better security and recoverability.</span>
                                 </div>
                                 <div class="input-group">
-                                    <input id="passphrase" name="passphrase" class="form-control" type="password" tkey="wif-key">
+                                    <input id="passphrase" class="form-control" type="password" autocomplete="off" tkey="wif-key">
                                     <button class="btn btn-primary b-width" type="submit" id="open-key-wallet" tkey="open"></button>
                                 </div>
                             </form>
@@ -328,16 +328,16 @@
                                 </div>
                                 <div id="send-outputs">
                                     <div class="input-group send-outputs-item mb-2">
-                                        <input name="send-address" class="form-control" type="text" value="" tkey="enter-address">
-                                        <input name="send-ammount" class="form-control" type="text" value="" tkey="amount">
-                                                                                    <button id="add-output" class="btn btn-outline-success">
-                                                <span class="fa-solid fa-plus"></span>
-                                            </button>
+                                        <input name="send-address" class="form-control" type="text" value="" autocomplete="off" tkey="enter-address">
+                                        <input name="send-ammount" class="form-control" type="text" value="" autocomplete="off" tkey="amount">
+                                        <button id="add-output" class="btn btn-outline-success">
+                                        <span class="fa-solid fa-plus"></span>
+                                        </button>
                                     </div>
                                 </div>
                                 <div class="input-group">
-                                    <input id="send-fee" class="form-control" placeholder="Fee" type="text" value="">
-                                                                            <button class="btn btn-primary b-width" type="submit" id="send-tx" tkey="send" disabled></button>
+                                    <input id="send-fee" class="form-control" placeholder="Fee" type="text" value="" autocomplete="off">
+                                    <button class="btn btn-primary b-width" type="submit" id="send-tx" tkey="send" disabled></button>
                                 </div>
                                 <div class="mt-2">
                                     <a href="#" id="coin-control-toggle" class="text-muted small">

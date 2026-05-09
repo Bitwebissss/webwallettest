@@ -2200,8 +2200,8 @@
         $('#add-output').click(function(e) {
             $('#send-outputs').append(
                 '<div class="send-additional-output send-outputs-item input-group mb-2">' +
-                '<input name="send-address" class="form-control" placeholder="' + getText('enter-address') + '" type="text">' +
-                '<input name="send-ammount" class="form-control" placeholder="' + getText('amount') + '" type="text">' +
+                '<input name="send-address" class="form-control" placeholder="' + getText('enter-address') + '" type="text" autocomplete="off">' +
+                '<input name="send-ammount" class="form-control" placeholder="' + getText('amount') + '" type="text" autocomplete="off">' +
                 '<button class="btn btn-outline-danger remove-additional-output" type="button"><span class="fa-solid fa-minus"></span></button>' +
                 '</div>'
             )
