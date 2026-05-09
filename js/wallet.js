@@ -904,34 +904,30 @@
         ))
         pin = null  // drop reference — no pin string kept in memory beyond this point
 
+        // Async validator: tries to decrypt the sentinel — error shown INSIDE the modal,
+        // modal stays open until PIN matches or user explicitly cancels.
+        var confirmValidator = async function(candidate) {
+            try {
+                var key2 = await deriveKey(candidate, salt)
+                var pt   = new Uint8Array(await crypto.subtle.decrypt(
+                    { name: 'AES-GCM', iv: iv }, key2, ct
+                ))
+                pt.fill(0)
+                return null  // null = valid, modal will close
+            } catch(e) {
+                return getText('pin-mismatch') || 'PIN does not match — please try again'
+            }
+        }
+
         var confirmed = await askPin(
             getText('pin-confirm-title'),
             getText('pin-confirm-desc'),
-            null,
+            confirmValidator,
             false
         )
-        if (confirmed === null) {
-            sentinel.fill(0); ct.fill(0)
-            return null
-        }
-
-        var ok = false
-        try {
-            var key2 = await deriveKey(confirmed, salt)
-            var pt   = new Uint8Array(await crypto.subtle.decrypt(
-                { name: 'AES-GCM', iv: iv }, key2, ct
-            ))
-            ok = true
-            pt.fill(0)
-        } catch(e) { ok = false }
 
         sentinel.fill(0); ct.fill(0)
-
-        if (!ok) {
-            showMessage(getText('pin-mismatch') || 'PIN does not match — please try again')
-            confirmed = null
-        }
-        return confirmed
+        return confirmed  // null = user cancelled, string = confirmed PIN for wallet encryption
     }
     function initMessages() {
         return {
@@ -1854,11 +1850,11 @@
         $('#address-type-select select').val(getAddressType())
         routePage()
         updateSavedWalletUI()
-        $('#pin-confirm').click(function() {
+        $('#pin-confirm').click(async function() {
             var pin = $('#pin-input').val()
             if (_pinResolve) {
                 if (_pinValidator) {
-                    var err = _pinValidator(pin)
+                    var err = await _pinValidator(pin)
                     if (err) {
                         $('#pin-error').text(err).removeClass('d-none')
                         $('#pin-input').focus()
