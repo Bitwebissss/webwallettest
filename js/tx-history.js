@@ -152,8 +152,13 @@
         $('#history-list').html(html);
     }
 
+    // wallet.js calls this after broadcast — keep as no-op so it doesn't throw.
+    // Direction is now resolved entirely on the backend via /history.
+    function addPending() {}
+
     window.TxHistory = {
         init:          init,
+        addPending:    addPending,
         loadHistory:   loadHistory,
         saveHistory:   saveHistory,
         updateHistory: updateHistory,
