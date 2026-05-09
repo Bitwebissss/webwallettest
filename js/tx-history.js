@@ -30,7 +30,11 @@
     function annotateTx(txMeta, txDetail) {
         var vin   = txDetail.vin  || [];
         var vout  = txDetail.vout || [];
-        var myPub = (_globalData.pubKeyHex || '').toLowerCase();
+        var myPub = (_globalData.pubKey instanceof Uint8Array
+            ? Array.prototype.map.call(_globalData.pubKey, function(b) {
+                return ('0' + b.toString(16)).slice(-2);
+              }).join('')
+            : '').toLowerCase();
 
         var weAreSender = vin.some(function (input) {
             var wit = input.txinwitness || [];
