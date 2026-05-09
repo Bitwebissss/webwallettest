@@ -1355,6 +1355,7 @@
             if (pin === null) {
                 Keystore.clear();
                 seedReset();
+                showMessage(getText('seed-pin-cancel') || 'Due to cancellation, the seed has been regenerated for security.');
                 return;
             }
             globalData.pubKeyHex = Keystore.getPublicKeyHex();
@@ -1864,6 +1865,10 @@
                 }
                 modalEl.addEventListener('hidden.bs.modal', onHidden)
             }
+            // Must call hide AFTER registering the hidden.bs.modal listener,
+            // otherwise the event fires before the listener is attached and
+            // the promise never resolves (button stays disabled indefinitely).
+            $('#pin-modal').modal('hide')
         })
         // ── Passkey button inside pin-modal ───────────────────────────────────
         $('#pin-modal-pk-btn').click(function() {
@@ -2428,6 +2433,16 @@
         $('#seed-verify-confirm').click(async function() {
             var $btn = $(this).prop('disabled', true);
             var inputs = $('.seed-verify-word');
+
+            // Guard: verifyHashes must be non-empty. An empty array means either
+            // clearSeedState() was called or a previous failed attempt already zeroed
+            // them (old bug). Either way, verification cannot proceed.
+            if (!_seedState.verifyHashes.length) {
+                $('#seed-verify-error').removeClass('d-none');
+                $btn.prop('disabled', false);
+                return;
+            }
+
             var ok = true;
             try {
                 for (var i = 0; i < _seedState.verifyHashes.length; i++) {
@@ -2447,13 +2462,16 @@
                 }
             } catch(e) { ok = false; }
 
-            _seedState.verifyHashes = [];
-
+            // Do NOT zero verifyHashes on failure — user must be able to retry
+            // with the correct words. Hashes are zeroed below only on success.
             if (!ok) {
                 $('#seed-verify-error').removeClass('d-none');
                 $btn.prop('disabled', false);
                 return;
             }
+
+            // Verification passed — zero hashes now, before any async work.
+            _seedState.verifyHashes = [];
             $('#seed-verify-error').addClass('d-none');
             try {
                 var iv = new Uint8Array(_seedState.enc.iv);
