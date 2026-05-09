@@ -491,14 +491,18 @@
             null, false
         );
         if (pin === null) return;
-        var privHex  = await loadEncrypted(STORAGE_KEY_PRIV, pin);
-        var pubHex   = await loadEncrypted(STORAGE_KEY_PUB,  pin);
+        // Decrypt all stored keys in parallel — each blob is independent.
+        var pkResults = await Promise.all([
+            loadEncrypted(STORAGE_KEY_PRIV, pin),
+            loadEncrypted(STORAGE_KEY_PUB,  pin),
+            loadEncrypted(STORAGE_KEY_SEED, pin)
+        ]);
+        var privHex = pkResults[0], pubHex = pkResults[1], seedEntropyHex = pkResults[2];
         if (!privHex || !pubHex) {
             pin = null;
             showMessage(getText('pin-login-error') || 'Wrong PIN');
             return;
         }
-        var seedEntropyHex = await loadEncrypted(STORAGE_KEY_SEED, pin);
         pin = null;
         // 2. Register a new passkey with PRF extension
         var challenge = crypto.getRandomValues(new Uint8Array(32));
@@ -696,8 +700,11 @@
     async function saveWalletWif(pin) {
         var pubkey  = globalData.pubKeyHex;
         var privHex = Keystore.getPrivKeyHex();
-        await saveEncrypted(STORAGE_KEY_PUB,  pubkey,   pin);
-        await saveEncrypted(STORAGE_KEY_PRIV, privHex,  pin);
+        // Encrypt both in parallel — independent blobs, each gets its own salt/iv.
+        await Promise.all([
+            saveEncrypted(STORAGE_KEY_PUB,  pubkey,  pin),
+            saveEncrypted(STORAGE_KEY_PRIV, privHex, pin)
+        ]);
         localStorage.removeItem(STORAGE_KEY_SEED);
         localStorage.removeItem(STORAGE_KEY_PATH);
         privHex = '';
@@ -706,17 +713,24 @@
         var pubkey     = globalData.pubKeyHex;
         var privHex    = Keystore.getPrivKeyHex();
         var entropyHex = _mnemonicToEntropyHex(mnemonic);
-        mnemonic = '';  // no longer needed — entropy hex is the canonical form
-        await saveEncrypted(STORAGE_KEY_PUB,  pubkey,     pin);
-        await saveEncrypted(STORAGE_KEY_PRIV, privHex,    pin);
-        await saveEncrypted(STORAGE_KEY_SEED, entropyHex, pin);
+        mnemonic = '';
+        // Encrypt all three in parallel — independent blobs.
+        await Promise.all([
+            saveEncrypted(STORAGE_KEY_PUB,  pubkey,     pin),
+            saveEncrypted(STORAGE_KEY_PRIV, privHex,    pin),
+            saveEncrypted(STORAGE_KEY_SEED, entropyHex, pin)
+        ]);
         try { localStorage.setItem(STORAGE_KEY_PATH, path || DEFAULT_DERIV_PATH); } catch(e) {}
         privHex    = '';
         entropyHex = '';
     }
     async function loadWallet(pin) {
-        var pubHex  = await loadEncrypted(STORAGE_KEY_PUB,  pin);
-        var privHex = await loadEncrypted(STORAGE_KEY_PRIV, pin);
+        // Decrypt both keys in parallel — each blob has its own salt, no dependency.
+        var results = await Promise.all([
+            loadEncrypted(STORAGE_KEY_PUB,  pin),
+            loadEncrypted(STORAGE_KEY_PRIV, pin)
+        ]);
+        var pubHex = results[0], privHex = results[1];
         if (!pubHex || !privHex) return null;
         return { pubkey: pubHex, privHex: privHex };
     }
