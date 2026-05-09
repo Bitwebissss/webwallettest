@@ -2326,6 +2326,7 @@
             else globalData.rfee = getConfig()['fee']
         })
         $('#scan-modal').on('hide.bs.modal', function() { stopStream() })
+        $(window).on('beforeunload', stopStream);
         $('#copy-address-btn').click(function() {
             if (globalData.address) copyToClipboard(globalData.address, $(this))
         })
