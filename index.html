@@ -296,6 +296,13 @@
                                             <span class="text-muted"> — <span tkey="immature-cannot-spend">cannot spend yet</span></span>
                                         </small>
                                     </div>
+                                    <div id="unconfirmed-balance-row-main" class="d-none mt-1">
+                                        <small class="text-info">
+                                            <span class="fa-solid fa-clock"></span>
+                                            <span tkey="unconfirmed-balance">Unconfirmed:</span> <b class="unconfirmed-amount"></b>
+                                            <span class="text-muted"> — <span tkey="unconfirmed-mempool">pending in mempool</span></span>
+                                        </small>
+                                    </div>
                                 </div>
                             </div>
                             <div id="wallet-send" class="tab-item d-none" data-tab="wallet-send">
@@ -312,6 +319,13 @@
                                             <span class="fa-solid fa-lock"></span>
                                             <span tkey="immature-mining">Immature (mining):</span>
                                             <b class="immature-amount"></b>
+                                        </span>
+                                    </div>
+                                    <div id="unconfirmed-balance-row" class="d-none mt-1">
+                                        <span class="text-info">
+                                            <span class="fa-solid fa-clock"></span>
+                                            <span tkey="unconfirmed-balance">Unconfirmed:</span>
+                                            <b class="unconfirmed-amount"></b>
                                         </span>
                                     </div>
                                     <div class="float-md-end">

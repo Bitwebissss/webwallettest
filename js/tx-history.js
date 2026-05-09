@@ -7,12 +7,12 @@
     var _getConfig    = null;
     var _amountFormat = null;
     var _blockExplorer = null;
-    var HISTORY_LIMIT = 10;
+    var HISTORY_LIMIT  = 10;
+    var EXPLORER_BASE  = 'https://explorer.bitwebcore.net';
+    var PENDING_TTL    = 86400000; // 24 h
 
-    // In-memory cache for previous-output transactions.
-    // Cleared on each updateHistory() call. Avoids fetching the same tx
-    // multiple times when several history entries share common inputs.
-    var _prevTxCache = Object.create(null);
+    // Map<txid, {amount: sats, ts: ms}> — tx-ы отправленные нами, ещё в мемпуле
+    var _pending = Object.create(null);
 
     function init(deps) {
         _globalData    = deps.globalData;
@@ -22,6 +22,11 @@
         _getConfig     = deps.getConfig;
         _amountFormat  = deps.amountFormat;
         _blockExplorer = deps.blockExplorer;
+    }
+
+    // Вызывается из wallet.js сразу после успешного broadcast
+    function addPending(txid, amount) {
+        _pending[txid] = { amount: amount, ts: Date.now() };
     }
 
     function loadHistory() {
@@ -36,187 +41,110 @@
         } catch (e) {}
     }
 
-    // -----------------------------------------------------------------------
-    // isOurOutput
-    // Returns true if a vout (from a verbose transaction) belongs to one of
-    // our addresses. Checks by scriptPubKey.hex first — the most reliable and
-    // type-agnostic method (works for P2PKH, P2SH, P2WPKH, P2TR and any other
-    // script type). Falls back to address comparison when hex is absent.
-    // -----------------------------------------------------------------------
-    function isOurOutput(o) {
-        if (!o || !o.scriptPubKey) return false;
-
-        var hex = o.scriptPubKey.hex
-            ? o.scriptPubKey.hex.toLowerCase()
-            : '';
-
-        if (hex) {
-            return _globalData.allScriptHexes
-                ? _globalData.allScriptHexes.has(hex)
-                : hex === (_globalData.scriptHex || '').toLowerCase();
+    // Определяем direction для mempool-транзакции без запросов к сети:
+    //   1. txid в _pending          → мы отправили → 'out'
+    //   2. height===0 UTXO с этим txid → нам пришло → 'in'
+    function _annotateMempool(txHash) {
+        if (_pending[txHash]) {
+            return { direction: 'out', amount: _pending[txHash].amount };
         }
-
-        // Fallback: check by address (older ElectrumX versions may omit hex)
-        var addr = o.scriptPubKey.address
-            || (o.scriptPubKey.addresses && o.scriptPubKey.addresses[0])
-            || '';
-        if (addr) {
-            return _globalData.allAddresses
-                ? _globalData.allAddresses.has(addr)
-                : addr === (_globalData.address || '');
-        }
-
-        return false;
-    }
-
-    // -----------------------------------------------------------------------
-    // fetchTxCached
-    // Fetches a verbose transaction by txid, using _prevTxCache to avoid
-    // duplicate network requests within a single history refresh.
-    // -----------------------------------------------------------------------
-    function fetchTxCached(txid) {
-        if (_prevTxCache[txid]) return Promise.resolve(_prevTxCache[txid]);
-        return fetch(_getBackend() + '/tx/' + txid)
-            .then(function (r) { return r.json(); })
-            .then(function (d) {
-                var tx = (d.error == null && d.result) ? d.result : {};
-                _prevTxCache[txid] = tx;
-                return tx;
-            });
-    }
-
-    // -----------------------------------------------------------------------
-    // annotateTx — returns a Promise
-    //
-    // How direction is determined:
-    //
-    //   weAreSender = any input whose previous output pays to one of our
-    //                 scriptpubkeys.
-    //
-    // This is the ONLY correct universal approach. Checking for our pubkey
-    // inside txinwitness / scriptSig fails for:
-    //   - Taproot key-path spending: witness = [<64-byte Schnorr sig>], no pubkey
-    //   - Taproot script-path spending: witness = [stack…, script, control-block]
-    //   - P2SH-wrapped segwit with non-standard scriptSig encoding
-    //
-    // After we know weAreSender we compute:
-    //   received      = sum of vout amounts that pay to us
-    //   sentToOthers  = sum of vout amounts that pay to others
-    //
-    //   weAreSender && sentToOthers == 0  → 'self'  (consolidation / internal move)
-    //   weAreSender && sentToOthers  > 0  → 'out',  amount = sentToOthers
-    //   !weAreSender                      → 'in',   amount = received
-    // -----------------------------------------------------------------------
-    function annotateTx(txMeta, txDetail) {
-        var vin  = txDetail.vin  || [];
-        var vout = txDetail.vout || [];
-
-        // --- vout pass ---
-        var received = 0, sentToOthers = 0;
-        vout.forEach(function (o) {
-            var sat = (o.value_sat != null)
-                ? o.value_sat
-                : Math.round((o.value || 0) * 1e8);
-            if (isOurOutput(o)) {
-                received += sat;
-            } else {
-                sentToOthers += sat;
-            }
+        var found = null;
+        (_globalData.utxos || []).forEach(function (u) {
+            if (u.txid === txHash && u.height === 0) found = u;
         });
-
-        // --- vin pass: resolve previous outputs to detect sender ---
-        // Coinbase inputs have no txid — skip them (they can never be ours).
-        var inputChecks = vin.map(function (input) {
-            if (!input.txid) return Promise.resolve(false);
-            return fetchTxCached(input.txid)
-                .then(function (prevTx) {
-                    var prevOut = (prevTx.vout || [])[input.vout];
-                    return !!prevOut && isOurOutput(prevOut);
-                })
-                .catch(function () { return false; });
-        });
-
-        return Promise.all(inputChecks).then(function (results) {
-            var weAreSender = results.some(Boolean);
-
-            var direction, amount;
-            if (weAreSender) {
-                var isSelfSend = (sentToOthers === 0);
-                direction = isSelfSend ? 'self' : 'out';
-                amount    = isSelfSend ? received : sentToOthers;
-            } else {
-                direction = 'in';
-                amount    = received;
-            }
-
-            return {
-                tx_hash:   txMeta.tx_hash,
-                height:    txMeta.height,
-                direction: direction,
-                amount:    amount
-            };
-        });
+        if (found) return { direction: 'in', amount: found.value };
+        return { direction: 'unknown', amount: null };
     }
 
     function updateHistory() {
         if (_globalData.status !== 'unlocked') return;
         var requestedAddress = _globalData.address;
 
-        // Clear the cache on every refresh so stale data never bleeds through.
-        _prevTxCache = Object.create(null);
+        // Чистим протухшие записи из _pending
+        var now = Date.now();
+        Object.keys(_pending).forEach(function (k) {
+            if (now - _pending[k].ts > PENDING_TTL) delete _pending[k];
+        });
 
         $('#history-list').html(
             '<div class="text-muted text-center py-3 small">' +
             _escHtml(_getText('history-loading')) + '</div>'
         );
 
-        fetch(_getBackend() + '/history/' + requestedAddress)
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                if (!data || data.error != null) {
-                    $('#history-list').html(
-                        '<div class="text-danger text-center py-3 small">' +
-                        _escHtml(_getText('history-failed')) + '</div>'
-                    );
-                    return;
-                }
-                var all    = data.result || [];
-                var total  = all.length;
-                var recent = all.slice(-HISTORY_LIMIT).reverse();
-                if (recent.length === 0) { renderHistory([], total); return; }
+        // Параллельно: наш бэк (heights + мемпул) и обозреватель (sent/received/timestamp)
+        Promise.all([
+            fetch(_getBackend() + '/history/' + requestedAddress)
+                .then(function (r) { return r.json(); }),
+            fetch(EXPLORER_BASE + '/ext/getaddresstxs/' + requestedAddress + '/0/' + HISTORY_LIMIT)
+                .then(function (r) { return r.json(); })
+                .catch(function () { return []; })
+        ]).then(function (results) {
+            var histData     = results[0];
+            var explorerData = results[1];
 
-                var fetches = recent.map(function (txMeta) {
-                    return fetch(_getBackend() + '/tx/' + txMeta.tx_hash)
-                        .then(function (r) { return r.json(); })
-                        .then(function (d) {
-                            var txDetail = (d.error == null && d.result) ? d.result : {};
-                            // Seed the cache: this tx may be referenced as a
-                            // previous output by another tx in the same batch.
-                            _prevTxCache[txMeta.tx_hash] = txDetail;
-                            return annotateTx(txMeta, txDetail);
-                        })
-                        .catch(function () {
-                            return {
-                                tx_hash:   txMeta.tx_hash,
-                                height:    txMeta.height,
-                                direction: 'unknown',
-                                amount:    null
-                            };
-                        });
-                });
-
-                Promise.all(fetches).then(function (annotated) {
-                    if (!_globalData.address || _globalData.address !== requestedAddress) return;
-                    saveHistory(annotated);
-                    renderHistory(annotated, total);
-                });
-            })
-            .catch(function () {
+            if (!histData || histData.error != null) {
                 $('#history-list').html(
                     '<div class="text-danger text-center py-3 small">' +
-                    _escHtml(_getText('history-network-error')) + '</div>'
+                    _escHtml(_getText('history-failed')) + '</div>'
                 );
+                return;
+            }
+            if (_globalData.address !== requestedAddress) return;
+
+            var all    = histData.result || [];
+            var total  = all.length;
+            var recent = all.slice(-HISTORY_LIMIT).reverse();
+            if (recent.length === 0) { renderHistory([], total); return; }
+
+            // explorerMap: txid → {sent, received, timestamp}
+            var explorerMap = Object.create(null);
+            if (Array.isArray(explorerData)) {
+                explorerData.forEach(function (ex) {
+                    if (ex.txid) explorerMap[ex.txid] = ex;
+                });
+            }
+
+            var annotated = recent.map(function (item) {
+                var ex = explorerMap[item.tx_hash];
+                if (ex) {
+                    // Подтверждённая — direction из sent/received обозревателя
+                    var dir, amt;
+                    if (ex.sent === 0) {
+                        dir = 'in';
+                        amt = ex.received;
+                    } else {
+                        var net = ex.sent - ex.received;
+                        if (net <= 0) { dir = 'self'; amt = ex.received; }
+                        else          { dir = 'out';  amt = net; }
+                    }
+                    return { tx_hash: item.tx_hash, height: item.height, direction: dir, amount: amt, timestamp: ex.timestamp };
+                }
+                // Мемпул — аннотируем локально
+                var mem = _annotateMempool(item.tx_hash);
+                return { tx_hash: item.tx_hash, height: 0, direction: mem.direction, amount: mem.amount, timestamp: null };
             });
+
+            // Tx подтвердился — убираем из _pending
+            annotated.forEach(function (tx) {
+                if (tx.height > 0 && _pending[tx.tx_hash]) delete _pending[tx.tx_hash];
+            });
+
+            saveHistory(annotated);
+            renderHistory(annotated, total);
+        }).catch(function () {
+            $('#history-list').html(
+                '<div class="text-danger text-center py-3 small">' +
+                _escHtml(_getText('history-network-error')) + '</div>'
+            );
+        });
+    }
+
+    function _formatTs(ts) {
+        if (!ts) return '';
+        var d   = new Date(ts * 1000);
+        var pad = function (n) { return n < 10 ? '0' + n : String(n); };
+        return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear() +
+               ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
     }
 
     function renderHistory(txs, total) {
@@ -256,11 +184,15 @@
             var safeHash  = _escHtml(tx.tx_hash || '');
             var txUrl     = _escHtml(_blockExplorer.tx(tx.tx_hash || ''));
             var shortHash = safeHash.substr(0, 10) + '…' + safeHash.substr(-6);
+            var tsHtml    = tx.timestamp
+                ? '<div class="text-muted history-ts">' + _escHtml(_formatTs(tx.timestamp)) + '</div>'
+                : '';
 
             html += '<div class="history-item d-flex align-items-center border-bottom history-item-inner">' +
                 dirLabel +
                 '<div class="font-monospace text-truncate flex-grow-1 history-tx-hash">' +
                     '<a href="' + txUrl + '" target="_blank" rel="noopener noreferrer">' + shortHash + '</a>' +
+                    tsHtml +
                 '</div>' +
                 '<div class="flex-shrink-0">' + confBadge + '</div>' +
             '</div>';
@@ -279,6 +211,7 @@
 
     window.TxHistory = {
         init:          init,
+        addPending:    addPending,
         loadHistory:   loadHistory,
         saveHistory:   saveHistory,
         updateHistory: updateHistory,

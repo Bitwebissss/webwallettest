@@ -276,9 +276,10 @@
     })();
     var globalData = {
         status:          'locked',
-        balance:         0,
-        immatureBalance: 0,
-        height:          0,
+        balance:             0,
+        unconfirmedBalance:  0,
+        immatureBalance:     0,
+        height:              0,
         address:         undefined,
         scriptHex:       undefined,
         pubKey:          null,
@@ -287,7 +288,7 @@
         coinControl:     false,
         selectedUtxos:   null,
         tx:              { amount: 0, outputs: [], fee: 0 },
-        _lastRendered:   { balance: -1, immature: -1, utxoFingerprint: '' },
+        _lastRendered:   { balance: -1, immature: -1, unconfirmed: -1, utxoFingerprint: '' },
         resetTx: function() {
             this.tx = { amount: 0, outputs: [], fee: 0 };
         },
@@ -299,13 +300,14 @@
             this.pubKey          = null;
             this.allScriptHexes  = null;
             this.allAddresses    = null;
-            this.balance         = 0;
-            this.immatureBalance = 0;
-            this.height          = 0;
-            this.utxos           = [];
-            this.coinControl     = false;
-            this.selectedUtxos   = null;
-            this._lastRendered   = { balance: -1, immature: -1, utxoFingerprint: '' };
+            this.balance             = 0;
+            this.unconfirmedBalance  = 0;
+            this.immatureBalance     = 0;
+            this.height              = 0;
+            this.utxos               = [];
+            this.coinControl         = false;
+            this.selectedUtxos       = null;
+            this._lastRendered       = { balance: -1, immature: -1, unconfirmed: -1, utxoFingerprint: '' };
             this.resetTx();
         }
     };
@@ -1050,11 +1052,13 @@
         return Promise.resolve($.ajax({ 'url': getBackend() + '/fee' }))
     }
     function _applyUtxoData() {
-        var immature = 0
+        var immature = 0, unconfirmed = 0
         globalData.utxos.forEach(function(u) {
-            if (!u.mature) immature += u.value
+            if (u.height === 0)   unconfirmed += u.value   // мемпул
+            else if (!u.mature)   immature    += u.value   // coinbase, не созрел
         })
-        globalData.immatureBalance = immature
+        globalData.immatureBalance    = immature
+        globalData.unconfirmedBalance = unconfirmed
         var fp = globalData.utxos.map(function(u) {
             return u.txid + ':' + u.index + ':' + (u.mature ? 1 : 0)
         }).join('|')
@@ -1098,22 +1102,31 @@
         QRCode.toCanvas(canvas, text, { width: 256, margin: 2, color: { dark: '#000000', light: '#ffffff' } });
     }
     function _renderBalanceDisplay() {
-        var total    = globalData.balance
-        var immature = globalData.immatureBalance
-        var avail    = Math.max(0, total - immature)
+        var confirmed    = globalData.balance
+        var immature     = globalData.immatureBalance
+        var unconfirmed  = globalData.unconfirmedBalance
+        var avail        = Math.max(0, confirmed - immature)
         var lr = globalData._lastRendered
-        if (lr.balance === total && lr.immature === immature) return
-        lr.balance = total
-        lr.immature = immature
+        if (lr.balance === confirmed && lr.immature === immature && lr.unconfirmed === unconfirmed) return
+        lr.balance     = confirmed
+        lr.immature    = immature
+        lr.unconfirmed = unconfirmed
         var ticker = getConfig()['ticker']
         $('.wallet-balance .amount').text(amountFormat(avail))
         $('.wallet-balance .ticker').text(ticker)
-        var immatureText = immature > 0
-            ? amountFormat(immature) + ' ' + ticker
-            : ''
+        var immatureText = immature > 0 ? amountFormat(immature) + ' ' + ticker : ''
         $('#immature-balance-row-main, #immature-balance-row').each(function() {
             if (immature > 0) {
                 $(this).find('.immature-amount').text(immatureText)
+                $(this).removeClass('d-none')
+            } else {
+                $(this).addClass('d-none')
+            }
+        })
+        var unconfirmedText = unconfirmed > 0 ? amountFormat(unconfirmed) + ' ' + ticker : ''
+        $('#unconfirmed-balance-row-main, #unconfirmed-balance-row').each(function() {
+            if (unconfirmed > 0) {
+                $(this).find('.unconfirmed-amount').text(unconfirmedText)
                 $(this).removeClass('d-none')
             } else {
                 $(this).addClass('d-none')
@@ -1479,6 +1492,7 @@
                 transactionBroadcast(tx.toHex()).then(function(data) {
                     if (data.error == null) {
                         clearUtxoCache(address);
+                        TxHistory.addPending(data.result, globalData.tx.amount);
                         $('#status-screen span').html(
                             '<a href="' + escHtml(blockExplorer.tx(data.result)) + '" target="_blank" rel="noopener noreferrer">' + escHtml(data.result) + '</a>'
                         );
@@ -2159,7 +2173,8 @@
             globalData.coinControl = false;
             globalData.selectedUtxos = null;
             globalData.immatureBalance = 0;
-            globalData._lastRendered = { balance: -1, immature: -1, utxoFingerprint: '' };
+            globalData.unconfirmedBalance = 0;
+            globalData._lastRendered = { balance: -1, immature: -1, unconfirmed: -1, utxoFingerprint: '' };
             globalData.address        = Keystore.deriveAddress(newType, globalData.pubKey);
             globalData.scriptHex      = Keystore.getScriptHex(newType, globalData.pubKey);
             globalData.allScriptHexes = Keystore.getAllScriptHexes(globalData.pubKey);
@@ -2517,9 +2532,9 @@
         });
         _ws.on('balance_changed', function(data) {
             if (globalData.status !== 'unlocked') return;
-            if (data && typeof data.balance === 'number' && Array.isArray(data.utxos)) {
+            if (data && typeof data.confirmed === 'number' && Array.isArray(data.utxos)) {
                 var prevBalance = globalData.balance;
-                globalData.balance = data.balance;
+                globalData.balance = data.confirmed;
                 if (typeof data.height === 'number') {
                     globalData.height = data.height;
                 }
@@ -2530,7 +2545,7 @@
                         blocksLeft: blocksToMature(u, h)
                     });
                 });
-                saveUtxoCache(globalData.address, globalData.utxos, h, data.balance);
+                saveUtxoCache(globalData.address, globalData.utxos, h, data.confirmed);
                 _applyUtxoData();
                 if (globalData.balance !== prevBalance && globalData.address) {
                     TxHistory.updateHistory();
