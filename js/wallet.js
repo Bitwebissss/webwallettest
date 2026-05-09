@@ -1354,7 +1354,24 @@
             var pin = await askPinSetup();
             if (pin === null) {
                 Keystore.clear();
-                seedReset();
+                // When cancelling during BIP39 seed creation: the generated mnemonic must be
+                // discarded immediately (Keystore.clear() already wipes the key pair).
+                // Navigate away from the seed screen entirely — leaving the user half-way
+                // through the flow with a half-noted seed is a safety hazard: they could
+                // re-enter the flow, get a NEW seed, save that one, but try to recover with
+                // the old one they wrote down — resulting in permanent loss of funds.
+                if (bip39Mnemonic) {
+                    bip39Mnemonic = null;
+                    seedReset();
+                    switchPage('');   // go to homepage
+                    // Translation key 'seed-cancelled-regen' — to be added to lang files
+                    showMessage(
+                        getText('seed-cancelled-regen') ||
+                        'PIN setup cancelled — seed discarded for security. A new seed will be generated on your next attempt.'
+                    );
+                } else {
+                    seedReset();
+                }
                 return;
             }
             globalData.pubKeyHex = Keystore.getPublicKeyHex();
@@ -1729,8 +1746,14 @@
     function resetTxForm() {
         $('.send-additional-output').remove()
         $('#wallet-send input').val('')
+        // BUG FIX: #send-fee and #send-outputs inputs may sit outside #wallet-send in the DOM,
+        // so the generic selector above might miss them. Clear them explicitly so the form is
+        // guaranteed clean after wallet lock/unlock or manual reset.
+        $('#send-fee').val('')
+        $('#send-outputs [name="send-address"]').val('')
+        $('#send-outputs [name="send-ammount"]').val('')
         $('#wallet-send .wallet-balance').removeClass('text-danger')
-        $('#send-fee, #send-outputs [name="send-ammount"]').removeClass('is-invalid')
+        $('#send-fee, #send-outputs [name="send-ammount"], #send-outputs [name="send-address"]').removeClass('is-invalid')
         globalData.resetTx()
         validateSendForm()
     }
@@ -1804,6 +1827,36 @@
     // ─────────────────────────────────────────────────────────────────────
     $(document).ready(function() {
         initLang()
+        // ── Prevent password managers from autofilling sensitive crypto fields ─────────
+        // These inputs hold key material, seed phrases, or PINs — NOT account passwords.
+        // Browsers and extensions (LastPass, 1Password, Bitwarden) see type="password" or
+        // a form-like structure and try to save/fill — risking key material leaking into
+        // password vaults or confusing users with wrong credentials.
+        //
+        //   autocomplete="off"          — standard hint (many browsers honour this for non-login forms)
+        //   autocomplete="new-password" — stronger signal for password-type fields (suppresses autofill)
+        //   data-lpignore="true"        — LastPass explicit ignore
+        //   data-1p-ignore="true"       — 1Password explicit ignore
+        //   data-bwignore="true"        — Bitwarden explicit ignore
+        (function _blockPasswordManagers() {
+            $('#pin-input, #pin-login-input').attr({
+                autocomplete: 'off', 'data-lpignore': 'true', 'data-1p-ignore': 'true', 'data-bwignore': 'true'
+            });
+            $('#passphrase').attr({
+                autocomplete: 'off', 'data-lpignore': 'true', 'data-1p-ignore': 'true', 'data-bwignore': 'true'
+            });
+            // Brain-wallet form looks like a login to browsers — use new-password to suppress autofill
+            $('#open-email').attr({
+                autocomplete: 'off', 'data-lpignore': 'true', 'data-1p-ignore': 'true', 'data-bwignore': 'true'
+            });
+            $('#open-password, #open-password-confirm').attr({
+                autocomplete: 'new-password', 'data-lpignore': 'true', 'data-1p-ignore': 'true', 'data-bwignore': 'true'
+            });
+            $('#restore-input, #transaction-broadcast-raw').attr({
+                autocomplete: 'off', 'data-lpignore': 'true', 'data-1p-ignore': 'true', 'data-bwignore': 'true'
+            });
+        })();
+        // ──────────────────────────────────────────────────────────────────────────────
         $(document).on('click', '.theme-option', function(e) {
             e.preventDefault();
             var theme = $(this).data('theme');
@@ -1863,6 +1916,13 @@
                     resolve(null)
                 }
                 modalEl.addEventListener('hidden.bs.modal', onHidden)
+                // BUG FIX: modal('hide') was missing — without it the 'hidden.bs.modal' event
+                // never fires, resolve(null) is never called, and the awaiting button stays
+                // disabled forever (e.g. "Подтвердить и задать PIN" on seed create screen).
+                $('#pin-modal').modal('hide')
+            } else {
+                // Safety: close modal even if no promise is pending (e.g. stale state)
+                $('#pin-modal').modal('hide')
             }
         })
         // ── Passkey button inside pin-modal ───────────────────────────────────
