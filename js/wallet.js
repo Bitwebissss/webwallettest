@@ -2532,7 +2532,8 @@
         _ws.on('balance_changed', function(data) {
             if (globalData.status !== 'unlocked') return;
             if (data && typeof data.confirmed === 'number' && Array.isArray(data.utxos)) {
-                var prevBalance = globalData.balance;
+                var prevBalance     = globalData.balance;
+                var prevUnconfirmed = globalData.unconfirmedBalance;
                 globalData.balance = data.confirmed;
                 if (typeof data.height === 'number') {
                     globalData.height = data.height;
@@ -2546,7 +2547,7 @@
                 });
                 saveUtxoCache(globalData.address, globalData.utxos, h, data.confirmed);
                 _applyUtxoData();
-                if (globalData.balance !== prevBalance && globalData.address) {
+                if ((globalData.balance !== prevBalance || globalData.unconfirmedBalance !== prevUnconfirmed) && globalData.address) {
                     TxHistory.updateHistory();
                 }
             }
