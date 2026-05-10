@@ -1,10 +1,6 @@
 (function () {
     'use strict';
-
-    // ─── Constants ────────────────────────────────────────────────────────────
     const HISTORY_LIMIT = 10;
-
-    // ─── Class ────────────────────────────────────────────────────────────────
     class TxHistoryManager {
         #globalData    = null;
         #escHtml       = null;
@@ -13,8 +9,6 @@
         #getConfig     = null;
         #amountFormat  = null;
         #blockExplorer = null;
-
-        // ─── Init ─────────────────────────────────────────────────────────────
         init(deps) {
             this.#globalData    = deps.globalData;
             this.#escHtml       = deps.escHtml;
@@ -24,39 +18,29 @@
             this.#amountFormat  = deps.amountFormat;
             this.#blockExplorer = deps.blockExplorer;
         }
-
-        // ─── Persistence ──────────────────────────────────────────────────────
         loadHistory() {
             const key = 'bte_history_' + this.#globalData.address;
             try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { return []; }
         }
-
         saveHistory(txs) {
             if (!this.#globalData.address) return;
             try {
                 localStorage.setItem('bte_history_' + this.#globalData.address, JSON.stringify(txs));
             } catch (e) {}
         }
-
-        // ─── Network fetch ────────────────────────────────────────────────────
         updateHistory() {
             if (this.#globalData.status !== 'unlocked') return;
-
             const requestedAddress = this.#globalData.address;
-
             $('#history-list').html(
                 '<div class="text-muted text-center py-3 small">' +
                 this.#escHtml(this.#getText('history-loading')) + '</div>'
             );
-
             const url = this.#getBackend() + '/history/' + requestedAddress
                       + '?limit=' + HISTORY_LIMIT;
-
             fetch(url)
                 .then(r => r.json())
                 .then(data => {
                     if (this.#globalData.address !== requestedAddress) return;
-
                     if (data.error != null) {
                         $('#history-list').html(
                             '<div class="text-danger text-center py-3 small">' +
@@ -64,7 +48,6 @@
                         );
                         return;
                     }
-
                     const txs = data.result || [];
                     this.saveHistory(txs);
                     this.renderHistory(txs);
@@ -81,8 +64,6 @@
                     }
                 });
         }
-
-        // ─── Private helper ───────────────────────────────────────────────────
         #formatTs(ts) {
             if (!ts) return '';
             const d   = new Date(ts * 1000);
@@ -90,8 +71,6 @@
             return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' +
                    d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
         }
-
-        // ─── Render ───────────────────────────────────────────────────────────
         renderHistory(txs) {
             if (!txs || txs.length === 0) {
                 $('#history-list').html(
@@ -100,13 +79,10 @@
                 );
                 return;
             }
-
             let html         = '';
             const ticker     = this.#getConfig()['ticker'];
-
             txs.forEach(tx => {
                 const confirmed = tx.height !== 0;
-
                 const confBadge = confirmed
                     ? '<span class="badge text-bg-success ms-1">' +
                       this.#escHtml(
@@ -116,10 +92,8 @@
                       ) + '</span>'
                     : '<span class="badge text-bg-warning ms-1">' +
                       this.#escHtml(this.#getText('history-pending')) + '</span>';
-
                 const dir = tx.direction || 'unknown';
                 const amt = (tx.amount != null) ? this.#amountFormat(tx.amount) : '?';
-
                 let dirLabel;
                 if (dir === 'in') {
                     dirLabel = '<span class="fw-bold text-success tx-dir-label">' +
@@ -137,14 +111,12 @@
                     dirLabel = '<span class="text-muted tx-dir-label">— ? ' +
                                this.#escHtml(ticker) + '</span>';
                 }
-
                 const safeHash = this.#escHtml(tx.txid || '');
                 const txUrl    = this.#escHtml(this.#blockExplorer.tx(tx.txid || ''));
                 const tsHtml   = tx.timestamp
                     ? '<div class="text-muted history-ts">' +
                       this.#escHtml(this.#formatTs(tx.timestamp)) + '</div>'
                     : '';
-
                 html += '<div class="history-item d-flex align-items-center border-bottom history-item-inner">' +
                         dirLabel +
                         '<div class="font-monospace flex-grow-1 history-tx-hash break-word">' +
@@ -155,7 +127,6 @@
                         '<div class="flex-shrink-0">' + confBadge + '</div>' +
                         '</div>';
             });
-
             if (txs.length >= HISTORY_LIMIT) {
                 const explorerUrl = this.#escHtml(this.#blockExplorer.address(this.#globalData.address));
                 html += '<div class="text-center py-2"><small>' +
@@ -163,10 +134,8 @@
                         this.#escHtml(this.#getText('history-view-all')) + ' &#x2197;' +
                         '</a></small></div>';
             }
-
             $('#history-list').html(html);
         }
     }
-
     window.TxHistory = new TxHistoryManager();
 })();

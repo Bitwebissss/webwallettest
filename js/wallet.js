@@ -1,14 +1,9 @@
 (function() {
     'use strict';
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // CONSTANTS
-    // ═══════════════════════════════════════════════════════════════════════════
     const walletVersion      = '0.5';
     const DEFAULT_DERIV_PATH = "m/84'/738'/0'/0/0";
     const AUTO_LOCK_MS       = 20 * 60 * 1000;
     const UTXO_CACHE_TTL     = 60000;  // ms
-
     const STORAGE_KEY_PUB     = 'bte_wallet_pubkey';
     const STORAGE_KEY_PRIV    = 'bte_wallet_privkey';
     const STORAGE_KEY_SEED    = 'bte_wallet_seed';
@@ -17,9 +12,7 @@
     const STORAGE_KEY_PRIV_PK = 'bte_wallet_privkey_pk';
     const STORAGE_KEY_SEED_PK = 'bte_wallet_seed_pk';
     const STORAGE_KEY_PK_ID   = 'bte_pk_credential_id';
-
     const PK_PRF_SALT = new TextEncoder().encode('bitweb-wallet-v1');
-
     const networkConfigs = {
         'BTE': {
             'uri':     'bitweb:',
@@ -47,47 +40,30 @@
             }
         }
     };
-
     const blockExplorer = {
         'address': function(address) { return 'https://explorer.bitwebcore.net/address/' + address + '/' },
         'tx':      function(tx)      { return 'https://explorer.bitwebcore.net/tx/' + tx + '/' }
     };
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // MUTABLE MODULE STATE
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    // QR scanner
     let stream      = null;
     let scanVideo   = null;
     let scanRafId   = null;
     let scanSession = 0;
-
-    // Send flow
     let isSending = false;
-
-    // Auto-lock timer
     let autoLockTimer = null;
-
-    // PIN modal callbacks
     let pinResolve         = null;
     let pinValidator       = null;
     let pinPasskeyCallback = null;
 
     class SeedStore {
         #revealedWords = [];
-        #entropy       = null;   // Uint8Array — энтропия, никогда не строки
+        #entropy       = null;
         #enc           = null;
         #tempKey       = null;
         #verifyHashes  = [];
         #strength      = 256;
-
-        // revealed words (display state, wiped after 60s)
         getRevealed()       { return this.#revealedWords; }
         setRevealed(arr)    { this.#revealedWords = arr; }
         wipeRevealed()      { if (this.#revealedWords.length) this.#revealedWords.fill(''); this.#revealedWords = []; }
-
-        // entropy (seed generation state) — Uint8Array, не строки
         get entropy()       { return this.#entropy; }
         set entropy(v)      { this.#entropy = v; }
         get enc()           { return this.#enc; }
@@ -98,7 +74,6 @@
         set verifyHashes(v) { this.#verifyHashes = v; }
         get strength()      { return this.#strength; }
         set strength(v)     { this.#strength = v; }
-
         clear() {
             this.wipeRevealed();
             if (this.#entropy) { this.#entropy.fill(0); this.#entropy = null; }
@@ -108,16 +83,9 @@
         }
     }
     const seedStore = new SeedStore();
-
-    // WebSocket
     let ws       = null;
     let wsActive = false;
     let messages  = null;
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // UTILITY FUNCTIONS
-    // ═══════════════════════════════════════════════════════════════════════════
-
     function applyTheme(mode) {
         const resolved = mode === 'auto'
             ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
@@ -168,11 +136,6 @@
         wipeInputValue('#restore-input');
         wipeInputValue('#transaction-broadcast-raw');
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // KEY MATERIAL
-    // ═══════════════════════════════════════════════════════════════════════════
-
     function destroyKeyMaterial(keyPair) {
         if (!keyPair) return;
         try {
@@ -186,11 +149,6 @@
             }
         } catch (ignore) { /* not critical */ }
     }
-    // ── Private-key canvas helpers ────────────────────────────────────────────
-    // WIF is a JS string — immutable, cannot be zeroed.
-    // We render it to a canvas so it never sits in an input.value that the
-    // browser can cache / autofill-snapshot.  The canvas pixel buffer is the
-    // only in-DOM trace; we clear it on hide.
     function clearPrivKeyCanvas() {
         const canvas = document.getElementById('wallet-privkey-canvas');
         if (canvas) {
@@ -202,18 +160,14 @@
     }
     function revealPrivKeyCanvas() {
         if (!Keystore.isUnlocked()) return;
-        // Build WIF just-in-time from live Keystore bytes.
-        // String is unavoidable for display; we null the reference immediately
-        // after rendering so GC can collect it as soon as possible.
         let wif = Keystore.getWIF();
         if (!wif) return;
         const canvas = document.getElementById('wallet-privkey-canvas');
         if (!canvas) { wif = null; return; }
-        // Switch state first, then measure canvas in rAF after layout is updated.
         $('#privkey-show-row').addClass('d-none');
         $('#privkey-reveal-row').removeClass('d-none');
         const capturedWif = wif;
-        wif = null;  // release — string can't be zeroed but GC can now collect
+        wif = null;
         requestAnimationFrame(function() {
             const dpr = Math.min(window.devicePixelRatio || 1, 2);
             const W = Math.max(canvas.offsetWidth || 340, 200);
@@ -230,17 +184,10 @@
             ctx.font         = '13px monospace';
             ctx.textBaseline = 'middle';
             ctx.fillText(capturedWif, 8, H / 2);
-            // capturedWif exits scope here — GC can collect
         });
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // KEYSTORE (private-key vault)
-    // ═══════════════════════════════════════════════════════════════════════════
-
     class KeystoreClass {
         #keyPair = null;
-
         getPublicKeyBytes() {
             return this.#keyPair ? this.#keyPair.publicKey : null;
         }
@@ -251,7 +198,6 @@
         getWIF() {
             return this.#keyPair ? this.#keyPair.toWIF() : null;
         }
-
         #makeTaprootSigner(onSigned) {
             const ecc = bitcoin.ecc;
             if (!ecc || typeof ecc.privateAdd !== 'function' ||
@@ -278,14 +224,13 @@
                     publicKey:   tweakedXOnly,
                     signSchnorr: function(hash) { return ecc.signSchnorr(hash, td); }
                 };
-                onSigned(signer);   // ключевой материал не покидает метод
+                onSigned(signer);
             } finally {
                 rawD.fill(0);
                 if (effectiveD) effectiveD.fill(0);
                 if (tweakedD)   tweakedD.fill(0);
             }
         }
-
         signAllInputs(psbt) {
             if (!this.#keyPair) throw new Error('Wallet locked');
             const hasTaproot = psbt.data.inputs.some(function(inp) {
@@ -306,7 +251,6 @@
                 });
             });
         }
-
         deriveAddress(type, pubKey) {
             if (!this.#keyPair || !pubKey) return '';
             const network = getConfig()['network'];
@@ -322,7 +266,6 @@
                 return bitcoin.payments.p2pkh({ pubkey: pubKey, network: network }).address;
             }
         }
-
         getScriptHex(type, pubKey) {
             if (!this.#keyPair || !pubKey) return '';
             const network = getConfig()['network'];
@@ -338,7 +281,6 @@
                 return bitcoin.Buffer.from(bitcoin.payments.p2pkh({ pubkey: pubKey, network: network }).output).toString('hex');
             }
         }
-
         getAllScriptHexes(pubKey) {
             const set = new Set();
             if (!this.#keyPair || !pubKey) return set;
@@ -353,7 +295,6 @@
             } catch(e) {}
             return set;
         }
-
         getAllAddresses(pubKey) {
             const set = new Set();
             if (!this.#keyPair || !pubKey) return set;
@@ -370,7 +311,6 @@
             } catch(e) {}
             return set;
         }
-
         isUnlocked() {
             return this.#keyPair !== null;
         }
@@ -386,11 +326,6 @@
         }
     }
     const Keystore = new KeystoreClass();
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // CRYPTO HELPERS
-    // ═══════════════════════════════════════════════════════════════════════════
-
     async function deriveKey(pin, salt) {
         const enc = new TextEncoder();
         const km  = await crypto.subtle.importKey(
@@ -454,12 +389,6 @@
             return new Uint8Array(pt);
         } catch(e) { return null; }
     }
-    // mnemonicToEntropyBytes removed — callers convert entropy directly via bip39Bundle
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PASSKEY HELPERS
-    // ═══════════════════════════════════════════════════════════════════════════
-
     function credIdToB64(rawId) {
         return btoa(String.fromCharCode.apply(null, new Uint8Array(rawId)));
     }
@@ -687,11 +616,6 @@
         }
         $section.removeClass('d-none');
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // WALLET SAVE / LOAD
-    // ═══════════════════════════════════════════════════════════════════════════
-
     async function saveWalletWif(pin) {
         const privBytes = Keystore.getPrivKeyBytes();
         const pubCopy   = new Uint8Array(globalData.pubKey);
@@ -715,13 +639,7 @@
         try { localStorage.setItem(STORAGE_KEY_PATH, path || DEFAULT_DERIV_PATH); } catch(e) {}
         pubCopy.fill(0);
         privBytes.fill(0);
-        // entropyBytes.fill(0) — caller's responsibility after this returns
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // AUTO-LOCK
-    // ═══════════════════════════════════════════════════════════════════════════
-
     function resetAutoLock() {
         if (!Keystore.isUnlocked()) return;
         clearTimeout(autoLockTimer);
@@ -734,11 +652,6 @@
         clearTimeout(autoLockTimer);
         autoLockTimer = null;
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // SEED STATE
-    // ═══════════════════════════════════════════════════════════════════════════
-
     function hasSeedBackup() {
         return localStorage.getItem(STORAGE_KEY_SEED) !== null;
     }
@@ -746,11 +659,6 @@
         seedStore.clear();
 
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PIN MODAL
-    // ═══════════════════════════════════════════════════════════════════════════
-
     function askPin(title, desc, validator, mandatory, onPasskeyClick) {
         return new Promise(function(resolve) {
             pinResolve         = resolve;
@@ -821,11 +729,6 @@
         sentinel.fill(0); ct.fill(0);
         return confirmed;
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // LANGUAGE / CONFIG
-    // ═══════════════════════════════════════════════════════════════════════════
-
     function initMessages() {
         return {
             'settings': {
@@ -955,17 +858,12 @@
             $('#wallet-backend input').val(getBackend());
         });
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // RUNTIME STATE (depends on getConfig / initMessages)
-    // ═══════════════════════════════════════════════════════════════════════════
-
     const globalData = {
         status:             'locked',
         balance:             0,
         unconfirmedBalance:  0,
         immatureBalance:     0,
-        pendingOut:          0,   // confirmed coins currently being spent in mempool (set by backend)
+        pendingOut:          0,
         height:              0,
         address:         undefined,
         scriptHex:       undefined,
@@ -999,11 +897,6 @@
             this.resetTx();
         }
     };
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // TX HISTORY
-    // ═══════════════════════════════════════════════════════════════════════════
-
     TxHistory.init({
         globalData:    globalData,
         escHtml:       escHtml,
@@ -1013,11 +906,6 @@
         amountFormat:  amountFormat,
         blockExplorer: blockExplorer
     });
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // UI HELPERS
-    // ═══════════════════════════════════════════════════════════════════════════
-
     function copyToClipboard(text, $btn) {
         const doFeedback = function(ok) {
             const $icon    = $btn.find('.fa-solid, .fa-regular, .fa-brands').first();
@@ -1078,11 +966,6 @@
         if (Keystore.isUnlocked()) setTitle(getText('address') + ' ' + globalData.address);
         else setTitle(getText('open-wallet'));
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // BALANCE / UTXO
-    // ═══════════════════════════════════════════════════════════════════════════
-
     function getRequiredMaturity(coinHeight) {
         const cfg = getConfig()['maturity'];
         if (!cfg) return 100;
@@ -1131,12 +1014,11 @@
         let immature    = 0;
         let unconfirmed = 0;
         globalData.utxos.forEach(function(u) {
-            if (u.height === 0)   unconfirmed += u.value;   // мемпул
-            else if (!u.mature)   immature    += u.value;   // coinbase, не созрел
+            if (u.height === 0)   unconfirmed += u.value;
+            else if (!u.mature)   immature    += u.value;
         });
         globalData.immatureBalance    = immature;
         globalData.unconfirmedBalance = unconfirmed;
-        // pendingOut is computed by the backend and set directly from balance_changed / cache.
         const fp = globalData.utxos.map(function(u) {
             return u.txid + ':' + u.index + ':' + (u.mature ? 1 : 0);
         }).join('|');
@@ -1190,11 +1072,6 @@
         });
         validateSendForm();
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // COIN CONTROL
-    // ═══════════════════════════════════════════════════════════════════════════
-
     function renderCoinControl() {
         const utxos  = globalData.utxos;
         const height = globalData.height;
@@ -1258,11 +1135,6 @@
             count + ' ' + getText('coin-control-selected') + ' — ' + amountFormat(total) + ' ' + getConfig()['ticker']
         );
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // SEND / TRANSACTION
-    // ═══════════════════════════════════════════════════════════════════════════
-
     function parseAmountSats(str) {
         const decimals = getConfig()['decimals'];
         str = String(str == null ? '' : str).trim();
@@ -1544,11 +1416,6 @@
         globalData.resetTx();
         validateSendForm();
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // WALLET OPEN / CLOSE
-    // ═══════════════════════════════════════════════════════════════════════════
-
     function hasSavedWallet() {
         return localStorage.getItem(STORAGE_KEY_PRIV) !== null;
     }
@@ -1706,20 +1573,12 @@
         updateSavedWalletUI();
         setHomeTitle();
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // SEED UI
-    // ═══════════════════════════════════════════════════════════════════════════
-
     function revealSeedFromBytes(entropyBytes) {
         seedStore.wipeRevealed();
-        // entropyToMnemonic returns a JS string — immutable, cannot be zeroed.
-        // Split immediately to words array, then null the string ref so GC
-        // can collect it as soon as possible.
         let mnemonic = bip39Bundle.entropyToMnemonic(entropyBytes);
         entropyBytes.fill(0);
         seedStore.setRevealed(mnemonic.split(' '));
-        mnemonic = null;  // release string ref — GC-eligible
+        mnemonic = null;
         seedRenderGrid(seedStore.getRevealed(), '#wallet-seed-grid');
         $('#wallet-seed-hidden').addClass('d-none');
         $('#wallet-seed-revealed').removeClass('d-none');
@@ -1771,11 +1630,6 @@
         $('#restore-advanced').removeClass('show');
         clearSeedState();
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // ROUTING
-    // ═══════════════════════════════════════════════════════════════════════════
-
     function routePage() {
         const urlParams = readParams();
         if (window.location.hash === '') {
@@ -1814,11 +1668,6 @@
     }
     function readParams() { return window.location.hash.split('/'); }
     function setTitle(title) { document.title = title + ' | ' + getConfig()['title']; }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // QR SCANNER
-    // ═══════════════════════════════════════════════════════════════════════════
-
     function stopStream() {
         scanSession += 1;
         if (scanRafId !== null) {
@@ -1906,11 +1755,6 @@
         $('#scan-modal').modal('toggle');
         startStream();
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // DOCUMENT READY — EVENT HANDLERS
-    // ═══════════════════════════════════════════════════════════════════════════
-
     $(document).ready(function() {
         initLang();
 		messages = initMessages();
@@ -1929,8 +1773,6 @@
         $('#address-type-select select').val(getAddressType());
         routePage();
         updateSavedWalletUI();
-
-        // ── PIN modal ──────────────────────────────────────────────────────────
         $('#pin-confirm').click(async function() {
             let pin = $('#pin-input').val();
             if (pinResolve) {
@@ -2008,8 +1850,6 @@
             if (capsOn) { $('#' + warnId).removeClass('d-none'); }
             else        { $('#' + warnId).addClass('d-none'); }
         });
-
-        // ── PIN login ──────────────────────────────────────────────────────────
         async function doPinLogin() {
             let pin = $('#pin-login-input').val();
             if (!pin) {
@@ -2047,8 +1887,6 @@
         }
         $('#pin-login-btn').click(doPinLogin);
         $('#pin-login-input').on('keydown', function(e) { if (e.key === 'Enter') doPinLogin(); });
-
-        // ── Passkey ───────────────────────────────────────────────────────────
         $('#pk-login-btn').click(function(e) {
             e.preventDefault();
             pkAuthenticate();
@@ -2067,8 +1905,6 @@
                 });
             }
         });
-
-        // ── Wallet forget / open ───────────────────────────────────────────────
         $('#pin-login-forget').click(function(e) {
             e.preventDefault();
             forgetSavedWallet();
@@ -2078,8 +1914,6 @@
             forgetSavedWallet();
             showMessage(escHtml(getText('wallet-deleted')));
         });
-
-        // ── Tabs ──────────────────────────────────────────────────────────────
         $('.tab-link').click(function(e) {
             const tabFamily = $(this).data('tab-family');
             const tabName   = $(this).data('tab-name');
@@ -2103,12 +1937,8 @@
             }
             e.preventDefault();
         });
-
-        // ── Routing ───────────────────────────────────────────────────────────
         $(window).on('hashchange', routePage);
         if (window.location.hash) $(window).trigger('hashchange');
-
-        // ── Send form ─────────────────────────────────────────────────────────
         $('#send-tx').click(function() {
             let error       = false;
             const decimals  = getConfig()['decimals'];
@@ -2183,8 +2013,6 @@
             $('#send-cancel').prop('disabled', false);
             $('#send-confirm').prop('disabled', false);
         });
-
-        // ── Open wallet forms ──────────────────────────────────────────────────
         $('#open-key-form').submit(function(e) {
             let wif = $('#passphrase').val().trim();
             if ([51, 52].includes(wif.length)) {
@@ -2195,7 +2023,7 @@
                 } catch(err) {
                     showMessage(messages.error['bad-priv-key']);
                 } finally {
-                    wif = null;  // string — cannot zero, release ref
+                    wif = null;
                 }
             } else {
                 showMessage(messages.error['bad-priv-key']);
@@ -2237,8 +2065,6 @@
             } else { showMessage(escHtml(getText('identity-too-short'))); pass = ''; passConfirm = ''; }
             e.preventDefault();
         });
-
-        // ── Private key reveal ─────────────────────────────────────────────────
         $('#toggle-wallet-privkey').click(async function() {
             if (!Keystore.isUnlocked()) return;
             async function onPasskeyChosen(retriesLeft) {
@@ -2285,7 +2111,7 @@
                 privKeyValidator, false,
                 canUsePasskey ? onPasskeyChosen : null
             );
-            if (pin === null) return;  // cancelled or passkey path handled itself
+            if (pin === null) return;
             pin = null;
             revealPrivKeyCanvas();
             setTimeout(function() { clearPrivKeyCanvas(); }, 60000);
@@ -2295,10 +2121,6 @@
         });
         $('#wallet-privkey-copy-btn').click(function() {
             if (!Keystore.isUnlocked()) return;
-            // Get WIF as string just-in-time.  JS strings are immutable; we
-            // cannot zero the bytes, but we null the ref immediately after the
-            // clipboard write so GC can reclaim it.  The clipboard is cleared
-            // automatically after 60 s via the Clipboard API.
             let wif = Keystore.getWIF();
             if (!wif) return;
             const $btn = $(this);
@@ -2316,13 +2138,11 @@
                 navigator.clipboard.writeText(wif).then(function() {
                     wif = null;
                     doFeedback(true);
-                    // Overwrite clipboard after 60 s (best-effort)
                     setTimeout(function() {
                         navigator.clipboard.writeText('').catch(function(){});
                     }, 60000);
                 }).catch(function() { wif = null; doFeedback(false); });
             } else {
-                // Legacy execCommand fallback — wipe textarea value before removal
                 const ta = document.createElement('textarea');
                 ta.value = wif;
                 wif = null;
@@ -2331,13 +2151,11 @@
                 ta.focus(); ta.select();
                 let ok = false;
                 try { ok = document.execCommand('copy'); } catch(e) {}
-                ta.value = '';  // overwrite before detach
+                ta.value = '';
                 document.body.removeChild(ta);
                 doFeedback(ok);
             }
         });
-
-        // ── Multi-output ───────────────────────────────────────────────────────
         $('#add-output').click(function(e) {
             $('#send-outputs').append(
                 '<div class="send-additional-output send-outputs-item input-group mb-2">' +
@@ -2357,8 +2175,6 @@
         $('#send-reset').click(function(e) { resetTxForm(); e.preventDefault(); });
         $('#send-qr').click(function(e)    { showScanModal(); e.preventDefault(); });
         $('#footer-close').click(function(e) { closeWallet(); e.preventDefault(); });
-
-        // ── Coin control ───────────────────────────────────────────────────────
         $('#coin-control-toggle').click(function(e) {
             $('#coin-control-panel').toggleClass('d-none');
             const open = !$('#coin-control-panel').hasClass('d-none');
@@ -2404,8 +2220,6 @@
             updateCoinControlInfo();
             validateSendForm();
         });
-
-        // ── Broadcast ──────────────────────────────────────────────────────────
         $('#footer-broadcast').click(function() {
             const rawtx = $('#transaction-broadcast-raw');
             transactionBroadcast(rawtx.val()).then(function(data) {
@@ -2417,8 +2231,6 @@
             });
             rawtx.val('');
         });
-
-        // ── Address type ───────────────────────────────────────────────────────
         $('#address-type-select select').on('change', function() {
             const newType = $(this).val();
             switchAddressType(newType);
@@ -2460,8 +2272,6 @@
             }
             setHomeTitle();
         });
-
-        // ── Backend / language ─────────────────────────────────────────────────
         $('#wallet-backend button').click(function() {
             switchBackend($('#wallet-backend input').val());
         });
@@ -2474,8 +2284,6 @@
             applyTheme(ct || 'auto');
             $('#address-type-select select').val(getAddressType());
         });
-
-        // ── Misc ───────────────────────────────────────────────────────────────
         estimateFee().then(function(data) {
             if (data.error == null) globalData.rfee = amountFormat(data.result.feerate);
             else globalData.rfee = getConfig()['fee'];
@@ -2485,8 +2293,6 @@
         $('#copy-address-btn').click(function() {
             if (globalData.address) copyToClipboard(globalData.address, $(this));
         });
-
-        // ── Seed: create ───────────────────────────────────────────────────────
         $('#seed-btn-create').click(function() {
             $('#seed-entry').addClass('d-none');
             $('#seed-create').removeClass('d-none');
@@ -2518,7 +2324,6 @@
         }
         $('#seed-btn-print').click(function() {
             if (!seedStore.entropy) return;
-            // entropyToMnemonic returns a string — release ref immediately after use.
             let mn = bip39Bundle.entropyToMnemonic(seedStore.entropy);
             window.seedExportPNG(mn, getText, DEFAULT_DERIV_PATH);
             mn = null;
@@ -2557,7 +2362,6 @@
                 seedStore.enc = { iv: Array.from(iv), data: Array.from(new Uint8Array(ct)) };
                 seedStore.entropy.fill(0);
                 seedStore.entropy = null;
-        
                 const $fields = $('#seed-verify-fields').empty();
                 pos.forEach(function(p) {
                     $fields.append(
@@ -2577,8 +2381,6 @@
                 showMessage(escHtml(getText('seed-crypto-error')) + ' ' + escHtml(e.message || String(e)));
             }
         });
-
-        // ── Seed: verify ───────────────────────────────────────────────────────
         $('#seed-verify-confirm').click(async function() {
             const $btn   = $(this).prop('disabled', true);
             const inputs = $('.seed-verify-word');
@@ -2610,7 +2412,6 @@
                 $btn.prop('disabled', false);
                 return;
             }
-    
             seedStore.verifyHashes = [];
             $('#seed-verify-error').addClass('d-none');
             try {
@@ -2621,14 +2422,9 @@
                 ));
                 seedStore.enc     = null;
                 seedStore.tempKey = null;
-
-                // entropyToMnemonic returns a JS string.
-                // Store in named var, pass to mnemonicToPrivKey, null immediately.
-                // Cannot zero the string — immutable in JS — but releasing the
-                // reference makes it GC-eligible before openWallet runs.
                 let interimMnemonic = bip39Bundle.entropyToMnemonic(entropyBytes);
                 const privBytes = bip39Bundle.mnemonicToPrivKey(interimMnemonic, DEFAULT_DERIV_PATH);
-                interimMnemonic = null;  // release string ref ASAP
+                interimMnemonic = null;
                 const keyPair = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes));
                 privBytes.fill(0);
                 Keystore.setKeyPair(keyPair);
@@ -2642,8 +2438,6 @@
                 showMessage(escHtml(getText('seed-deriv-error')) + ' ' + escHtml(err.message));
             }
         });
-
-        // ── Seed: restore ──────────────────────────────────────────────────────
         $('#restore-wordcount').change(function() {
             const cnt   = parseInt($(this).val(), 10);
             const words = $('#restore-input').val().trim().split(/\s+/).filter(Boolean);
@@ -2669,15 +2463,12 @@
             }
             const path = ($('#restore-path').val().trim() || DEFAULT_DERIV_PATH);
             try {
-                // Overwrite textarea before we touch any key material.
-                // Browser autofill snapshot may still hold the text, but
-                // the live DOM value is cleared immediately.
                 const $inp = $('#restore-input');
-                $inp.val(' '.repeat($inp.val().length));  // overwrite
+                $inp.val(' '.repeat($inp.val().length));
                 $inp.val('');
                 const privBytes    = bip39Bundle.mnemonicToPrivKey(raw, path);
                 const entropyBytes = bip39Bundle.mnemonicToEntropy(raw);
-                raw = null;  // release mnemonic string ref ASAP
+                raw = null;
                 const keyPair = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes));
                 privBytes.fill(0);
                 Keystore.setKeyPair(keyPair);
@@ -2689,8 +2480,6 @@
                 $('#restore-word-error').text(getText('seed-deriv-error') + ' ' + err.message).removeClass('d-none');
             }
         });
-
-        // ── Seed: show / hide ──────────────────────────────────────────────────
         $('#btn-show-seed').click(async function() {
             if (!hasSeedBackup()) return;
             async function onPasskeyChosen(retriesLeft) {
@@ -2749,13 +2538,10 @@
         $('#btn-hide-seed').click(hideSeedReveal);
         $('#btn-save-seed-png').click(function() {
             if (!seedStore.getRevealed().length) return;
-            // join() produces a new string — immutable in JS, cannot be zeroed.
-            // We null the ref immediately after passing it to seedExportPNG so
-            // GC can collect it once seedExportPNG returns.
             let mn = seedStore.getRevealed().join(' ');
             let savedPath; try { savedPath = localStorage.getItem(STORAGE_KEY_PATH); } catch(e) {}
             window.seedExportPNG(mn, getText, savedPath || DEFAULT_DERIV_PATH);
-            mn = null;  // release string ref — NOT '' which keeps the string alive
+            mn = null;
         });
         $('.tab-link').on('click', function() {
             if ($(this).data('tab-family') === 'wallet-block' && $(this).data('tab-name') !== 'wallet-keys') {
@@ -2763,11 +2549,6 @@
             }
         });
     });
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // WEBSOCKET
-    // ═══════════════════════════════════════════════════════════════════════════
-
     function wsConnect() {
         if (typeof io === 'undefined') return;
         if (!globalData.address)       return;
@@ -2846,6 +2627,5 @@
             wsActive = false;
         }
     }
-
     window.setTheme = setTheme;
 })();

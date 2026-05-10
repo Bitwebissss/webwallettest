@@ -58,9 +58,7 @@ body {
 	#_seed_print_area_ li { margin-bottom: 6px; }
 	#_seed_print_area_ ._seed_print_path_ { margin-top: 16px; color: #555; font-size: 12px; }
 }
-
 /* ── Extracted from inline styles ─────────────────────────────────────────── */
-
 /* Seed word grids (create + revealed backup) */
 #seed-word-grid,
 #wallet-seed-grid {
@@ -69,18 +67,14 @@ body {
 	gap: 5px;
 	font-size: 13px;
 }
-
 /* Restore word-count select */
 #restore-wordcount { max-width: 100px; }
-
 /* Address display row */
 .address-display-wrapper { gap: 5px; max-width: 100%; }
 #wallet-address { font-size: 13px; word-break: break-all; }
 #copy-address-btn { padding: 1px 7px; font-size: 12px; line-height: 1.6; }
-
 /* Immature balance label (send tab) */
 .immature-balance-label { font-size: 12px; }
-
 /* Coin control */
 #coin-control-toggle { font-size: 12px; padding: 2px 8px; }
 #coin-control-panel { font-size: 12px; }
@@ -88,7 +82,6 @@ body {
 .cc-th-check { width: 28px; }
 #coin-control-select-all,
 #coin-control-deselect-all { font-size: 11px; padding: 2px 7px; line-height: 1.4; }
-
 /* Private key canvas — matches form-control look */
 .privkey-canvas {
 	display: block;
@@ -99,33 +92,24 @@ body {
 	border-radius: var(--bs-border-radius);
 	box-sizing: border-box;
 }
-
 /* History tab overflow wrapper */
 .history-overflow { overflow: hidden; }
-
 /* Disclaimer max-width */
 .disclaimer small { max-width: 1100px; display: inline-block; }
-
 /* Transaction history direction labels */
 .tx-dir-label { min-width: 110px; display: inline-block; }
 /* Transaction history item gap */
 .history-item-inner { gap: 6px; }
 /* Transaction hash font */
 .history-tx-hash { font-size: 11px; }
-
 /* Seed word canvas cell */
 .seed-canvas-cell { overflow: hidden; line-height: 0; }
 .seed-canvas-cell canvas { display: block; max-width: 100%; }
 .seed-word-text { font-size: 12px; }
-
 /* Seed verify step — word-number badge */
 .seed-verify-num { min-width: 3rem; }
-
 /* Advanced collapse toggle in seed restore */
 [data-bs-target="#restore-advanced"] { font-size: 11px; padding: 2px 7px; line-height: 1.4; }
-
-
-
 /* Clipboard scratch textarea — off-screen, invisible, non-interactive */
 .clip-scratch {
 	position: fixed;
