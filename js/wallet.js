@@ -1323,17 +1323,25 @@
             _updateCoinControlInfo()
             return
         }
+        $('#coin-control-enable').prop('checked', globalData.coinControl);
         utxos.forEach(function(u, idx) {
-            var key      = escHtml(u.txid + ':' + u.index)
-            var checked  = !globalData.coinControl || (globalData.selectedUtxos && globalData.selectedUtxos.has(u.txid + ':' + u.index))
-            var mature   = u.mature
-            var isCbase  = u.coinbase
-            var disabled = (!globalData.coinControl || !mature) ? 'disabled' : ''
-            var rowClass = (!mature) ? 'text-muted' : ''
-            var status   = ''
-            if (!mature) {
+            var key       = escHtml(u.txid + ':' + u.index)
+            var confirmed = u.height !== 0
+            var mature    = u.mature
+            var spendable = confirmed && mature
+            var checked   = globalData.coinControl && globalData.selectedUtxos && globalData.selectedUtxos.has(u.txid + ':' + u.index)
+            var isCbase   = u.coinbase
+            var disabled  = (!globalData.coinControl || !spendable) ? 'disabled' : ''
+            var rowClass  = (!spendable) ? 'text-muted' : ''
+            var status    = ''
+            var disabledTitle = ''
+            if (!confirmed) {
+                status = '<span class="text-secondary"><span class="fa-solid fa-hourglass-half"></span> ' + escHtml(getText('history-pending') || 'Unconfirmed') + '</span>'
+                disabledTitle = ' title="' + escHtml(getText('coin-control-unconfirmed-title') || 'Cannot spend unconfirmed') + '"'
+            } else if (!mature) {
                 status = '<span class="text-warning" title="' + escHtml(getText('coin-control-matures-in')) + ' ' + escHtml(String(u.blocksLeft)) + ' ' + escHtml(getText('coin-control-blocks')) + '">' +
                     '<span class="fa-solid fa-lock"></span> ' + escHtml(String(u.blocksLeft)) + ' blk</span>'
+                disabledTitle = ' title="' + escHtml(getText('coin-control-immature-title')) + '"'
             } else {
                 status = '<span class="text-success"><span class="fa-solid fa-unlock"></span> ' + escHtml(getText('coin-control-mature')) + '</span>'
             }
@@ -1345,7 +1353,7 @@
             tbody.append(
                 '<tr class="' + rowClass + '" data-key="' + key + '">' +
                 '<td><input type="checkbox" class="cc-utxo-check" data-key="' + key + '"' +
-                (checked ? ' checked' : '') + (disabled ? ' disabled' : '') + (!mature ? ' title="' + escHtml(getText('coin-control-immature-title')) + '"' : '') + '></td>' +
+                (checked ? ' checked' : '') + (disabled ? ' disabled' : '') + (!spendable ? disabledTitle : '') + '></td>' +
                 '<td class="font-monospace">' + escHtml(String(amt)) + '</td>' +
                 '<td>' + (height > 0 && u.height > 0 ? escHtml(String(height - u.height + 1)) : '—') + '</td>' +
                 '<td>' + typeLabel + '</td>' +
@@ -1419,10 +1427,10 @@
             var spendable;
             if (globalData.coinControl && globalData.selectedUtxos && globalData.selectedUtxos.size > 0) {
                 spendable = utxos.filter(function(u) {
-                    return globalData.selectedUtxos.has(u.txid + ':' + u.index) && u.mature;
+                    return globalData.selectedUtxos.has(u.txid + ':' + u.index) && u.height !== 0 && u.mature;
                 });
             } else {
-                spendable = utxos.filter(function(u) { return u.mature; });
+                spendable = utxos.filter(function(u) { return u.height !== 0 && u.mature; });
             }
             var value     = 0;
             var inputMeta = [];
@@ -1699,7 +1707,7 @@
         if (globalData.coinControl && globalData.selectedUtxos && globalData.selectedUtxos.size > 0) {
             spendableSats = 0
             globalData.utxos.forEach(function(u) {
-                if (globalData.selectedUtxos.has(u.txid + ':' + u.index) && u.mature)
+                if (globalData.selectedUtxos.has(u.txid + ':' + u.index) && u.height !== 0 && u.mature)
                     spendableSats += u.value
             })
         } else {
@@ -1931,7 +1939,7 @@
             if (globalData.coinControl && globalData.selectedUtxos && globalData.selectedUtxos.size > 0) {
                 spendableSats = 0
                 globalData.utxos.forEach(function(u) {
-                    if (globalData.selectedUtxos.has(u.txid + ':' + u.index) && u.mature) {
+                    if (globalData.selectedUtxos.has(u.txid + ':' + u.index) && u.height !== 0 && u.mature) {
                         spendableSats += u.value
                     }
                 })
@@ -2125,7 +2133,7 @@
             if (globalData.coinControl) {
                 globalData.selectedUtxos = new Set()
                 globalData.utxos.forEach(function(u) {
-                    if (u.mature) globalData.selectedUtxos.add(u.txid + ':' + u.index)
+                    if (u.height !== 0 && u.mature) globalData.selectedUtxos.add(u.txid + ':' + u.index)
                 })
             } else {
                 globalData.selectedUtxos = null
@@ -2137,13 +2145,20 @@
             if (!globalData.coinControl) return e.preventDefault()
             globalData.selectedUtxos = new Set()
             globalData.utxos.forEach(function(u) {
-                if (u.mature) globalData.selectedUtxos.add(u.txid + ':' + u.index)
+                if (u.height !== 0 && u.mature) globalData.selectedUtxos.add(u.txid + ':' + u.index)
             })
             renderCoinControl()
             validateSendForm()
             e.preventDefault()
         })
-        $(document).on('change', '.cc-utxo-check', function() {
+        $('#coin-control-deselect-all').click(function(e) {
+            if (!globalData.coinControl) return e.preventDefault()
+            globalData.selectedUtxos = new Set()
+            renderCoinControl()
+            validateSendForm()
+            e.preventDefault()
+        })
+        
             if (!globalData.coinControl || !globalData.selectedUtxos) return
             var key = $(this).data('key')
             if ($(this).is(':checked')) globalData.selectedUtxos.add(key)
