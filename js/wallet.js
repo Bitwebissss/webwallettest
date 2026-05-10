@@ -543,7 +543,7 @@
             const ext = credential.getClientExtensionResults();
             if (!ext.prf || !ext.prf.results || !ext.prf.results.first) {
                 privBytes.fill(0); pubBytes.fill(0); if (seedBytes) seedBytes.fill(0);
-                showMessage(getText('passkey-prf-unsupported'));
+                showMessage(escHtml(getText('passkey-prf-unsupported')));
                 return;
             }
             const prfBytes = new Uint8Array(ext.prf.results.first);
@@ -554,7 +554,7 @@
             privBytes.fill(0); pubBytes.fill(0); if (seedBytes) seedBytes.fill(0);
             localStorage.setItem(STORAGE_KEY_PK_ID, credIdToB64(credential.rawId));
             updatePasskeyUI();
-            showMessage(getText('passkey-enabled'));
+            showMessage(escHtml(getText('passkey-enabled')));
         } catch(e) {
             if (privBytes) privBytes.fill(0);
             if (pubBytes)  pubBytes.fill(0);
@@ -567,7 +567,7 @@
         if (retriesLeft === undefined) retriesLeft = 2;
         let credIdStr = null;
         try { credIdStr = localStorage.getItem(STORAGE_KEY_PK_ID); } catch(e) {}
-        if (!credIdStr) { showMessage(getText('passkey-not-setup')); return; }
+        if (!credIdStr) { showMessage(escHtml(getText('passkey-not-setup'))); return; }
         const credIdBytes = b64ToCredId(credIdStr);
         try {
             const assertion = await navigator.credentials.get({
@@ -583,7 +583,7 @@
             });
             const ext = assertion.getClientExtensionResults();
             if (!ext.prf || !ext.prf.results || !ext.prf.results.first) {
-                showMessage(getText('passkey-prf-unsupported'));
+                showMessage(escHtml(getText('passkey-prf-unsupported')));
                 return;
             }
             const prfBytes  = new Uint8Array(ext.prf.results.first);
@@ -593,7 +593,7 @@
             if (!privBytes || !pubBytes) {
                 if (privBytes) privBytes.fill(0);
                 if (pubBytes)  pubBytes.fill(0);
-                showMessage(getText('passkey-decrypt-failed'));
+                showMessage(escHtml(getText('passkey-decrypt-failed')));
                 return;
             }
             Keystore.setKeyPair(
@@ -616,7 +616,7 @@
             try { localStorage.removeItem(k); } catch(e) {}
         });
         updatePasskeyUI();
-        showMessage(getText('passkey-disabled'));
+        showMessage(escHtml(getText('passkey-disabled')));
     }
     async function pkDisable() {
         async function onPasskeyChosen(retriesLeft) {
@@ -1342,7 +1342,7 @@
     }
     function showConfirmation(amount, totalSats, feeSats, outputsSats) {
         $('#confirm-amount').text(amount + ' ' + getConfig()['ticker']);
-        $('#send-modal-error').addClass('d-none').html('');
+        $('#send-modal-error').addClass('d-none').empty();
         $('#send-modal').modal('show');
         $('#send-title').text(messages.title['sure']);
         $('#send-cancel').removeClass('disabled d-none');
@@ -1350,7 +1350,7 @@
         $('#send-close-footer').addClass('d-none disabled');
         $('#confirm-screen').removeClass('d-none');
         $('#status-screen').addClass('d-none');
-        $('#status-screen span').html('');
+        $('#status-screen span').empty();
         globalData.tx.outputs = [];
         $.each($('#send-outputs .send-outputs-item'), function(key, item) {
             const address = $('[name="send-address"]', item).val().trim();
@@ -1491,7 +1491,7 @@
                         );
                         $('#send-title').text(messages.title['success']);
                     } else {
-                        $('#status-screen span').html(escHtml(messages.error['broadcast-failed']));
+                        $('#status-screen span').text(messages.error['broadcast-failed']);
                         $('#send-title').text(messages.title['failed']);
                         $('#status-screen .extra-info').html(
                             '<div class="mt-3"><textarea class="form-control" readonly cols="30" rows="10">' + escHtml(data.error.message) + '</textarea></div>'
@@ -1668,7 +1668,7 @@
                 if (bip39Entropy && !isRestore) {
                     bip39Entropy.fill(0);
                     seedReset();
-                    showMessage(getText('seed-pin-cancel'));
+                    showMessage(escHtml(getText('seed-pin-cancel')));
                 }
                 return;
             }
@@ -1679,7 +1679,7 @@
                 await saveWalletWif(pin);
             }
             pin = null;
-            showMessage(getText('wallet-saved'));
+            showMessage(escHtml(getText('wallet-saved')));
             updateSavedWalletUI();
         }
         if (bip39Entropy) { bip39Entropy.fill(0); bip39Entropy = null; }
@@ -1878,7 +1878,7 @@
             if (session !== scanSession) return;
             stopStream();
             $('#loading-message').text(getText('webcam-message')).removeClass('d-none');
-            showMessage(getText('webcam-message'));
+            showMessage(escHtml(getText('webcam-message')));
         });
         function tick() {
             if (session !== scanSession) return;
@@ -2068,7 +2068,7 @@
             } else {
                 checkPasskeySupport().then(function(supported) {
                     if (!supported) {
-                        showMessage(getText('passkey-unsupported'));
+                        showMessage(escHtml(getText('passkey-unsupported')));
                         return;
                     }
                     pkEnable();
@@ -2080,11 +2080,11 @@
         $('#pin-login-forget').click(function(e) {
             e.preventDefault();
             forgetSavedWallet();
-            showMessage(getText('wallet-deleted'));
+            showMessage(escHtml(getText('wallet-deleted')));
         });
         $('#settings-forget-wallet').click(function() {
             forgetSavedWallet();
-            showMessage(getText('wallet-deleted'));
+            showMessage(escHtml(getText('wallet-deleted')));
         });
 
         // ── Tabs ──────────────────────────────────────────────────────────────
@@ -2244,7 +2244,7 @@
                         openWallet(true);
                     } else { showMessage(messages.error['pass-not-match']); pass = ''; passConfirm = ''; }
                 } else { showMessage(messages.error['pass-too-short']); pass = ''; passConfirm = ''; }
-            } else { showMessage(getText('identity-too-short')); pass = ''; passConfirm = ''; }
+            } else { showMessage(escHtml(getText('identity-too-short'))); pass = ''; passConfirm = ''; }
             e.preventDefault();
         });
 
@@ -2269,7 +2269,7 @@
                         });
                         const ext = assertion.getClientExtensionResults();
                         if (!ext.prf || !ext.prf.results || !ext.prf.results.first) {
-                            showMessage(getText('passkey-prf-unsupported'));
+                            showMessage(escHtml(getText('passkey-prf-unsupported')));
                             return;
                         }
                         revealPrivKeyCanvas();
@@ -2724,7 +2724,7 @@
                 if (retriesLeft === undefined) retriesLeft = 2;
                 let credIdStr = null;
                 try { credIdStr = localStorage.getItem(STORAGE_KEY_PK_ID); } catch(e) {}
-                if (!credIdStr) { showMessage(getText('passkey-not-setup')); return; }
+                if (!credIdStr) { showMessage(escHtml(getText('passkey-not-setup'))); return; }
                 try {
                     const assertion = await navigator.credentials.get({
                         publicKey: {
@@ -2737,14 +2737,14 @@
                     });
                     const ext = assertion.getClientExtensionResults();
                     if (!ext.prf || !ext.prf.results || !ext.prf.results.first) {
-                        showMessage(getText('passkey-prf-unsupported'));
+                        showMessage(escHtml(getText('passkey-prf-unsupported')));
                         return;
                     }
                     const prfBytes  = new Uint8Array(ext.prf.results.first);
                     const seedBytes = await loadEncryptedBytesWithKey(STORAGE_KEY_SEED_PK, prfBytes);
                     prfBytes.fill(0);
                     if (!seedBytes) {
-                        showMessage(getText('passkey-decrypt-failed'));
+                        showMessage(escHtml(getText('passkey-decrypt-failed')));
                         return;
                     }
                     revealSeedFromBytes(seedBytes);
