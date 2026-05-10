@@ -1088,14 +1088,14 @@
     }
     function showSendError(message) {
         _isSending = false;
-        $('#send-modal-error').html(message).removeClass('d-none')
+        $('#send-modal-error').text(message).removeClass('d-none')
         $('#confirm-screen').addClass('d-none')
         $('#status-screen').addClass('d-none')
         $('#send-cancel').prop('disabled', false).removeClass('disabled d-none')
         $('#send-confirm').prop('disabled', false).addClass('d-none')
         $('#send-close-footer').addClass('d-none disabled')
         if (!$('#send-modal').hasClass('show')) {
-            $('#send-title').text(messages.title['sure'] || 'Send')
+            $('#send-title').text(messages.title['sure'])
             $('#send-modal').modal('show')
         }
     }
@@ -1427,11 +1427,11 @@
         $('#status-screen').removeClass('d-none');
         $('#send-title').text(messages.title['processing']);
         $('#status-screen .extra-info').empty();
-        $('#status-screen span').html(messages.tx['generating']);
+        $('#status-screen span').text(messages.tx['generating']);
         for (var i = 0; i < outputs.length; i++) {
             psbt.addOutput({ address: outputs[i].address, value: BigInt(outputs[i].amount) });
         }
-        $('#status-screen span').html(messages.tx['loading-utxo']);
+        $('#status-screen span').text(messages.tx['loading-utxo']);
         var doSend = function(utxos) {
             var spendable;
             if (globalData.coinControl && globalData.selectedUtxos && globalData.selectedUtxos.size > 0) {

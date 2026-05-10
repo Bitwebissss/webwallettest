@@ -353,6 +353,9 @@ var walletLanguages = {
         'pin-need-lower': 'Потрібна мала літера (a–z)',
         'pin-need-digit': 'Потрібна цифра (0–9)',
         'pin-need-special': 'Потрібен спеціальний символ (!@#$…)',
+        'bip39-not-loaded': 'Бібліотека BIP39 не завантажена. Будь ласка, перезавантажте сторінку.',
+        'seed-crypto-error': 'Криптографічна помилка',
+        'coin-control-unconfirmed-title': 'Неможливо витратити непідтверджений вихід',
     },
     'id': {
         'lang-alias': 'Indonesian',
@@ -529,6 +532,9 @@ var walletLanguages = {
         'pin-need-lower': 'Harus mengandung huruf kecil (a–z)',
         'pin-need-digit': 'Harus mengandung angka (0–9)',
         'pin-need-special': 'Harus mengandung karakter khusus (!@#$…)',
+        'bip39-not-loaded': 'Perpustakaan BIP39 tidak termuat. Silakan muat ulang halaman.',
+        'seed-crypto-error': 'Kesalahan kriptografi',
+        'coin-control-unconfirmed-title': 'Tidak dapat menggunakan output yang belum dikonfirmasi',
     },
     'ja': {
         'lang-alias': '日本語',
@@ -705,6 +711,9 @@ var walletLanguages = {
         'pin-need-lower': '小文字（a–z）が必要です',
         'pin-need-digit': '数字（0–9）が必要です',
         'pin-need-special': '特殊文字（!@#$…）が必要です',
+        'bip39-not-loaded': 'BIP39ライブラリが読み込まれていません。ページを再読み込みしてください。',
+        'seed-crypto-error': '暗号化エラー',
+        'coin-control-unconfirmed-title': '未確認のアウトプットは使用できません',
     },
     'zh': {
         'lang-alias': '简体中文',
@@ -881,6 +890,9 @@ var walletLanguages = {
         'pin-need-lower': '须包含小写字母（a–z）',
         'pin-need-digit': '须包含数字（0–9）',
         'pin-need-special': '须包含特殊字符（!@#$…）',
+        'bip39-not-loaded': 'BIP39 库未加载，请重新加载页面。',
+        'seed-crypto-error': '加密错误',
+        'coin-control-unconfirmed-title': '无法使用未确认的输出',
     },
     'es': {
         'lang-alias': 'Español',
@@ -1057,6 +1069,9 @@ var walletLanguages = {
         'pin-need-lower': 'Debe contener una letra minúscula (a–z)',
         'pin-need-digit': 'Debe contener un dígito (0–9)',
         'pin-need-special': 'Debe contener un carácter especial (!@#$…)',
+        'bip39-not-loaded': 'La biblioteca BIP39 no está cargada. Por favor, recarga la página.',
+        'seed-crypto-error': 'Error criptográfico',
+        'coin-control-unconfirmed-title': 'No se puede gastar una salida no confirmada',
     },
     'ru': {
         'lang-alias': 'Русский',
@@ -1233,6 +1248,9 @@ var walletLanguages = {
         'pin-need-lower': 'Требуется строчная буква (a–z)',
         'pin-need-digit': 'Требуется цифра (0–9)',
         'pin-need-special': 'Требуется специальный символ (!@#$…)',
+        'bip39-not-loaded': 'Библиотека BIP39 не загружена. Пожалуйста, перезагрузите страницу.',
+        'seed-crypto-error': 'Криптографическая ошибка',
+        'coin-control-unconfirmed-title': 'Невозможно потратить неподтверждённый выход',
     },
     'kr': {
         'lang-alias': '한국어',
@@ -1409,6 +1427,9 @@ var walletLanguages = {
         'pin-need-lower': '소문자(a–z)가 포함되어야 합니다',
         'pin-need-digit': '숫자(0–9)가 포함되어야 합니다',
         'pin-need-special': '특수 문자(!@#$…)가 포함되어야 합니다',
+        'bip39-not-loaded': 'BIP39 라이브러리가 로드되지 않았습니다. 페이지를 다시 로드해주세요.',
+        'seed-crypto-error': '암호화 오류',
+        'coin-control-unconfirmed-title': '미확인 출력은 사용할 수 없습니다',
     },
     'de': {
         'lang-alias': 'Deutsch',
@@ -1585,5 +1606,8 @@ var walletLanguages = {
         'pin-need-lower': 'Muss einen Kleinbuchstaben enthalten (a–z)',
         'pin-need-digit': 'Muss eine Ziffer enthalten (0–9)',
         'pin-need-special': 'Muss ein Sonderzeichen enthalten (!@#$…)',
+        'bip39-not-loaded': 'BIP39-Bibliothek nicht geladen. Bitte die Seite neu laden.',
+        'seed-crypto-error': 'Kryptografischer Fehler',
+        'coin-control-unconfirmed-title': 'Unbestätigten Ausgang kann nicht ausgegeben werden',
     }
 }
