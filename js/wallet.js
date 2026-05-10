@@ -279,6 +279,8 @@
         balance:             0,
         unconfirmedBalance:  0,
         immatureBalance:     0,
+        mempoolDelta:        0,   // ElectrumX net mempool change (negative = pending outgoing)
+        pendingOut:          0,   // confirmed coins currently being spent in mempool
         height:              0,
         address:         undefined,
         scriptHex:       undefined,
@@ -288,7 +290,7 @@
         coinControl:     false,
         selectedUtxos:   null,
         tx:              { amount: 0, outputs: [], fee: 0 },
-        _lastRendered:   { balance: -1, immature: -1, unconfirmed: -1, utxoFingerprint: '' },
+        _lastRendered:   { balance: -1, immature: -1, unconfirmed: -1, pendingOut: -1, utxoFingerprint: '' },
         resetTx: function() {
             this.tx = { amount: 0, outputs: [], fee: 0 };
         },
@@ -303,11 +305,13 @@
             this.balance             = 0;
             this.unconfirmedBalance  = 0;
             this.immatureBalance     = 0;
+            this.mempoolDelta        = 0;
+            this.pendingOut          = 0;
             this.height              = 0;
             this.utxos               = [];
             this.coinControl         = false;
             this.selectedUtxos       = null;
-            this._lastRendered       = { balance: -1, immature: -1, unconfirmed: -1, utxoFingerprint: '' };
+            this._lastRendered       = { balance: -1, immature: -1, unconfirmed: -1, pendingOut: -1, utxoFingerprint: '' };
             this.resetTx();
         }
     };
@@ -997,10 +1001,11 @@
             return c
         } catch(e) { return null }
     }
-    function saveUtxoCache(address, utxos, height, balance) {
+    function saveUtxoCache(address, utxos, height, balance, mempoolDelta) {
         try {
             localStorage.setItem('bte_utxo_' + address, JSON.stringify({
-                utxos: utxos, height: height, balance: balance || 0, ts: Date.now()
+                utxos: utxos, height: height, balance: balance || 0,
+                mempoolDelta: mempoolDelta || 0, ts: Date.now()
             }))
         } catch(e) {}
     }
@@ -1059,6 +1064,10 @@
         })
         globalData.immatureBalance    = immature
         globalData.unconfirmedBalance = unconfirmed
+        // pendingOut = confirmed coins being spent in unconfirmed outgoing txs.
+        // ElectrumX mempoolDelta = incoming_unconfirmed - spent_confirmed (can be negative).
+        // Therefore: spent_confirmed = unconfirmed_incoming - mempoolDelta (clamped to 0).
+        globalData.pendingOut = Math.max(0, unconfirmed - (globalData.mempoolDelta || 0))
         var fp = globalData.utxos.map(function(u) {
             return u.txid + ':' + u.index + ':' + (u.mature ? 1 : 0)
         }).join('|')
@@ -1105,12 +1114,14 @@
         var confirmed    = globalData.balance
         var immature     = globalData.immatureBalance
         var unconfirmed  = globalData.unconfirmedBalance
-        var avail        = Math.max(0, confirmed - immature)
+        var pendingOut   = globalData.pendingOut || 0
+        var avail        = Math.max(0, confirmed - immature - pendingOut)
         var lr = globalData._lastRendered
-        if (lr.balance === confirmed && lr.immature === immature && lr.unconfirmed === unconfirmed) return
+        if (lr.balance === confirmed && lr.immature === immature && lr.unconfirmed === unconfirmed && lr.pendingOut === pendingOut) return
         lr.balance     = confirmed
         lr.immature    = immature
         lr.unconfirmed = unconfirmed
+        lr.pendingOut  = pendingOut
         var ticker = getConfig()['ticker']
         $('.wallet-balance .amount').text(amountFormat(avail))
         $('.wallet-balance .ticker').text(ticker)
@@ -1247,10 +1258,12 @@
                     blocksLeft: blocksToMature(u, _ch)
                 });
             });
-            globalData.balance = _cached.balance || 0;
+            globalData.balance      = _cached.balance || 0;
+            globalData.mempoolDelta = _cached.mempoolDelta || 0;
         } else {
             globalData.balance         = 0;
             globalData.immatureBalance = 0;
+            globalData.mempoolDelta    = 0;
             globalData.utxos           = [];
         }
         _applyUtxoData();
@@ -2192,7 +2205,9 @@
             globalData.selectedUtxos = null;
             globalData.immatureBalance = 0;
             globalData.unconfirmedBalance = 0;
-            globalData._lastRendered = { balance: -1, immature: -1, unconfirmed: -1, utxoFingerprint: '' };
+            globalData.mempoolDelta = 0;
+            globalData.pendingOut = 0;
+            globalData._lastRendered = { balance: -1, immature: -1, unconfirmed: -1, pendingOut: -1, utxoFingerprint: '' };
             globalData.address        = Keystore.deriveAddress(newType, globalData.pubKey);
             globalData.scriptHex      = Keystore.getScriptHex(newType, globalData.pubKey);
             globalData.allScriptHexes = Keystore.getAllScriptHexes(globalData.pubKey);
@@ -2554,6 +2569,7 @@
                 var prevBalance     = globalData.balance;
                 var prevUnconfirmed = globalData.unconfirmedBalance;
                 globalData.balance = data.confirmed;
+                globalData.mempoolDelta = typeof data.unconfirmed === 'number' ? data.unconfirmed : 0;
                 if (typeof data.height === 'number') {
                     globalData.height = data.height;
                 }
@@ -2564,7 +2580,7 @@
                         blocksLeft: blocksToMature(u, h)
                     });
                 });
-                saveUtxoCache(globalData.address, globalData.utxos, h, data.confirmed);
+                saveUtxoCache(globalData.address, globalData.utxos, h, data.confirmed, data.unconfirmed || 0);
                 _applyUtxoData();
                 if ((globalData.balance !== prevBalance || globalData.unconfirmedBalance !== prevUnconfirmed) && globalData.address) {
                     TxHistory.updateHistory();
