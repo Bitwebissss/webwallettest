@@ -196,32 +196,24 @@
         if (canvas) {
             const ctx = canvas.getContext('2d');
             if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-            canvas.classList.add('d-none');
         }
-        const pi = document.getElementById('wallet-privkey-input');
-        if (pi) { pi.value = ''; pi.classList.remove('d-none'); }
+        $('#privkey-reveal-row').addClass('d-none');
+        $('#privkey-show-row').removeClass('d-none');
     }
     function revealPrivKeyCanvas() {
         if (!Keystore.isUnlocked()) return;
-        const pi = document.getElementById('wallet-privkey-input');
         // Build WIF just-in-time from live Keystore bytes.
         // String is unavoidable for display; we null the reference immediately
         // after rendering so GC can collect it as soon as possible.
         let wif = Keystore.getWIF();
         if (!wif) return;
-        let canvas = document.getElementById('wallet-privkey-canvas');
-        if (!canvas) {
-            canvas = document.createElement('canvas');
-            canvas.id = 'wallet-privkey-canvas';
-            if (pi && pi.parentNode) pi.parentNode.insertBefore(canvas, pi);
-            else if (pi) pi.insertAdjacentElement('afterend', canvas);
-        }
-        // Hide input first so canvas inherits its flex slot, then show canvas.
-        // Width is measured after layout in rAF so we get the real rendered size.
-        if (pi) pi.classList.add('d-none');
-        canvas.classList.remove('d-none');
+        const canvas = document.getElementById('wallet-privkey-canvas');
+        if (!canvas) { wif = null; return; }
+        // Switch state first, then measure canvas in rAF after layout is updated.
+        $('#privkey-show-row').addClass('d-none');
+        $('#privkey-reveal-row').removeClass('d-none');
         const capturedWif = wif;
-        wif = null;  // release ref — rAF closure keeps capturedWif alive briefly
+        wif = null;  // release — string can't be zeroed but GC can now collect
         requestAnimationFrame(function() {
             const dpr = Math.min(window.devicePixelRatio || 1, 2);
             const W = Math.max(canvas.offsetWidth || 340, 200);
@@ -231,17 +223,14 @@
             canvas.style.width = W + 'px';
             const ctx = canvas.getContext('2d');
             ctx.scale(dpr, dpr);
-            // Use canvas own computed style so bg matches form-control in any theme
-            const cs = getComputedStyle(canvas);
-            const bodyCs = getComputedStyle(document.body);
-            ctx.fillStyle = cs.backgroundColor || bodyCs.getPropertyValue('--bs-body-bg').trim() || '#ffffff';
+            const cs = getComputedStyle(document.body);
+            ctx.fillStyle = cs.getPropertyValue('--bs-body-bg').trim() || '#ffffff';
             ctx.fillRect(0, 0, W, H);
-            ctx.fillStyle    = bodyCs.getPropertyValue('--bs-body-color').trim() || '#212529';
+            ctx.fillStyle    = cs.getPropertyValue('--bs-body-color').trim() || '#212529';
             ctx.font         = '13px monospace';
             ctx.textBaseline = 'middle';
-            // 12px left padding mirrors Bootstrap form-control padding-x (0.75rem ≈ 12px)
-            ctx.fillText(capturedWif, 12, H / 2);
-            // capturedWif string is immutable — cannot zero, but ref leaves scope here
+            ctx.fillText(capturedWif, 8, H / 2);
+            // capturedWif exits scope here — GC can collect
         });
     }
 
@@ -1583,8 +1572,6 @@
         Keystore.clear();
         globalData.clear();
         clearPrivKeyCanvas();
-        $('#wallet-privkey-copy-btn').addClass('d-none');
-        $('#toggle-wallet-privkey').text(getText('show'));
         $('#wallet-keys-pubkey input').val('');
         $('#wallet-keys-script input').val('');
         $('#wallet-address').text('');
@@ -1625,8 +1612,6 @@
         }
         $('#wallet-keys-pubkey input').val(pubkeyDisplay);
         clearPrivKeyCanvas();
-        $('#wallet-privkey-copy-btn').addClass('d-none');
-        $('#toggle-wallet-privkey').text(getText('show'));
         $('#wallet-keys-script input').val(redeem);
         if (addressType === 'legacy') {
             $('#wallet-keys-script').addClass('d-none');
@@ -1707,8 +1692,6 @@
         stopStream();
         wsDisconnect();
         clearPrivKeyCanvas();
-        $('#wallet-privkey-copy-btn').addClass('d-none');
-        $('#toggle-wallet-privkey').text(getText('show'));
         $('#wallet-keys-pubkey input').val('');
         $('#wallet-keys-script input').val('');
         $('#wallet-address').text('');
@@ -2102,8 +2085,6 @@
             const tabName   = $(this).data('tab-name');
             if (tabFamily === 'wallet-block' && tabName !== 'wallet-keys') {
                 clearPrivKeyCanvas();
-                $('#wallet-privkey-copy-btn').addClass('d-none');
-                $('#toggle-wallet-privkey').text(getText('show'));
             }
             $('#' + tabFamily + ' .tab-item').addClass('d-none');
             $('#' + tabFamily + ' .card-header .card-header-tabs .nav-link').removeClass('active');
@@ -2259,73 +2240,58 @@
 
         // ── Private key reveal ─────────────────────────────────────────────────
         $('#toggle-wallet-privkey').click(async function() {
-            if ($(this).text() == getText('show')) {
-                if (!Keystore.isUnlocked()) return;
-                async function onPasskeyChosen(retriesLeft) {
-                    if (retriesLeft === undefined) retriesLeft = 2;
-                    let credIdStr = null;
-                    try { credIdStr = localStorage.getItem(STORAGE_KEY_PK_ID); } catch(e) {}
-                    if (!credIdStr) return;
-                    try {
-                        const assertion = await navigator.credentials.get({
-                            publicKey: {
-                                challenge:        crypto.getRandomValues(new Uint8Array(32)),
-                                rpId:             window.location.hostname,
-                                allowCredentials: [{ type: 'public-key', id: b64ToCredId(credIdStr) }],
-                                userVerification: 'required',
-                                extensions:       { prf: { eval: { first: PK_PRF_SALT } } }
-                            }
-                        });
-                        const ext = assertion.getClientExtensionResults();
-                        if (!ext.prf || !ext.prf.results || !ext.prf.results.first) {
-                            showMessage(escHtml(getText('passkey-prf-unsupported')));
-                            return;
+            if (!Keystore.isUnlocked()) return;
+            async function onPasskeyChosen(retriesLeft) {
+                if (retriesLeft === undefined) retriesLeft = 2;
+                let credIdStr = null;
+                try { credIdStr = localStorage.getItem(STORAGE_KEY_PK_ID); } catch(e) {}
+                if (!credIdStr) return;
+                try {
+                    const assertion = await navigator.credentials.get({
+                        publicKey: {
+                            challenge:        crypto.getRandomValues(new Uint8Array(32)),
+                            rpId:             window.location.hostname,
+                            allowCredentials: [{ type: 'public-key', id: b64ToCredId(credIdStr) }],
+                            userVerification: 'required',
+                            extensions:       { prf: { eval: { first: PK_PRF_SALT } } }
                         }
-                        revealPrivKeyCanvas();
-                        $('#wallet-privkey-copy-btn').removeClass('d-none');
-                        $('#toggle-wallet-privkey').text(getText('hide'));
-                        setTimeout(function() {
-                            clearPrivKeyCanvas();
-                            $('#wallet-privkey-copy-btn').addClass('d-none');
-                            $('#toggle-wallet-privkey').text(getText('show'));
-                        }, 60000);
-                    } catch(e) {
-                        if (e.name === 'NotAllowedError') return;
-                        if (retriesLeft > 0 && isTransientPasskeyError(e)) {
-                            await new Promise(function(r) { setTimeout(r, 300); });
-                            return onPasskeyChosen(retriesLeft - 1);
-                        }
-                        showMessage(escHtml(getText('passkey-error')) + escHtml(e.message));
+                    });
+                    const ext = assertion.getClientExtensionResults();
+                    if (!ext.prf || !ext.prf.results || !ext.prf.results.first) {
+                        showMessage(escHtml(getText('passkey-prf-unsupported')));
+                        return;
                     }
+                    revealPrivKeyCanvas();
+                    setTimeout(function() { clearPrivKeyCanvas(); }, 60000);
+                } catch(e) {
+                    if (e.name === 'NotAllowedError') return;
+                    if (retriesLeft > 0 && isTransientPasskeyError(e)) {
+                        await new Promise(function(r) { setTimeout(r, 300); });
+                        return onPasskeyChosen(retriesLeft - 1);
+                    }
+                    showMessage(escHtml(getText('passkey-error')) + escHtml(e.message));
                 }
-                const canUsePasskey = isPasskeyEnabled() && hasPasskeyCredential();
-                const privKeyValidator = async function(candidate) {
-                    const pub = await loadEncryptedBytes(STORAGE_KEY_PUB, candidate);
-                    if (!pub) return getText('pin-login-error');
-                    pub.fill(0);
-                    return null;
-                };
-                let pin = await askPin(
-                    getText('pin-title-default'),
-                    getText('privkey-pin-desc'),
-                    privKeyValidator, false,
-                    canUsePasskey ? onPasskeyChosen : null
-                );
-                if (pin === null) return;  // cancelled or passkey path handled itself
-                pin = null;
-                revealPrivKeyCanvas();
-                $('#wallet-privkey-copy-btn').removeClass('d-none');
-                $('#toggle-wallet-privkey').text(getText('hide'));
-                setTimeout(function() {
-                    clearPrivKeyCanvas();
-                    $('#wallet-privkey-copy-btn').addClass('d-none');
-                    $('#toggle-wallet-privkey').text(getText('show'));
-                }, 60000);
-            } else {
-                clearPrivKeyCanvas();
-                $('#wallet-privkey-copy-btn').addClass('d-none');
-                $(this).text(getText('show'));
             }
+            const canUsePasskey = isPasskeyEnabled() && hasPasskeyCredential();
+            const privKeyValidator = async function(candidate) {
+                const pub = await loadEncryptedBytes(STORAGE_KEY_PUB, candidate);
+                if (!pub) return getText('pin-login-error');
+                pub.fill(0);
+                return null;
+            };
+            let pin = await askPin(
+                getText('pin-title-default'),
+                getText('privkey-pin-desc'),
+                privKeyValidator, false,
+                canUsePasskey ? onPasskeyChosen : null
+            );
+            if (pin === null) return;  // cancelled or passkey path handled itself
+            pin = null;
+            revealPrivKeyCanvas();
+            setTimeout(function() { clearPrivKeyCanvas(); }, 60000);
+        });
+        $('#privkey-hide-btn').click(function() {
+            clearPrivKeyCanvas();
         });
         $('#wallet-privkey-copy-btn').click(function() {
             if (!Keystore.isUnlocked()) return;
@@ -2480,8 +2446,6 @@
             if (pb) { for (let j = 0; j < pb.length; j++) phex += pb[j].toString(16).padStart(2, '0'); }
             $('#wallet-keys-pubkey input').val(phex);
             clearPrivKeyCanvas();
-            $('#wallet-privkey-copy-btn').addClass('d-none');
-            $('#toggle-wallet-privkey').text(getText('show'));
             let redeem = '';
             if (newType !== 'legacy') {
                 redeem = '0014' + bitcoin.Buffer.from(

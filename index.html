@@ -390,18 +390,23 @@
                                             <input class="form-control" readonly type="text">
                                         </div>
                                     </div>
-                                    <div id="wallet-keys-privkey">
-                                        <label tkey="private-key"></label>
-                                        <div class="d-flex align-items-center pb-2 privkey-row">
-                                            <input id="wallet-privkey-input" type="password" readonly autocomplete="off" class="form-control font-monospace" tabindex="-1">
-                                            <button id="wallet-privkey-copy-btn" class="btn btn-outline-secondary flex-shrink-0 d-none" type="button" title="Copy"><span class="fa-solid fa-copy"></span></button>
-                                            <button id="toggle-wallet-privkey" class="btn btn-primary flex-shrink-0 b-width" type="button" tkey="show"></button>
-                                        </div>
-                                    </div>
                                     <div id="wallet-keys-script">
                                         <label tkey="redeem-script">Redeem Script <i>(SegWit)</i></label>
                                         <div class="input-group pb-2">
                                             <input class="form-control" readonly type="text">
+                                        </div>
+                                    </div>
+                                    <div id="wallet-keys-privkey">
+                                        <label tkey="private-key"></label>
+                                        <div id="privkey-show-row" class="pb-2">
+                                            <button id="toggle-wallet-privkey" class="btn btn-primary b-width" type="button" tkey="show"></button>
+                                        </div>
+                                        <div id="privkey-reveal-row" class="d-none pb-2">
+                                            <div class="d-flex align-items-center gap-2 mb-2">
+                                                <canvas id="wallet-privkey-canvas" class="privkey-canvas"></canvas>
+                                                <button id="wallet-privkey-copy-btn" class="btn btn-outline-secondary flex-shrink-0" type="button" title="Copy"><span class="fa-solid fa-copy"></span></button>
+                                            </div>
+                                            <button id="privkey-hide-btn" class="btn btn-outline-secondary btn-sm" type="button" tkey="hide"></button>
                                         </div>
                                     </div>
                                     <div id="wallet-keys-seed" class="d-none">

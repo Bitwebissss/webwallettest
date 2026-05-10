@@ -89,12 +89,15 @@ body {
 #coin-control-select-all,
 #coin-control-deselect-all { font-size: 11px; padding: 2px 7px; line-height: 1.4; }
 
-/* Private key input row */
-.privkey-row { gap: 4px; }
-#wallet-privkey-input {
+/* Private key canvas — matches form-control look */
+.privkey-canvas {
+	display: block;
 	flex: 1 1 auto;
-	pointer-events: none;
-	caret-color: transparent;
+	min-width: 0;
+	height: calc(1.5em + 0.75rem + 2px);
+	border: 1px solid var(--bs-border-color);
+	border-radius: var(--bs-border-radius);
+	box-sizing: border-box;
 }
 
 /* History tab overflow wrapper */
@@ -121,18 +124,7 @@ body {
 /* Advanced collapse toggle in seed restore */
 [data-bs-target="#restore-advanced"] { font-size: 11px; padding: 2px 7px; line-height: 1.4; }
 
-/* Private-key reveal canvas — styled to match .form-control */
-#wallet-privkey-canvas {
-	display: block;
-	flex: 1 1 auto;
-	min-width: 0;
-	max-width: 100%;
-	height: calc(1.5em + 0.75rem + 2px); /* Bootstrap form-control height formula */
-	border: 1px solid var(--bs-border-color);
-	border-radius: var(--bs-border-radius);
-	background-color: var(--bs-body-bg);
-	box-sizing: border-box;
-}
+
 
 /* Clipboard scratch textarea — off-screen, invisible, non-interactive */
 .clip-scratch {
