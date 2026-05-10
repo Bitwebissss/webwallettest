@@ -2162,7 +2162,7 @@
             validateSendForm()
             e.preventDefault()
         })
-        
+        $(document).on('change', '.cc-utxo-check', function() {
             if (!globalData.coinControl || !globalData.selectedUtxos) return
             var key = $(this).data('key')
             if ($(this).is(':checked')) globalData.selectedUtxos.add(key)
