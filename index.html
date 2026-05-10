@@ -59,9 +59,7 @@
         <script src="js/bitcoin-bundle-v7.min.js"
                 integrity="sha512-tHiUwjZ7E2a/zTil4RbIeBCVHHVcyvcXcj1cuC/fzn4qvnZ0nc0LJkg0yifWnvTP1CEakabPJSwe22f3mOYp1g=="
                 crossorigin="anonymous"></script>
-        <link rel="stylesheet" href="css/style.css"
-                integrity="sha512-Of5cW6JbTgKfWWJOWipwumdmUi8++ZpYCqwiY9vUEgGW9p86d+ydshg8iAQWctep268vLtZcKxkCccmefICqZg=="
-                crossorigin="anonymous"></script>
+        <link rel="stylesheet" href="css/style.css"></script>
         <!-- https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js -->
         <script src="js/socket.io.min.js"
                 integrity="sha512-8ExARjWWkIllMlNzVg7JKq9RKWPlJABQUNq6YvAjE/HobctjH/NA+bSiDMDvouBVjp4Wwnf1VP1OEv7Zgjtuxw=="
@@ -204,7 +202,7 @@
                                         autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
                                     <div id="restore-word-error" class="text-danger small mb-2 d-none"></div>
                                     <div class="mb-2">
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#restore-advanced" tkey="seed-advanced">Advanced ▼</button>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#restore-advanced" tkey="seed-advanced">Advanced ▼</button>
                                         <div class="collapse" id="restore-advanced">
                                             <div class="border rounded p-2 mt-1 small">
                                                 <div class="mb-2">
@@ -351,7 +349,7 @@
                                     <button class="btn btn-primary b-width" type="submit" id="send-tx" tkey="send" disabled></button>
                                 </div>
                                 <div class="mt-2">
-                                    <button type="button" id="coin-control-toggle" class="btn btn-sm btn-outline-secondary">
+                                    <button type="button" id="coin-control-toggle" class="btn btn-sm btn-outline-primary">
                                         <span class="fa-solid fa-sliders"></span>
                                         <span id="coin-control-toggle-text" tkey="coin-control">Coin Control</span>
                                     </button>
@@ -364,7 +362,7 @@
                                         </div>
                                         <div class="d-flex gap-1">
                                             <button type="button" id="coin-control-select-all" class="btn btn-sm btn-primary" tkey="coin-control-select-all">Select all mature</button>
-                                            <button type="button" id="coin-control-deselect-all" class="btn btn-sm btn-outline-secondary" tkey="coin-control-deselect-all">Deselect all</button>
+                                            <button type="button" id="coin-control-deselect-all" class="btn btn-sm btn-outline-primary" tkey="coin-control-deselect-all">Deselect all</button>
                                         </div>
                                     </div>
                                     <div id="coin-control-list" class="table-responsive">
