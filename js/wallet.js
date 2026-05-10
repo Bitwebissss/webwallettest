@@ -2048,6 +2048,11 @@
             e.preventDefault();
         });
         $('#send-confirm').click(function(e) { sendTransaction(); e.preventDefault() })
+        $('#send-modal').on('hidden.bs.modal', function() {
+            _isSending = false;
+            $('#send-cancel').prop('disabled', false);
+            $('#send-confirm').prop('disabled', false);
+        });
         $('#toggle-wallet-privkey').click(async function() {
             if ($(this).text() == getText('show')) {
                 if (!Keystore.isUnlocked()) return;

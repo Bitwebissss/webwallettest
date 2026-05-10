@@ -174,6 +174,9 @@ var walletLanguages = {
         'pin-need-lower': 'Must contain a lowercase letter (a–z)',
         'pin-need-digit': 'Must contain a digit (0–9)',
         'pin-need-special': 'Must contain a special character (!@#$…)',
+        'bip39-not-loaded': 'BIP39 library not loaded. Please reload the page.',
+        'seed-crypto-error': 'Cryptographic error',
+        'coin-control-unconfirmed-title': 'Cannot spend unconfirmed output',
     },
     'uk': {
         'lang-alias': 'Українська',
