@@ -6,8 +6,6 @@
 
     // ─── Class ────────────────────────────────────────────────────────────────
     class TxHistoryManager {
-        // Реально приватные поля — недоступны даже из DevTools,
-        // даже если обёртку IIFE случайно уберут
         #globalData    = null;
         #escHtml       = null;
         #getText       = null;
