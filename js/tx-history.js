@@ -132,7 +132,6 @@
 
             var safeHash  = _escHtml(tx.txid || '');
             var txUrl     = _escHtml(_blockExplorer.tx(tx.txid || ''));
-            var shortHash = safeHash.substr(0, 10) + '\u2026' + safeHash.substr(-6);
             var tsHtml    = tx.timestamp
                 ? '<div class="text-muted history-ts">' +
                   _escHtml(_formatTs(tx.timestamp)) + '</div>'
@@ -140,9 +139,9 @@
 
             html += '<div class="history-item d-flex align-items-center border-bottom history-item-inner">' +
                     dirLabel +
-                    '<div class="font-monospace text-truncate flex-grow-1 history-tx-hash">' +
+                    '<div class="font-monospace flex-grow-1 history-tx-hash break-word">' +
                         '<a href="' + txUrl + '" target="_blank" rel="noopener noreferrer">' +
-                        shortHash + '</a>' +
+                        safeHash + '</a>' +
                         tsHtml +
                     '</div>' +
                     '<div class="flex-shrink-0">' + confBadge + '</div>' +
