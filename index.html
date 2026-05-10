@@ -204,7 +204,7 @@
                                         autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
                                     <div id="restore-word-error" class="text-danger small mb-2 d-none"></div>
                                     <div class="mb-2">
-                                        <a class="small text-muted" data-bs-toggle="collapse" href="#restore-advanced" role="button" tkey="seed-advanced">Advanced ▼</a>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#restore-advanced" tkey="seed-advanced">Advanced ▼</button>
                                         <div class="collapse" id="restore-advanced">
                                             <div class="border rounded p-2 mt-1 small">
                                                 <div class="mb-2">
@@ -351,10 +351,10 @@
                                     <button class="btn btn-primary b-width" type="submit" id="send-tx" tkey="send" disabled></button>
                                 </div>
                                 <div class="mt-2">
-                                    <a href="#" id="coin-control-toggle" class="text-muted small">
+                                    <button type="button" id="coin-control-toggle" class="btn btn-sm btn-outline-secondary">
                                         <span class="fa-solid fa-sliders"></span>
                                         <span id="coin-control-toggle-text" tkey="coin-control">Coin Control</span>
-                                    </a>
+                                    </button>
                                 </div>
                                 <div id="coin-control-panel" class="d-none mt-2 border rounded p-2">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -362,9 +362,9 @@
                                             <input type="checkbox" id="coin-control-enable">
                                             <label for="coin-control-enable" class="mb-0 ms-1" tkey="coin-control-manual">Manual UTXO selection</label>
                                         </div>
-                                        <div class="d-flex gap-2">
-                                            <a href="#" id="coin-control-select-all" class="text-primary small" tkey="coin-control-select-all">Select all mature</a>
-                                            <a href="#" id="coin-control-deselect-all" class="text-secondary small" tkey="coin-control-deselect-all">Deselect all</a>
+                                        <div class="d-flex gap-1">
+                                            <button type="button" id="coin-control-select-all" class="btn btn-sm btn-primary" tkey="coin-control-select-all">Select all mature</button>
+                                            <button type="button" id="coin-control-deselect-all" class="btn btn-sm btn-outline-secondary" tkey="coin-control-deselect-all">Deselect all</button>
                                         </div>
                                     </div>
                                     <div id="coin-control-list" class="table-responsive">
