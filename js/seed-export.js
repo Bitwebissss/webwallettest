@@ -102,6 +102,9 @@
         ctx.textBaseline = 'middle';
         ctx.fillText('Generated ' + dateStr, W - padX, footerY + footerH / 2);
 
+        // Release word string references so GC can collect them.
+        // JS strings are immutable — fill('') cannot zero the underlying bytes,
+        // but it drops the array references, making strings GC-eligible.
         words.fill('');
 
         try {

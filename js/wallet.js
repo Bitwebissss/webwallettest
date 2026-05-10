@@ -186,16 +186,54 @@
             }
         } catch (ignore) { /* not critical */ }
     }
-    function clearPrivKeyInput() {
-        const pi = document.getElementById('wallet-privkey-input');
-        if (pi) {
-            pi.value = '•'.repeat(40);
-            pi.type = 'password';
+    // ── Private-key canvas helpers ────────────────────────────────────────────
+    // WIF is a JS string — immutable, cannot be zeroed.
+    // We render it to a canvas so it never sits in an input.value that the
+    // browser can cache / autofill-snapshot.  The canvas pixel buffer is the
+    // only in-DOM trace; we clear it on hide.
+    function clearPrivKeyCanvas() {
+        const canvas = document.getElementById('wallet-privkey-canvas');
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+            canvas.classList.add('d-none');
         }
-    }
-    function revealPrivKeyInput(wif) {
         const pi = document.getElementById('wallet-privkey-input');
-        if (pi) { pi.value = wif; pi.type = 'text'; }
+        if (pi) { pi.value = ''; pi.classList.remove('d-none'); }
+    }
+    function revealPrivKeyCanvas() {
+        if (!Keystore.isUnlocked()) return;
+        const pi = document.getElementById('wallet-privkey-input');
+        // Build WIF just-in-time from live Keystore bytes.
+        // String is unavoidable for display; we null the reference immediately
+        // after rendering so GC can collect it as soon as possible.
+        let wif = Keystore.getWIF();
+        if (!wif) return;
+        let canvas = document.getElementById('wallet-privkey-canvas');
+        if (!canvas) {
+            canvas = document.createElement('canvas');
+            canvas.id = 'wallet-privkey-canvas';
+            if (pi && pi.parentNode) pi.parentNode.insertBefore(canvas, pi);
+            else if (pi) pi.insertAdjacentElement('afterend', canvas);
+        }
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const W = pi ? Math.max(pi.offsetWidth || 340, 200) : 340;
+        const H = 36;
+        canvas.width  = W * dpr;
+        canvas.height = H * dpr;
+        canvas.style.width = W + 'px';
+        const ctx = canvas.getContext('2d');
+        ctx.scale(dpr, dpr);
+        const cs = getComputedStyle(document.body);
+        ctx.fillStyle = cs.getPropertyValue('--bs-body-bg').trim() || '#ffffff';
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle    = cs.getPropertyValue('--bs-body-color').trim() || '#212529';
+        ctx.font         = '13px monospace';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(wif, 8, H / 2);
+        wif = null;  // release — string can't be zeroed but GC can now collect
+        canvas.classList.remove('d-none');
+        if (pi) pi.classList.add('d-none');
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -1004,8 +1042,7 @@
         } else {
             const ta = document.createElement('textarea');
             ta.value = text;
-            ta.style.position = 'fixed';
-            ta.style.opacity  = '0';
+            ta.className = 'clip-scratch';
             document.body.appendChild(ta);
             ta.focus(); ta.select();
             let ok = false;
@@ -1536,7 +1573,7 @@
         clearSeedState();
         Keystore.clear();
         globalData.clear();
-        clearPrivKeyInput();
+        clearPrivKeyCanvas();
         $('#wallet-privkey-copy-btn').addClass('d-none');
         $('#toggle-wallet-privkey').text(getText('show'));
         $('#wallet-keys-pubkey input').val('');
@@ -1578,7 +1615,7 @@
             ).toString('hex');
         }
         $('#wallet-keys-pubkey input').val(pubkeyDisplay);
-        clearPrivKeyInput();
+        clearPrivKeyCanvas();
         $('#wallet-privkey-copy-btn').addClass('d-none');
         $('#toggle-wallet-privkey').text(getText('show'));
         $('#wallet-keys-script input').val(redeem);
@@ -1660,7 +1697,7 @@
         stopAutoLock();
         stopStream();
         wsDisconnect();
-        clearPrivKeyInput();
+        clearPrivKeyCanvas();
         $('#wallet-privkey-copy-btn').addClass('d-none');
         $('#toggle-wallet-privkey').text(getText('show'));
         $('#wallet-keys-pubkey input').val('');
@@ -1684,9 +1721,13 @@
 
     function revealSeedFromBytes(entropyBytes) {
         seedStore.wipeRevealed();
-        const mnemonic = bip39Bundle.entropyToMnemonic(entropyBytes);
+        // entropyToMnemonic returns a JS string — immutable, cannot be zeroed.
+        // Split immediately to words array, then null the string ref so GC
+        // can collect it as soon as possible.
+        let mnemonic = bip39Bundle.entropyToMnemonic(entropyBytes);
         entropyBytes.fill(0);
         seedStore.setRevealed(mnemonic.split(' '));
+        mnemonic = null;  // release string ref — GC-eligible
         seedRenderGrid(seedStore.getRevealed(), '#wallet-seed-grid');
         $('#wallet-seed-hidden').addClass('d-none');
         $('#wallet-seed-revealed').removeClass('d-none');
@@ -2051,7 +2092,7 @@
             const tabFamily = $(this).data('tab-family');
             const tabName   = $(this).data('tab-name');
             if (tabFamily === 'wallet-block' && tabName !== 'wallet-keys') {
-                clearPrivKeyInput();
+                clearPrivKeyCanvas();
                 $('#wallet-privkey-copy-btn').addClass('d-none');
                 $('#toggle-wallet-privkey').text(getText('show'));
             }
@@ -2164,11 +2205,11 @@
                 } catch(err) {
                     showMessage(messages.error['bad-priv-key']);
                 } finally {
-                    wif = '';
+                    wif = null;  // string — cannot zero, release ref
                 }
             } else {
                 showMessage(messages.error['bad-priv-key']);
-                wif = '';
+                wif = null;
             }
             e.preventDefault();
         });
@@ -2231,11 +2272,11 @@
                             showMessage(getText('passkey-prf-unsupported'));
                             return;
                         }
-                        revealPrivKeyInput(Keystore.getWIF());
+                        revealPrivKeyCanvas();
                         $('#wallet-privkey-copy-btn').removeClass('d-none');
                         $('#toggle-wallet-privkey').text(getText('hide'));
                         setTimeout(function() {
-                            clearPrivKeyInput();
+                            clearPrivKeyCanvas();
                             $('#wallet-privkey-copy-btn').addClass('d-none');
                             $('#toggle-wallet-privkey').text(getText('show'));
                         }, 60000);
@@ -2263,23 +2304,61 @@
                 );
                 if (pin === null) return;  // cancelled or passkey path handled itself
                 pin = null;
-                revealPrivKeyInput(Keystore.getWIF());
+                revealPrivKeyCanvas();
                 $('#wallet-privkey-copy-btn').removeClass('d-none');
                 $('#toggle-wallet-privkey').text(getText('hide'));
                 setTimeout(function() {
-                    clearPrivKeyInput();
+                    clearPrivKeyCanvas();
                     $('#wallet-privkey-copy-btn').addClass('d-none');
                     $('#toggle-wallet-privkey').text(getText('show'));
                 }, 60000);
             } else {
-                clearPrivKeyInput();
+                clearPrivKeyCanvas();
                 $('#wallet-privkey-copy-btn').addClass('d-none');
                 $(this).text(getText('show'));
             }
         });
         $('#wallet-privkey-copy-btn').click(function() {
-            if (Keystore.isUnlocked()) {
-                copyToClipboard(Keystore.getWIF(), $(this));
+            if (!Keystore.isUnlocked()) return;
+            // Get WIF as string just-in-time.  JS strings are immutable; we
+            // cannot zero the bytes, but we null the ref immediately after the
+            // clipboard write so GC can reclaim it.  The clipboard is cleared
+            // automatically after 60 s via the Clipboard API.
+            let wif = Keystore.getWIF();
+            if (!wif) return;
+            const $btn = $(this);
+            const doFeedback = function(ok) {
+                const $icon    = $btn.find('.fa-solid, .fa-regular').first();
+                const origClass = $icon.attr('class');
+                if ($icon.length) $icon.attr('class', 'fa-solid ' + (ok ? 'fa-check' : 'fa-times'));
+                $btn.addClass(ok ? 'btn-success' : 'btn-danger').removeClass('btn-outline-secondary');
+                setTimeout(function() {
+                    if ($icon.length) $icon.attr('class', origClass);
+                    $btn.removeClass('btn-success btn-danger').addClass('btn-outline-secondary');
+                }, 1500);
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(wif).then(function() {
+                    wif = null;
+                    doFeedback(true);
+                    // Overwrite clipboard after 60 s (best-effort)
+                    setTimeout(function() {
+                        navigator.clipboard.writeText('').catch(function(){});
+                    }, 60000);
+                }).catch(function() { wif = null; doFeedback(false); });
+            } else {
+                // Legacy execCommand fallback — wipe textarea value before removal
+                const ta = document.createElement('textarea');
+                ta.value = wif;
+                wif = null;
+                ta.className = 'clip-scratch';
+                document.body.appendChild(ta);
+                ta.focus(); ta.select();
+                let ok = false;
+                try { ok = document.execCommand('copy'); } catch(e) {}
+                ta.value = '';  // overwrite before detach
+                document.body.removeChild(ta);
+                doFeedback(ok);
             }
         });
 
@@ -2391,7 +2470,7 @@
             let phex = '';
             if (pb) { for (let j = 0; j < pb.length; j++) phex += pb[j].toString(16).padStart(2, '0'); }
             $('#wallet-keys-pubkey input').val(phex);
-            clearPrivKeyInput();
+            clearPrivKeyCanvas();
             $('#wallet-privkey-copy-btn').addClass('d-none');
             $('#toggle-wallet-privkey').text(getText('show'));
             let redeem = '';
@@ -2466,6 +2545,7 @@
         }
         $('#seed-btn-print').click(function() {
             if (!seedStore.entropy) return;
+            // entropyToMnemonic returns a string — release ref immediately after use.
             let mn = bip39Bundle.entropyToMnemonic(seedStore.entropy);
             window.seedExportPNG(mn, getText, DEFAULT_DERIV_PATH);
             mn = null;
@@ -2569,10 +2649,13 @@
                 seedStore.enc     = null;
                 seedStore.tempKey = null;
 
-                const privBytes = bip39Bundle.mnemonicToPrivKey(
-                    bip39Bundle.entropyToMnemonic(entropyBytes),
-                    DEFAULT_DERIV_PATH
-                );
+                // entropyToMnemonic returns a JS string.
+                // Store in named var, pass to mnemonicToPrivKey, null immediately.
+                // Cannot zero the string — immutable in JS — but releasing the
+                // reference makes it GC-eligible before openWallet runs.
+                let interimMnemonic = bip39Bundle.entropyToMnemonic(entropyBytes);
+                const privBytes = bip39Bundle.mnemonicToPrivKey(interimMnemonic, DEFAULT_DERIV_PATH);
+                interimMnemonic = null;  // release string ref ASAP
                 const keyPair = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes));
                 privBytes.fill(0);
                 Keystore.setKeyPair(keyPair);
@@ -2608,13 +2691,20 @@
             }
             if (!bip39Bundle.validateMnemonic(raw)) {
                 $('#restore-word-error').text(getText('seed-invalid-phrase')).removeClass('d-none');
+                raw = null;
                 return;
             }
             const path = ($('#restore-path').val().trim() || DEFAULT_DERIV_PATH);
             try {
+                // Overwrite textarea before we touch any key material.
+                // Browser autofill snapshot may still hold the text, but
+                // the live DOM value is cleared immediately.
+                const $inp = $('#restore-input');
+                $inp.val(' '.repeat($inp.val().length));  // overwrite
+                $inp.val('');
                 const privBytes    = bip39Bundle.mnemonicToPrivKey(raw, path);
                 const entropyBytes = bip39Bundle.mnemonicToEntropy(raw);
-                raw = null;
+                raw = null;  // release mnemonic string ref ASAP
                 const keyPair = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes));
                 privBytes.fill(0);
                 Keystore.setKeyPair(keyPair);
@@ -2686,10 +2776,13 @@
         $('#btn-hide-seed').click(hideSeedReveal);
         $('#btn-save-seed-png').click(function() {
             if (!seedStore.getRevealed().length) return;
+            // join() produces a new string — immutable in JS, cannot be zeroed.
+            // We null the ref immediately after passing it to seedExportPNG so
+            // GC can collect it once seedExportPNG returns.
             let mn = seedStore.getRevealed().join(' ');
             let savedPath; try { savedPath = localStorage.getItem(STORAGE_KEY_PATH); } catch(e) {}
             window.seedExportPNG(mn, getText, savedPath || DEFAULT_DERIV_PATH);
-            mn = '';
+            mn = null;  // release string ref — NOT '' which keeps the string alive
         });
         $('.tab-link').on('click', function() {
             if ($(this).data('tab-family') === 'wallet-block' && $(this).data('tab-name') !== 'wallet-keys') {
