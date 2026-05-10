@@ -76,20 +76,20 @@
 
     class SeedStore {
         #revealedWords = [];
-        #words         = [];
+        #entropy       = null;   // Uint8Array — энтропия, никогда не строки
         #enc           = null;
         #tempKey       = null;
         #verifyHashes  = [];
         #strength      = 256;
 
-        // revealed words
+        // revealed words (display state, wiped after 60s)
         getRevealed()       { return this.#revealedWords; }
         setRevealed(arr)    { this.#revealedWords = arr; }
         wipeRevealed()      { if (this.#revealedWords.length) this.#revealedWords.fill(''); this.#revealedWords = []; }
 
-        // seed generation state
-        get words()         { return this.#words; }
-        set words(v)        { this.#words = v; }
+        // entropy (seed generation state) — Uint8Array, не строки
+        get entropy()       { return this.#entropy; }
+        set entropy(v)      { this.#entropy = v; }
         get enc()           { return this.#enc; }
         set enc(v)          { this.#enc = v; }
         get tempKey()       { return this.#tempKey; }
@@ -101,8 +101,7 @@
 
         clear() {
             this.wipeRevealed();
-            if (this.#words && this.#words.length) this.#words.fill('');
-            this.#words        = [];
+            if (this.#entropy) { this.#entropy.fill(0); this.#entropy = null; }
             this.#enc          = null;
             this.#tempKey      = null;
             this.#verifyHashes = [];
@@ -419,9 +418,7 @@
             return new Uint8Array(pt);
         } catch(e) { return null; }
     }
-    function mnemonicToEntropyBytes(mnemonic) {
-        return bip39Bundle.mnemonicToEntropy(mnemonic);
-    }
+    // mnemonicToEntropyBytes removed — callers convert entropy directly via bip39Bundle
 
     // ═══════════════════════════════════════════════════════════════════════════
     // PASSKEY HELPERS
@@ -671,11 +668,9 @@
         localStorage.removeItem(STORAGE_KEY_SEED);
         localStorage.removeItem(STORAGE_KEY_PATH);
     }
-    async function saveWalletBip39(mnemonic, pin, path) {
-        const privBytes    = Keystore.getPrivKeyBytes();
-        const pubCopy      = new Uint8Array(globalData.pubKey);
-        const entropyBytes = mnemonicToEntropyBytes(mnemonic);
-        mnemonic = null;
+    async function saveWalletBip39(entropyBytes, pin, path) {
+        const privBytes = Keystore.getPrivKeyBytes();
+        const pubCopy   = new Uint8Array(globalData.pubKey);
         await Promise.all([
             saveEncryptedBytes(STORAGE_KEY_PUB,  pubCopy,      pin),
             saveEncryptedBytes(STORAGE_KEY_PRIV, privBytes,    pin),
@@ -684,7 +679,7 @@
         try { localStorage.setItem(STORAGE_KEY_PATH, path || DEFAULT_DERIV_PATH); } catch(e) {}
         pubCopy.fill(0);
         privBytes.fill(0);
-        entropyBytes.fill(0);
+        // entropyBytes.fill(0) — caller's responsibility after this returns
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -1628,20 +1623,21 @@
             ws.emit('subscribe', { address: globalData.address });
         }
     }
-    async function openWallet(offerPin, bip39Mnemonic, derivPath, isRestore) {
+    async function openWallet(offerPin, bip39Entropy, derivPath, isRestore) {
         if (offerPin && !hasSavedWallet()) {
             let pin = await askPinSetup();
             if (pin === null) {
                 Keystore.clear();
-                if (bip39Mnemonic && !isRestore) {
+                if (bip39Entropy && !isRestore) {
+                    bip39Entropy.fill(0);
                     seedReset();
                     showMessage(getText('seed-pin-cancel'));
                 }
                 return;
             }
             globalData.pubKey = new Uint8Array(Keystore.getPublicKeyBytes());
-            if (bip39Mnemonic) {
-                await saveWalletBip39(bip39Mnemonic, pin, derivPath);
+            if (bip39Entropy) {
+                await saveWalletBip39(bip39Entropy, pin, derivPath);
             } else {
                 await saveWalletWif(pin);
             }
@@ -1649,7 +1645,7 @@
             showMessage(getText('wallet-saved'));
             updateSavedWalletUI();
         }
-        bip39Mnemonic = null;
+        if (bip39Entropy) { bip39Entropy.fill(0); bip39Entropy = null; }
         globalData.status         = 'unlocked';
         globalData.address        = Keystore.deriveAddress(getAddressType(), globalData.pubKey);
         globalData.scriptHex      = Keystore.getScriptHex(getAddressType(), globalData.pubKey);
@@ -2394,7 +2390,7 @@
             const pb = globalData.pubKey;
             let phex = '';
             if (pb) { for (let j = 0; j < pb.length; j++) phex += pb[j].toString(16).padStart(2, '0'); }
-            $('#wallet-keys-pubkey input').val(_phex);
+            $('#wallet-keys-pubkey input').val(phex);
             clearPrivKeyInput();
             $('#wallet-privkey-copy-btn').addClass('d-none');
             $('#toggle-wallet-privkey').text(getText('show'));
@@ -2461,20 +2457,25 @@
         function seedDoGenerate() {
             if (typeof bip39Bundle === 'undefined') { showMessage(escHtml(getText('bip39-not-loaded'))); return; }
             clearSeedState();
-            const mnemonic = bip39Bundle.generateMnemonic(seedStore.strength);
-            seedStore.words = mnemonic.split(' ');
-            seedRenderGrid(seedStore.words, '#seed-word-grid');
+            let mnemonic = bip39Bundle.generateMnemonic(seedStore.strength);
+            seedStore.entropy = bip39Bundle.mnemonicToEntropy(mnemonic);
+            mnemonic = null;
+            const words = bip39Bundle.entropyToMnemonic(seedStore.entropy).split(' ');
+            seedRenderGrid(words, '#seed-word-grid');
+            words.fill('');
         }
         $('#seed-btn-print').click(function() {
-            if (!seedStore.words.length) return;
-            let mn = seedStore.words.join(' ');
+            if (!seedStore.entropy) return;
+            let mn = bip39Bundle.entropyToMnemonic(seedStore.entropy);
             window.seedExportPNG(mn, getText, DEFAULT_DERIV_PATH);
-            mn = '';
+            mn = null;
         });
         $('#seed-btn-to-verify').click(async function() {
-            if (!seedStore.words.length) return;
-            const $btn  = $(this).prop('disabled', true);
-            const words = seedStore.words;
+            if (!seedStore.entropy) return;
+            const $btn = $(this).prop('disabled', true);
+            let mnStr = bip39Bundle.entropyToMnemonic(seedStore.entropy);
+            const words = mnStr.split(' ');
+            mnStr = null;
             const len   = words.length;
             function rnd(lo, hi) {
                 const buf = new Uint32Array(1);
@@ -2494,15 +2495,15 @@
                     wordBytes.fill(0);
                     return { pos: p, salt: Array.from(salt), hash: Array.from(sig) };
                 }));
+                words.fill('');
                 seedStore.tempKey = await crypto.subtle.generateKey(
                     { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
                 );
-                const iv    = crypto.getRandomValues(new Uint8Array(12));
-                const plain = new TextEncoder().encode(words.join(' '));
-                const ct    = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, seedStore.tempKey, plain);
-                plain.fill(0);
-                seedStore.enc   = { iv: Array.from(iv), data: Array.from(new Uint8Array(ct)) };
-                seedStore.words.fill('');
+                const iv  = crypto.getRandomValues(new Uint8Array(12));
+                const ct  = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, seedStore.tempKey, seedStore.entropy);
+                seedStore.enc = { iv: Array.from(iv), data: Array.from(new Uint8Array(ct)) };
+                seedStore.entropy.fill(0);
+                seedStore.entropy = null;
         
                 const $fields = $('#seed-verify-fields').empty();
                 pos.forEach(function(p) {
@@ -2518,6 +2519,7 @@
                 $('#seed-create-step2').removeClass('d-none');
                 setTimeout(function() { $('.seed-verify-word').first().focus(); }, 100);
             } catch(e) {
+                words.fill('');
                 $btn.prop('disabled', false);
                 showMessage(escHtml(getText('seed-crypto-error')) + ' ' + escHtml(e.message || String(e)));
             }
@@ -2556,23 +2558,26 @@
                 return;
             }
     
+            seedStore.verifyHashes = [];
             $('#seed-verify-error').addClass('d-none');
             try {
                 const iv = new Uint8Array(seedStore.enc.iv);
                 const ct = new Uint8Array(seedStore.enc.data);
-                const pt = new Uint8Array(await crypto.subtle.decrypt(
+                const entropyBytes = new Uint8Array(await crypto.subtle.decrypt(
                     { name: 'AES-GCM', iv: iv }, seedStore.tempKey, ct
                 ));
                 seedStore.enc     = null;
-        
-                let mnemonic = new TextDecoder().decode(pt);
-                pt.fill(0);
-                const privBytes = bip39Bundle.mnemonicToPrivKey(mnemonic, DEFAULT_DERIV_PATH);
-                const keyPair   = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes));
+                seedStore.tempKey = null;
+
+                const privBytes = bip39Bundle.mnemonicToPrivKey(
+                    bip39Bundle.entropyToMnemonic(entropyBytes),
+                    DEFAULT_DERIV_PATH
+                );
+                const keyPair = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes));
                 privBytes.fill(0);
                 Keystore.setKeyPair(keyPair);
-                await openWallet(true, mnemonic, DEFAULT_DERIV_PATH);
-                mnemonic = '';
+                await openWallet(true, entropyBytes, DEFAULT_DERIV_PATH);
+                entropyBytes.fill(0);
                 inputs.each(function() { this.value = ''; });
                 seedReset();
                 $btn.prop('disabled', false);
@@ -2607,12 +2612,14 @@
             }
             const path = ($('#restore-path').val().trim() || DEFAULT_DERIV_PATH);
             try {
-                const privBytes = bip39Bundle.mnemonicToPrivKey(raw, path);
-                const keyPair   = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes));
+                const privBytes    = bip39Bundle.mnemonicToPrivKey(raw, path);
+                const entropyBytes = bip39Bundle.mnemonicToEntropy(raw);
+                raw = null;
+                const keyPair = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes));
                 privBytes.fill(0);
                 Keystore.setKeyPair(keyPair);
-                await openWallet(true, raw, path, true);
-                raw = null;
+                await openWallet(true, entropyBytes, path, true);
+                entropyBytes.fill(0);
                 seedReset();
             } catch(err) {
                 raw = null;
