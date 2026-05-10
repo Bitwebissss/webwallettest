@@ -74,8 +74,6 @@
     let pinValidator       = null;
     let pinPasskeyCallback = null;
 
-    // Seed reveal state — класс с # защищает мнемонику даже при случайном
-    // удалении IIFE, поля физически недоступны снаружи
     class SeedStore {
         #revealedWords = [];
         #words         = [];
@@ -206,8 +204,6 @@
     // ═══════════════════════════════════════════════════════════════════════════
 
     class KeystoreClass {
-        // Приватный ключ недоступен извне даже при удалении IIFE,
-        // даже через DevTools — это настоящая защита, не визуальная
         #keyPair = null;
 
         getPublicKeyBytes() {
@@ -221,8 +217,6 @@
             return this.#keyPair ? this.#keyPair.toWIF() : null;
         }
 
-        // Приватный метод: ключевой материал taproot не торчит наружу,
-        // обнуляется прямо здесь через finally — не через caller
         #makeTaprootSigner(onSigned) {
             const ecc = bitcoin.ecc;
             if (!ecc || typeof ecc.privateAdd !== 'function' ||
