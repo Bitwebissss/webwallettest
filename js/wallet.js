@@ -1267,7 +1267,7 @@
         $.each($('#send-outputs .send-outputs-item'), function(_, item) {
             const $addrInput = $('[name="send-address"]', item);
             const address    = $addrInput.val().trim();
-            const amtStr     = $('[name="send-ammount"]', item).val().trim();
+            const amtStr     = $('[name="send-amount"]', item).val().trim();
             const amtSats    = parseAmountSats(amtStr);
             const addrOk     = address !== '' && validateAddress(address);
             if (!address || !amtStr) allFilled = false;
@@ -1297,7 +1297,7 @@
         $('#wallet-send .wallet-balance').toggleClass('text-danger', overLimit);
         const feeTyped = $('#send-fee').val() !== '';
         $('#send-fee').toggleClass('is-invalid', feeTyped && (!feeOk || overLimit));
-        $('#send-outputs [name="send-ammount"]').each(function() {
+        $('#send-outputs [name="send-amount"]').each(function() {
             const amtSats = parseAmountSats($(this).val());
             const typed   = $(this).val() !== '';
             $(this).toggleClass('is-invalid', typed && (!amtSats || amtSats <= 0 || overLimit));
@@ -1317,7 +1317,7 @@
         globalData.tx.outputs = [];
         $.each($('#send-outputs .send-outputs-item'), function(key, item) {
             const address = $('[name="send-address"]', item).val().trim();
-            const amtSats = parseAmountSats($('[name="send-ammount"]', item).val());
+            const amtSats = parseAmountSats($('[name="send-amount"]', item).val());
             globalData.tx.outputs.push({ 'address': address, 'amount': amtSats });
         });
         globalData.tx.amount = totalSats;
@@ -1503,7 +1503,7 @@
         $('.send-additional-output').remove();
         $('#wallet-send input').val('');
         $('#wallet-send .wallet-balance').removeClass('text-danger');
-        $('#send-fee, #send-outputs [name="send-ammount"]').removeClass('is-invalid');
+        $('#send-fee, #send-outputs [name="send-amount"]').removeClass('is-invalid');
         $('#send-cancel').prop('disabled', false);
         $('#send-confirm').prop('disabled', false);
         globalData.resetTx();
@@ -2086,7 +2086,7 @@
             let outputsSats = 0;
             $.each($('#send-outputs .send-outputs-item'), function(key, item) {
                 const address = $('[name="send-address"]', item).val().trim();
-                const amtStr  = $('[name="send-ammount"]', item).val();
+                const amtStr  = $('[name="send-amount"]', item).val();
                 const amtSats = parseAmountSats(amtStr);
                 if (amtSats === null || amtSats <= 0) {
                     showSendError(messages.error['not-valid-amount']); error = true;
@@ -2124,7 +2124,7 @@
             if (cur !== $(this).val()) $(this).val(cur);
             validateSendForm();
         });
-        $('#send-outputs').on('input', '[name="send-ammount"]', function() {
+        $('#send-outputs').on('input', '[name="send-amount"]', function() {
             const cur = filterAmountStr($(this).val(), getConfig()['decimals']);
             if (cur !== $(this).val()) $(this).val(cur);
             validateSendForm();
@@ -2132,7 +2132,7 @@
         $('#send-outputs').on('input', '[name="send-address"]', function() {
             validateSendForm();
         });
-        $(document).on('paste', '#send-fee, [name="send-ammount"]', function() {
+        $(document).on('paste', '#send-fee, [name="send-amount"]', function() {
             const self = this;
             setTimeout(function() {
                 const cur = filterAmountStr($(self).val(), getConfig()['decimals']);
@@ -2282,7 +2282,7 @@
             $('#send-outputs').append(
                 '<div class="send-additional-output send-outputs-item input-group mb-2">' +
                 '<input name="send-address" class="form-control" placeholder="' + escHtml(getText('enter-address')) + '" type="text" autocomplete="off">' +
-                '<input name="send-ammount" class="form-control" placeholder="' + escHtml(getText('amount')) + '" type="text" autocomplete="off">' +
+                '<input name="send-amount" class="form-control" placeholder="' + escHtml(getText('amount')) + '" type="text" autocomplete="off">' +
                 '<button class="btn btn-outline-danger remove-additional-output" type="button"><span class="fa-solid fa-minus"></span></button>' +
                 '</div>'
             );

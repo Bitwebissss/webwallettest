@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -26,6 +26,7 @@
         <link rel="stylesheet" href="css/bootstrap.min.css"
                 integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
                 crossorigin="anonymous">
+        <link rel="stylesheet" href="css/style.css"
         <link rel="icon" type="image/svg+xml" href="images/logo.svg">
         <script src="js/theme.js"></script>
         <!-- https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js -->
@@ -57,12 +58,11 @@
         <script src="js/bitcoin-bundle-v7.min.js"
                 integrity="sha512-tHiUwjZ7E2a/zTil4RbIeBCVHHVcyvcXcj1cuC/fzn4qvnZ0nc0LJkg0yifWnvTP1CEakabPJSwe22f3mOYp1g=="
                 crossorigin="anonymous"></script>
-        <link rel="stylesheet" href="css/style.css"></script>
         <!-- https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js -->
         <script src="js/socket.io.min.js"
                 integrity="sha512-8ExARjWWkIllMlNzVg7JKq9RKWPlJABQUNq6YvAjE/HobctjH/NA+bSiDMDvouBVjp4Wwnf1VP1OEv7Zgjtuxw=="
                 crossorigin="anonymous"></script>
-		<script src="js/seed-export.js"></script>
+        <script src="js/seed-export.js"></script>
         <script src="js/tx-history.js"></script>
         <title>Wallet</title>
         <meta name="description" content="Bitweb Web Wallet">
@@ -334,7 +334,7 @@
                                 <div id="send-outputs">
                                     <div class="input-group send-outputs-item mb-2">
                                         <input name="send-address" class="form-control" type="text" value="" autocomplete="off" tkey="enter-address">
-                                        <input name="send-ammount" class="form-control" type="text" value="" autocomplete="off" tkey="amount">
+                                        <input name="send-amount" class="form-control" type="text" value="" autocomplete="off" tkey="amount">
                                         <button id="add-output" class="btn btn-outline-success">
                                         <span class="fa-solid fa-plus"></span>
                                         </button>

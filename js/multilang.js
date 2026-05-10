@@ -1,4 +1,4 @@
-var walletLanguages = {
+const walletLanguages = {
     'en': {
         'lang-alias': 'English',
         'open-regular': 'Regular wallet',
