@@ -1743,28 +1743,32 @@
 
     function routePage() {
         const urlParams = readParams();
-        if (window.location.hash == '') window.location.replace(window.location.href.split('#')[0] + '#/');
-        if (urlParams[0] == '#') {
-            const pageName    = urlParams[1] != '' ? urlParams[1] : 'homepage';
-            const templateName = '#' + pageName;
-            $('.router-link').removeClass('active');
-            $('.router-link[data-route=' + pageName + ']').addClass('active');
-            if ($('.router-page:visible').attr('id') != urlParams[1]) {
-                $('div.router-page').hide();
-                if ($(templateName).length) $(templateName).show();
+        if (window.location.hash === '') {
+            window.location.replace(window.location.href.split('#')[0] + '#/');
+        }
+        if (urlParams[0] !== '#') return;
+        const pageName     = urlParams[1] || 'homepage';
+        const templateName = '#' + pageName;
+        $('.router-link').removeClass('active');
+        $('.router-link[data-route=' + pageName + ']').addClass('active');
+        if ($('.router-page:visible').attr('id') !== urlParams[1]) {
+            $('div.router-page').hide();
+            if ($(templateName).length) $(templateName).show();
+        }
+        switch (pageName) {
+            case 'homepage':
+                setHomeTitle();
+                break;
+            case 'broadcast':
+                setTitle(getText('broadcast-transaction'));
+                break;
+            case 'network': {
+                const network = urlParams[2];
+                if (network !== undefined) switchConfig(network);
+                break;
             }
-            switch(pageName) {
-                case 'homepage':  setHomeTitle();
-                    break;
-                case 'broadcast': setTitle(getText('broadcast-transaction'));
-                    break;
-                case 'network':
-                    const network = urlParams[2];
-                    if (network != undefined) switchConfig(network);
-                    break;
-                default: switchPage();
-                    break;
-            }
+            default:
+                switchPage();
         }
     }
     function switchPage(url, params) {
