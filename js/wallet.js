@@ -216,24 +216,33 @@
             if (pi && pi.parentNode) pi.parentNode.insertBefore(canvas, pi);
             else if (pi) pi.insertAdjacentElement('afterend', canvas);
         }
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        const W = pi ? Math.max(pi.offsetWidth || 340, 200) : 340;
-        const H = 36;
-        canvas.width  = W * dpr;
-        canvas.height = H * dpr;
-        canvas.style.width = W + 'px';
-        const ctx = canvas.getContext('2d');
-        ctx.scale(dpr, dpr);
-        const cs = getComputedStyle(document.body);
-        ctx.fillStyle = cs.getPropertyValue('--bs-body-bg').trim() || '#ffffff';
-        ctx.fillRect(0, 0, W, H);
-        ctx.fillStyle    = cs.getPropertyValue('--bs-body-color').trim() || '#212529';
-        ctx.font         = '13px monospace';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(wif, 8, H / 2);
-        wif = null;  // release — string can't be zeroed but GC can now collect
-        canvas.classList.remove('d-none');
+        // Hide input first so canvas inherits its flex slot, then show canvas.
+        // Width is measured after layout in rAF so we get the real rendered size.
         if (pi) pi.classList.add('d-none');
+        canvas.classList.remove('d-none');
+        const capturedWif = wif;
+        wif = null;  // release ref — rAF closure keeps capturedWif alive briefly
+        requestAnimationFrame(function() {
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            const W = Math.max(canvas.offsetWidth || 340, 200);
+            const H = Math.max(canvas.offsetHeight || 38, 32);
+            canvas.width  = W * dpr;
+            canvas.height = H * dpr;
+            canvas.style.width = W + 'px';
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+            // Use canvas own computed style so bg matches form-control in any theme
+            const cs = getComputedStyle(canvas);
+            const bodyCs = getComputedStyle(document.body);
+            ctx.fillStyle = cs.backgroundColor || bodyCs.getPropertyValue('--bs-body-bg').trim() || '#ffffff';
+            ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle    = bodyCs.getPropertyValue('--bs-body-color').trim() || '#212529';
+            ctx.font         = '13px monospace';
+            ctx.textBaseline = 'middle';
+            // 12px left padding mirrors Bootstrap form-control padding-x (0.75rem ≈ 12px)
+            ctx.fillText(capturedWif, 12, H / 2);
+            // capturedWif string is immutable — cannot zero, but ref leaves scope here
+        });
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
