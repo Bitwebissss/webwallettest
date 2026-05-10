@@ -1247,9 +1247,7 @@
                     blocksLeft: blocksToMature(u, _ch)
                 });
             });
-            globalData.balance = _cached.balance != null
-                ? _cached.balance
-                : globalData.utxos.reduce(function(s, u) { return u.height !== 0 ? s + u.value : s; }, 0);
+            globalData.balance = _cached.balance || 0;
         } else {
             globalData.balance         = 0;
             globalData.immatureBalance = 0;
@@ -1715,10 +1713,6 @@
             globalData.utxos.forEach(function(u) {
                 if (u.height !== 0 && u.mature) spendableSats += u.value
             })
-            // fallback to balance-based if no UTXOs loaded yet
-            if (spendableSats === 0 && globalData.utxos.length === 0) {
-                spendableSats = Math.max(0, globalData.balance - globalData.immatureBalance)
-            }
         }
         var overLimit = totalSats > spendableSats && totalSats > 0
         var canSend   = allFilled && allAmtOk && allAddrOk && feeOk && !overLimit && totalSats > 0
@@ -1955,9 +1949,6 @@
                 globalData.utxos.forEach(function(u) {
                     if (u.height !== 0 && u.mature) spendableSats += u.value
                 })
-                if (spendableSats === 0 && globalData.utxos.length === 0) {
-                    spendableSats = Math.max(0, globalData.balance - globalData.immatureBalance)
-                }
             }
             if (!error) {
                 if (totalSats <= spendableSats) {
