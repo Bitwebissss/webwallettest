@@ -962,8 +962,6 @@
         }
     };
 
-    let messages = initMessages();
-
     // ═══════════════════════════════════════════════════════════════════════════
     // TX HISTORY
     // ═══════════════════════════════════════════════════════════════════════════
@@ -1875,6 +1873,7 @@
 
     $(document).ready(function() {
         initLang();
+		messages = initMessages();
         $(document).on('click', '.theme-option', function(e) {
             e.preventDefault();
             const theme = $(this).data('theme');
