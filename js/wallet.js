@@ -55,6 +55,7 @@
     var scanRafId     = null
     var scanSession   = 0
     var walletVersion = '0.5'
+    var _isSending    = false
     var networkConfigs = {
         'BTE': {
             'uri':     'bitweb:',
@@ -279,8 +280,7 @@
         balance:             0,
         unconfirmedBalance:  0,
         immatureBalance:     0,
-        mempoolDelta:        0,   // ElectrumX net mempool change (negative = pending outgoing)
-        pendingOut:          0,   // confirmed coins currently being spent in mempool
+        pendingOut:          0,   // confirmed coins currently being spent in mempool (set by backend)
         height:              0,
         address:         undefined,
         scriptHex:       undefined,
@@ -305,7 +305,6 @@
             this.balance             = 0;
             this.unconfirmedBalance  = 0;
             this.immatureBalance     = 0;
-            this.mempoolDelta        = 0;
             this.pendingOut          = 0;
             this.height              = 0;
             this.utxos               = [];
@@ -411,13 +410,13 @@
     async function pkEnable() {
         var pkEnableValidator = async function(candidate) {
             var pub = await loadEncryptedBytes(STORAGE_KEY_PUB, candidate);
-            if (!pub) return getText('pin-login-error') || 'Wrong PIN';
+            if (!pub) return getText('pin-login-error');
             pub.fill(0);
             return null;
         };
         var pin = await askPin(
-            getText('pin-title-default') || 'Wallet PIN',
-            (getText('passkey-confirm-pin') || 'Enter PIN to verify identity before setting up passkey'),
+            getText('pin-title-default'),
+            (getText('passkey-confirm-pin')),
             pkEnableValidator, false
         );
         if (pin === null) return;
@@ -462,7 +461,7 @@
             var ext = credential.getClientExtensionResults();
             if (!ext.prf || !ext.prf.results || !ext.prf.results.first) {
                 privBytes.fill(0); pubBytes.fill(0); if (seedBytes) seedBytes.fill(0);
-                showMessage(getText('passkey-prf-unsupported') || 'This browser/device does not support the PRF extension required for passkey unlock. Use PIN instead.');
+                showMessage(getText('passkey-prf-unsupported'));
                 return;
             }
             var prfBytes = new Uint8Array(ext.prf.results.first);
@@ -473,13 +472,13 @@
             privBytes.fill(0); pubBytes.fill(0); if (seedBytes) seedBytes.fill(0);
             localStorage.setItem(STORAGE_KEY_PK_ID, _credIdToB64(credential.rawId));
             updatePasskeyUI();
-            showMessage(getText('passkey-enabled') || '🔐 Passkey enabled — you can now unlock with biometrics');
+            showMessage(getText('passkey-enabled'));
         } catch(e) {
             if (privBytes) privBytes.fill(0);
             if (pubBytes)  pubBytes.fill(0);
             if (seedBytes) seedBytes.fill(0);
             if (e.name === 'NotAllowedError') return;
-            showMessage((getText('passkey-error') || 'Passkey error: ') + e.message);
+            showMessage(escHtml(getText('passkey-error')) + escHtml(e.message));
         }
     }
     function _isTransientPasskeyError(e) {
@@ -491,7 +490,7 @@
         if (_retriesLeft === undefined) _retriesLeft = 2;
         var credIdStr = null;
         try { credIdStr = localStorage.getItem(STORAGE_KEY_PK_ID); } catch(e) {}
-        if (!credIdStr) { showMessage(getText('passkey-not-setup') || 'Passkey not set up'); return; }
+        if (!credIdStr) { showMessage(getText('passkey-not-setup')); return; }
         var credIdBytes = _b64ToCredId(credIdStr);
         try {
             var assertion = await navigator.credentials.get({
@@ -507,7 +506,7 @@
             });
             var ext = assertion.getClientExtensionResults();
             if (!ext.prf || !ext.prf.results || !ext.prf.results.first) {
-                showMessage(getText('passkey-prf-unsupported') || 'PRF extension not available');
+                showMessage(getText('passkey-prf-unsupported'));
                 return;
             }
             var prfBytes  = new Uint8Array(ext.prf.results.first);
@@ -517,7 +516,7 @@
             if (!privBytes || !pubBytes) {
                 if (privBytes) privBytes.fill(0);
                 if (pubBytes)  pubBytes.fill(0);
-                showMessage(getText('passkey-decrypt-failed') || 'Passkey decryption failed — try PIN');
+                showMessage(getText('passkey-decrypt-failed'));
                 return;
             }
             Keystore.setKeyPair(
@@ -532,7 +531,7 @@
                 await new Promise(function(r) { setTimeout(r, 300); });
                 return pkAuthenticate(_retriesLeft - 1);
             }
-            showMessage((getText('passkey-error') || 'Passkey error: ') + e.message);
+            showMessage(escHtml(getText('passkey-error')) + escHtml(e.message));
         }
     }
     function _doPkDisable() {
@@ -540,7 +539,7 @@
             try { localStorage.removeItem(k); } catch(e) {}
         });
         updatePasskeyUI();
-        showMessage(getText('passkey-disabled') || 'Passkey disabled');
+        showMessage(getText('passkey-disabled'));
     }
     async function pkDisable() {
         async function onPasskeyChosen(_retriesLeft) {
@@ -565,18 +564,18 @@
                     await new Promise(function(r) { setTimeout(r, 300); });
                     return onPasskeyChosen(_retriesLeft - 1);
                 }
-                showMessage((getText('passkey-error') || 'Passkey error: ') + e.message);
+                showMessage(escHtml(getText('passkey-error')) + escHtml(e.message));
             }
         }
         var pkDisableValidator = async function(candidate) {
             var pub = await loadEncryptedBytes(STORAGE_KEY_PUB, candidate);
-            if (!pub) return getText('pin-login-error') || 'Wrong PIN';
+            if (!pub) return getText('pin-login-error');
             pub.fill(0);
             return null;
         };
         var pin = await askPin(
-            getText('pin-title-default') || 'Wallet PIN',
-            getText('passkey-disable-confirm') || 'Enter PIN (or use Passkey) to disable passkey',
+            getText('pin-title-default'),
+            getText('passkey-disable-confirm'),
             pkDisableValidator, false,
             onPasskeyChosen
         );
@@ -599,15 +598,15 @@
         var $section = $('#passkey-settings-section');
         if (!$section.length) return;
         if (isPasskeyEnabled()) {
-            $('#passkey-settings-status').text(getText('passkey-status-enabled') || '✅ Enabled — biometric unlock active');
+            $('#passkey-settings-status').text(getText('passkey-status-enabled'));
             $('#passkey-settings-btn')
-                .text(getText('passkey-disable-btn') || 'Disable Passkey')
+                .text(getText('passkey-disable-btn'))
                 .removeClass('btn-outline-primary btn-success')
                 .addClass('btn-outline-danger');
         } else {
-            $('#passkey-settings-status').text(getText('passkey-status-disabled') || '🔒 Disabled — PIN only');
+            $('#passkey-settings-status').text(getText('passkey-status-disabled'));
             $('#passkey-settings-btn')
-                .text(getText('passkey-enable-btn') || '🔐 Enable Passkey')
+                .text(getText('passkey-enable-btn'))
                 .removeClass('btn-outline-danger btn-success')
                 .addClass('btn-outline-primary');
         }
@@ -648,8 +647,7 @@
         clearTimeout(_autoLockTimer);
         _autoLockTimer = setTimeout(function() {
             closeWallet();
-            var msg = (typeof getText === 'function') ? getText('auto-locked') : '';
-            showMessage(msg || 'Wallet locked after inactivity');
+            showMessage(escHtml(getText('auto-locked')));
         }, AUTO_LOCK_MS);
     }
     function _stopAutoLock() {
@@ -762,11 +760,11 @@
         })
     }
     function validatePinStrength(p) {
-        if (!p || p.length < 8)          return getText('pin-too-short')   || 'Minimum 8 characters';
-        if (!/[A-Z]/.test(p))            return getText('pin-need-upper')  || 'Requires uppercase letter (A–Z)';
-        if (!/[a-z]/.test(p))            return getText('pin-need-lower')  || 'Requires lowercase letter (a–z)';
-        if (!/[0-9]/.test(p))            return getText('pin-need-digit')  || 'Requires a digit (0–9)';
-        if (!/[^A-Za-z0-9]/.test(p))     return getText('pin-need-special')|| 'Requires special character (!@#$…)';
+        if (!p || p.length < 8)          return getText('pin-too-short');
+        if (!/[A-Z]/.test(p))            return getText('pin-need-upper');
+        if (!/[a-z]/.test(p))            return getText('pin-need-lower');
+        if (!/[0-9]/.test(p))            return getText('pin-need-digit');
+        if (!/[^A-Za-z0-9]/.test(p))     return getText('pin-need-special');
         return null;
     }
     async function askPinSetup() {
@@ -794,7 +792,7 @@
                 pt.fill(0)
                 return null
             } catch(e) {
-                return getText('pin-mismatch') || 'PIN does not match — please try again'
+                return getText('pin-mismatch')
             }
         }
         var confirmed = await askPin(
@@ -1001,11 +999,11 @@
             return c
         } catch(e) { return null }
     }
-    function saveUtxoCache(address, utxos, height, balance, mempoolDelta) {
+    function saveUtxoCache(address, utxos, height, balance, pendingOut) {
         try {
             localStorage.setItem('bte_utxo_' + address, JSON.stringify({
                 utxos: utxos, height: height, balance: balance || 0,
-                mempoolDelta: mempoolDelta || 0, ts: Date.now()
+                pendingOut: pendingOut || 0, ts: Date.now()
             }))
         } catch(e) {}
     }
@@ -1064,10 +1062,7 @@
         })
         globalData.immatureBalance    = immature
         globalData.unconfirmedBalance = unconfirmed
-        // pendingOut = confirmed coins being spent in unconfirmed outgoing txs.
-        // ElectrumX mempoolDelta = incoming_unconfirmed - spent_confirmed (can be negative).
-        // Therefore: spent_confirmed = unconfirmed_incoming - mempoolDelta (clamped to 0).
-        globalData.pendingOut = Math.max(0, unconfirmed - (globalData.mempoolDelta || 0))
+        // pendingOut is computed by the backend and set directly from balance_changed / cache.
         var fp = globalData.utxos.map(function(u) {
             return u.txid + ':' + u.index + ':' + (u.mature ? 1 : 0)
         }).join('|')
@@ -1092,11 +1087,12 @@
         setTimeout(function() { $('#error-message').addClass('d-none') }, 3400)
     }
     function showSendError(message) {
+        _isSending = false;
         $('#send-modal-error').html(message).removeClass('d-none')
         $('#confirm-screen').addClass('d-none')
         $('#status-screen').addClass('d-none')
-        $('#send-cancel').removeClass('disabled d-none')
-        $('#send-confirm').addClass('d-none')
+        $('#send-cancel').prop('disabled', false).removeClass('disabled d-none')
+        $('#send-confirm').prop('disabled', false).addClass('d-none')
         $('#send-close-footer').addClass('d-none disabled')
         if (!$('#send-modal').hasClass('show')) {
             $('#send-title').text(messages.title['sure'] || 'Send')
@@ -1259,11 +1255,11 @@
                 });
             });
             globalData.balance      = _cached.balance || 0;
-            globalData.mempoolDelta = _cached.mempoolDelta || 0;
+            globalData.pendingOut   = _cached.pendingOut || 0;
         } else {
             globalData.balance         = 0;
             globalData.immatureBalance = 0;
-            globalData.mempoolDelta    = 0;
+            globalData.pendingOut      = 0;
             globalData.utxos           = [];
         }
         _applyUtxoData();
@@ -1278,7 +1274,7 @@
                 Keystore.clear();
                 if (bip39Mnemonic && !isRestore) {
                     seedReset();
-                    showMessage(getText('seed-pin-cancel') || 'Due to cancellation, the seed has been regenerated for security.');
+                    showMessage(getText('seed-pin-cancel'));
                 }
                 return;
             }
@@ -1347,8 +1343,8 @@
             var status    = ''
             var disabledTitle = ''
             if (!confirmed) {
-                status = '<span class="text-secondary"><span class="fa-solid fa-hourglass-half"></span> ' + escHtml(getText('history-pending') || 'Unconfirmed') + '</span>'
-                disabledTitle = ' title="' + escHtml(getText('coin-control-unconfirmed-title') || 'Cannot spend unconfirmed') + '"'
+                status = '<span class="text-secondary"><span class="fa-solid fa-hourglass-half"></span> ' + escHtml(getText('history-pending')) + '</span>'
+                disabledTitle = ' title="' + escHtml(getText('coin-control-unconfirmed-title')) + '"'
             } else if (!mature) {
                 status = '<span class="text-warning" title="' + escHtml(getText('coin-control-matures-in')) + ' ' + escHtml(String(u.blocksLeft)) + ' ' + escHtml(getText('coin-control-blocks')) + '">' +
                     '<span class="fa-solid fa-lock"></span> ' + escHtml(String(u.blocksLeft)) + ' blk</span>'
@@ -1417,14 +1413,16 @@
             })
     }
     function sendTransaction() {
+        if (_isSending) return;
+        _isSending = true;
         var network = getConfig()['network'];
         var outputs = globalData.tx.outputs;
         var amount  = globalData.tx.amount;
         var address = globalData.address;
         var psbt = new bitcoin.Psbt({ network: network });
         psbt.setVersion(2);
-        $('#send-cancel').addClass('disabled');
-        $('#send-confirm').addClass('disabled');
+        $('#send-cancel').prop('disabled', true).addClass('disabled');
+        $('#send-confirm').prop('disabled', true).addClass('disabled');
         $('#confirm-screen').addClass('d-none');
         $('#status-screen').removeClass('d-none');
         $('#send-title').text(messages.title['processing']);
@@ -1509,6 +1507,7 @@
                 psbt.finalizeAllInputs();
                 var tx = psbt.extractTransaction();
                 transactionBroadcast(tx.toHex()).then(function(data) {
+                    _isSending = false;
                     if (data.error == null) {
                         clearUtxoCache(address);
                         $('#status-screen span').html(
@@ -1516,7 +1515,7 @@
                         );
                         $('#send-title').text(messages.title['success']);
                     } else {
-                        $('#status-screen span').html(messages.error['broadcast-failed']);
+                        $('#status-screen span').html(escHtml(messages.error['broadcast-failed']));
                         $('#send-title').text(messages.title['failed']);
                         $('#status-screen .extra-info').html(
                             '<div class="mt-3"><textarea class="form-control" readonly cols="30" rows="10">' + escHtml(data.error.message) + '</textarea></div>'
@@ -1528,6 +1527,7 @@
                 $('#send-confirm').addClass('d-none');
                 $('#send-close-footer').removeClass('d-none disabled');
             }).catch(function() {
+                _isSending = false;
                 showSendError(messages.error['bad-utxo']);
             });
         };
@@ -1546,7 +1546,7 @@
                 globalData.utxos = utxos;
                 doSend(utxos);
             })
-            .catch(function() { showSendError(messages.error['not-enough-utxo']); });
+            .catch(function() { _isSending = false; showSendError(messages.error['not-enough-utxo']); });
         }
     }
     function getScriptType(script) {
@@ -1657,10 +1657,13 @@
         startStream()
     }
     function resetTxForm() {
+        _isSending = false;
         $('.send-additional-output').remove()
         $('#wallet-send input').val('')
         $('#wallet-send .wallet-balance').removeClass('text-danger')
         $('#send-fee, #send-outputs [name="send-ammount"]').removeClass('is-invalid')
+        $('#send-cancel').prop('disabled', false)
+        $('#send-confirm').prop('disabled', false)
         globalData.resetTx()
         validateSendForm()
     }
@@ -1881,7 +1884,7 @@
             } else {
                 checkPasskeySupport().then(function(supported) {
                     if (!supported) {
-                        showMessage(getText('passkey-unsupported') || 'Passkey not supported on this device/browser');
+                        showMessage(getText('passkey-unsupported'));
                         return;
                     }
                     pkEnable();
@@ -2065,7 +2068,7 @@
                         });
                         var ext = assertion.getClientExtensionResults();
                         if (!ext.prf || !ext.prf.results || !ext.prf.results.first) {
-                            showMessage(getText('passkey-prf-unsupported') || 'PRF not available');
+                            showMessage(getText('passkey-prf-unsupported'));
                             return;
                         }
                         revealPrivKeyInput(Keystore.getWIF());
@@ -2082,19 +2085,19 @@
                             await new Promise(function(r) { setTimeout(r, 300); });
                             return onPasskeyChosen(_retriesLeft - 1);
                         }
-                        showMessage((getText('passkey-error') || 'Passkey error: ') + e.message);
+                        showMessage(escHtml(getText('passkey-error')) + escHtml(e.message));
                     }
                 }
                 var canUsePasskey = isPasskeyEnabled() && hasPasskeyCredential();
                 var privKeyValidator = async function(candidate) {
                     var pub = await loadEncryptedBytes(STORAGE_KEY_PUB, candidate);
-                    if (!pub) return getText('pin-login-error') || 'Wrong PIN';
+                    if (!pub) return getText('pin-login-error');
                     pub.fill(0);
                     return null;
                 };
                 var pin = await askPin(
-                    getText('pin-title-default') || 'Wallet PIN',
-                    getText('privkey-pin-desc')  || 'Enter PIN to reveal private key',
+                    getText('pin-title-default'),
+                    getText('privkey-pin-desc'),
                     privKeyValidator, false,
                     canUsePasskey ? onPasskeyChosen : null
                 );
@@ -2122,8 +2125,8 @@
         $('#add-output').click(function(e) {
             $('#send-outputs').append(
                 '<div class="send-additional-output send-outputs-item input-group mb-2">' +
-                '<input name="send-address" class="form-control" placeholder="' + getText('enter-address') + '" type="text" autocomplete="off">' +
-                '<input name="send-ammount" class="form-control" placeholder="' + getText('amount') + '" type="text" autocomplete="off">' +
+                '<input name="send-address" class="form-control" placeholder="' + escHtml(getText('enter-address')) + '" type="text" autocomplete="off">' +
+                '<input name="send-ammount" class="form-control" placeholder="' + escHtml(getText('amount')) + '" type="text" autocomplete="off">' +
                 '<button class="btn btn-outline-danger remove-additional-output" type="button"><span class="fa-solid fa-minus"></span></button>' +
                 '</div>'
             )
@@ -2187,7 +2190,7 @@
             var rawtx = $('#transaction-broadcast-raw')
             transactionBroadcast(rawtx.val()).then(function(data) {
                 if (data.error == null) {
-                    showMessage(messages.tx['success'] + '<a href="' + escHtml(blockExplorer.tx(data.result)) + '" target="_blank" rel="noopener noreferrer">' + escHtml(data.result) + '</a>')
+                    showMessage(escHtml(messages.tx['success']) + '<a href="' + escHtml(blockExplorer.tx(data.result)) + '" target="_blank" rel="noopener noreferrer">' + escHtml(data.result) + '</a>')
                 } else {
                     showMessage(messages.error['broadcast-failed'])
                 }
@@ -2205,7 +2208,6 @@
             globalData.selectedUtxos = null;
             globalData.immatureBalance = 0;
             globalData.unconfirmedBalance = 0;
-            globalData.mempoolDelta = 0;
             globalData.pendingOut = 0;
             globalData._lastRendered = { balance: -1, immature: -1, unconfirmed: -1, pendingOut: -1, utxoFingerprint: '' };
             globalData.address        = Keystore.deriveAddress(newType, globalData.pubKey);
@@ -2295,7 +2297,7 @@
             _seedDoGenerate()
         })
         function _seedDoGenerate() {
-            if (typeof bip39Bundle === 'undefined') { alert('bip39-bundle.min.js not loaded'); return }
+            if (typeof bip39Bundle === 'undefined') { showMessage(escHtml(getText('bip39-not-loaded'))); return }
             clearSeedState();
             var mnemonic = bip39Bundle.generateMnemonic(_seedState.strength);
             _seedState.words = mnemonic.split(' ');
@@ -2345,7 +2347,7 @@
                 pos.forEach(function(p) {
                     $fields.append(
                         '<div class="input-group input-group-sm mb-2">' +
-                        '<span class="input-group-text seed-verify-num">' + getText('seed-word-num') + ' ' + (p + 1) + '</span>' +
+                        '<span class="input-group-text seed-verify-num">' + escHtml(getText('seed-word-num')) + ' ' + (p + 1) + '</span>' +
                         '<input type="text" class="form-control font-monospace seed-verify-word" data-pos="' + p + '" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">' +
                         '</div>'
                     );
@@ -2356,7 +2358,7 @@
                 setTimeout(function() { $('.seed-verify-word').first().focus(); }, 100);
             } catch(e) {
                 $btn.prop('disabled', false);
-                alert('Crypto error: ' + (e.message || e));
+                showMessage(escHtml(getText('seed-crypto-error')) + ' ' + escHtml(e.message || String(e)));
             }
         })
         $('#seed-verify-confirm').click(async function() {
@@ -2413,7 +2415,7 @@
                 $btn.prop('disabled', false);
             } catch(err) {
                 $btn.prop('disabled', false);
-                alert('Key derivation error: ' + err.message);
+                showMessage(escHtml(getText('seed-deriv-error')) + ' ' + escHtml(err.message));
             }
         });
         $('#restore-wordcount').change(function() {
@@ -2425,7 +2427,7 @@
             $('#restore-word-error').addClass('d-none')
         })
         $('#seed-restore-btn').click(async function() {
-            if (typeof bip39Bundle === 'undefined') { alert('bip39-bundle.min.js not loaded'); return; }
+            if (typeof bip39Bundle === 'undefined') { showMessage(escHtml(getText('bip39-not-loaded'))); return; }
             $('#restore-word-error').addClass('d-none');
             var raw = $('#restore-input').val().trim().toLowerCase().replace(/\s+/g, ' ');
             var words = raw.split(' ');
@@ -2458,7 +2460,7 @@
                 if (_retriesLeft === undefined) _retriesLeft = 2;
                 var credIdStr = null;
                 try { credIdStr = localStorage.getItem(STORAGE_KEY_PK_ID); } catch(e) {}
-                if (!credIdStr) { showMessage(getText('passkey-not-setup') || 'Passkey not set up'); return; }
+                if (!credIdStr) { showMessage(getText('passkey-not-setup')); return; }
                 try {
                     var assertion = await navigator.credentials.get({
                         publicKey: {
@@ -2471,14 +2473,14 @@
                     });
                     var ext = assertion.getClientExtensionResults();
                     if (!ext.prf || !ext.prf.results || !ext.prf.results.first) {
-                        showMessage(getText('passkey-prf-unsupported') || 'PRF not available');
+                        showMessage(getText('passkey-prf-unsupported'));
                         return;
                     }
                     var prfBytes  = new Uint8Array(ext.prf.results.first);
                     var seedBytes = await loadEncryptedBytesWithKey(STORAGE_KEY_SEED_PK, prfBytes);
                     prfBytes.fill(0);
                     if (!seedBytes) {
-                        showMessage(getText('passkey-decrypt-failed') || 'Seed not found via passkey — try PIN');
+                        showMessage(getText('passkey-decrypt-failed'));
                         return;
                     }
                     _revealSeedFromBytes(seedBytes);
@@ -2488,7 +2490,7 @@
                         await new Promise(function(r) { setTimeout(r, 300); });
                         return onPasskeyChosen(_retriesLeft - 1);
                     }
-                    showMessage((getText('passkey-error') || 'Passkey error: ') + e.message);
+                    showMessage(escHtml(getText('passkey-error')) + escHtml(e.message));
                 }
             }
             var title         = getText('seed-pin-modal-title');
@@ -2496,7 +2498,7 @@
             var canUsePasskey = isPasskeyEnabled() && hasSeedPkBackup();
             var seedPinValidator = async function(candidate) {
                 var pub = await loadEncryptedBytes(STORAGE_KEY_PUB, candidate);
-                if (!pub) return getText('pin-login-error') || 'Wrong PIN';
+                if (!pub) return getText('pin-login-error');
                 pub.fill(0);
                 return null;
             };
@@ -2568,8 +2570,8 @@
             if (data && typeof data.confirmed === 'number' && Array.isArray(data.utxos)) {
                 var prevBalance     = globalData.balance;
                 var prevUnconfirmed = globalData.unconfirmedBalance;
-                globalData.balance = data.confirmed;
-                globalData.mempoolDelta = typeof data.unconfirmed === 'number' ? data.unconfirmed : 0;
+                globalData.balance     = data.confirmed;
+                globalData.pendingOut  = typeof data.pending_out === 'number' ? data.pending_out : 0;
                 if (typeof data.height === 'number') {
                     globalData.height = data.height;
                 }
@@ -2580,7 +2582,7 @@
                         blocksLeft: blocksToMature(u, h)
                     });
                 });
-                saveUtxoCache(globalData.address, globalData.utxos, h, data.confirmed, data.unconfirmed || 0);
+                saveUtxoCache(globalData.address, globalData.utxos, h, data.confirmed, data.pending_out || 0);
                 _applyUtxoData();
                 if ((globalData.balance !== prevBalance || globalData.unconfirmedBalance !== prevUnconfirmed) && globalData.address) {
                     TxHistory.updateHistory();
