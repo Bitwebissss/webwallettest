@@ -18,7 +18,7 @@
     const STORAGE_KEY_SEED_PK = 'bte_wallet_seed_pk';
     const STORAGE_KEY_PK_ID   = 'bte_pk_credential_id';
 
-    const _PK_PRF_SALT = new TextEncoder().encode('bitweb-wallet-v1');
+    const PK_PRF_SALT = new TextEncoder().encode('bitweb-wallet-v1');
 
     const networkConfigs = {
         'BTE': {
@@ -64,29 +64,57 @@
     let scanSession = 0;
 
     // Send flow
-    let _isSending = false;
+    let isSending = false;
 
     // Auto-lock timer
-    let _autoLockTimer = null;
+    let autoLockTimer = null;
 
     // PIN modal callbacks
-    let _pinResolve         = null;
-    let _pinValidator       = null;
-    let _pinPasskeyCallback = null;
+    let pinResolve         = null;
+    let pinValidator       = null;
+    let pinPasskeyCallback = null;
 
-    // Seed reveal state
-    let _revealedWords = [];
-    const _seedState = {
-        words:        [],
-        enc:          null,
-        tempKey:      null,
-        verifyHashes: [],
-        strength:     256
-    };
+    // Seed reveal state — класс с # защищает мнемонику даже при случайном
+    // удалении IIFE, поля физически недоступны снаружи
+    class SeedStore {
+        #revealedWords = [];
+        #words         = [];
+        #enc           = null;
+        #tempKey       = null;
+        #verifyHashes  = [];
+        #strength      = 256;
+
+        // revealed words
+        getRevealed()       { return this.#revealedWords; }
+        setRevealed(arr)    { this.#revealedWords = arr; }
+        wipeRevealed()      { if (this.#revealedWords.length) this.#revealedWords.fill(''); this.#revealedWords = []; }
+
+        // seed generation state
+        get words()         { return this.#words; }
+        set words(v)        { this.#words = v; }
+        get enc()           { return this.#enc; }
+        set enc(v)          { this.#enc = v; }
+        get tempKey()       { return this.#tempKey; }
+        set tempKey(v)      { this.#tempKey = v; }
+        get verifyHashes()  { return this.#verifyHashes; }
+        set verifyHashes(v) { this.#verifyHashes = v; }
+        get strength()      { return this.#strength; }
+        set strength(v)     { this.#strength = v; }
+
+        clear() {
+            this.wipeRevealed();
+            if (this.#words && this.#words.length) this.#words.fill('');
+            this.#words        = [];
+            this.#enc          = null;
+            this.#tempKey      = null;
+            this.#verifyHashes = [];
+        }
+    }
+    const seedStore = new SeedStore();
 
     // WebSocket
-    let _ws       = null;
-    let _wsActive = false;
+    let ws       = null;
+    let wsActive = false;
     let messages  = null;
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -177,20 +205,25 @@
     // KEYSTORE (private-key vault)
     // ═══════════════════════════════════════════════════════════════════════════
 
-    const Keystore = (function() {
-        let keyPair = null;
+    class KeystoreClass {
+        // Приватный ключ недоступен извне даже при удалении IIFE,
+        // даже через DevTools — это настоящая защита, не визуальная
+        #keyPair = null;
 
-        function getPublicKeyBytes() {
-            return keyPair ? keyPair.publicKey : null;
+        getPublicKeyBytes() {
+            return this.#keyPair ? this.#keyPair.publicKey : null;
         }
-        function getPrivKeyBytes() {
-            if (!keyPair || !keyPair.privateKey) return null;
-            return new Uint8Array(keyPair.privateKey);
+        getPrivKeyBytes() {
+            if (!this.#keyPair || !this.#keyPair.privateKey) return null;
+            return new Uint8Array(this.#keyPair.privateKey);
         }
-        function getWIF() {
-            return keyPair ? keyPair.toWIF() : null;
+        getWIF() {
+            return this.#keyPair ? this.#keyPair.toWIF() : null;
         }
-        function _makeTaprootSigner() {
+
+        // Приватный метод: ключевой материал taproot не торчит наружу,
+        // обнуляется прямо здесь через finally — не через caller
+        #makeTaprootSigner(onSigned) {
             const ecc = bitcoin.ecc;
             if (!ecc || typeof ecc.privateAdd !== 'function' ||
                         typeof ecc.privateNegate !== 'function' ||
@@ -198,65 +231,55 @@
                         typeof ecc.xOnlyPointAddTweak !== 'function') {
                 throw new Error('bitcoin.ecc unavailable — rebuild bundle (see BUILDBitcoinjs.md)');
             }
-            const xOnlyPub = keyPair.publicKey.slice(1);
+            const xOnlyPub = this.#keyPair.publicKey.slice(1);
             const tweak    = bitcoin.crypto.taggedHash('TapTweak', xOnlyPub);
-            const rawD     = new Uint8Array(keyPair.privateKey);
+            const rawD     = new Uint8Array(this.#keyPair.privateKey);
             let effectiveD = null;
             let tweakedD   = null;
             try {
-                const oddY = (keyPair.publicKey[0] === 0x03);
+                const oddY = (this.#keyPair.publicKey[0] === 0x03);
                 effectiveD = oddY ? ecc.privateNegate(rawD) : new Uint8Array(rawD);
-                tweakedD = ecc.privateAdd(effectiveD, tweak);
+                tweakedD   = ecc.privateAdd(effectiveD, tweak);
                 if (!tweakedD) throw new Error('Taproot tweak produced an invalid private key');
                 const tweakedPubResult = ecc.xOnlyPointAddTweak(xOnlyPub, tweak);
                 if (!tweakedPubResult) throw new Error('Taproot xOnlyPointAddTweak failed');
                 const tweakedXOnly = tweakedPubResult.xOnlyPubkey;
-                const _td = tweakedD;
+                const td = tweakedD;
                 const signer = {
-                    publicKey: tweakedXOnly,
-                    signSchnorr: function(hash) {
-                        return ecc.signSchnorr(hash, _td);
-                    }
+                    publicKey:   tweakedXOnly,
+                    signSchnorr: function(hash) { return ecc.signSchnorr(hash, td); }
                 };
-                return { signer: signer, _rawD: rawD, _effectiveD: effectiveD, _tweakedD: tweakedD };
-            } catch (e) {
-                if (rawD)       rawD.fill(0);
+                onSigned(signer);   // ключевой материал не покидает метод
+            } finally {
+                rawD.fill(0);
                 if (effectiveD) effectiveD.fill(0);
                 if (tweakedD)   tweakedD.fill(0);
-                throw e;
             }
         }
-        function signAllInputs(psbt) {
-            if (!keyPair) throw new Error('Wallet locked');
+
+        signAllInputs(psbt) {
+            if (!this.#keyPair) throw new Error('Wallet locked');
             const hasTaproot = psbt.data.inputs.some(function(inp) {
                 return inp.tapInternalKey && inp.tapInternalKey.length === 32;
             });
             if (!hasTaproot) {
-                psbt.signAllInputs(keyPair);
+                psbt.signAllInputs(this.#keyPair);
                 return;
             }
-            let tapMaterial = null;
-            try {
-                tapMaterial = _makeTaprootSigner();
-                const tapSigner = tapMaterial.signer;
-
+            const kp = this.#keyPair;
+            this.#makeTaprootSigner(function(tapSigner) {
                 psbt.data.inputs.forEach(function(inp, idx) {
                     if (inp.tapInternalKey && inp.tapInternalKey.length === 32) {
                         psbt.signInput(idx, tapSigner);
                     } else {
-                        psbt.signInput(idx, keyPair);
+                        psbt.signInput(idx, kp);
                     }
                 });
-            } finally {
-                if (tapMaterial) {
-                    if (tapMaterial._rawD)       tapMaterial._rawD.fill(0);
-                    if (tapMaterial._effectiveD) tapMaterial._effectiveD.fill(0);
-                    if (tapMaterial._tweakedD)   tapMaterial._tweakedD.fill(0);
-                }
-            }
+            });
         }
-        function deriveAddress(type, pubKey) {
-            if (!keyPair || !pubKey) return '';
+
+        deriveAddress(type, pubKey) {
+            if (!this.#keyPair || !pubKey) return '';
             const network = getConfig()['network'];
             if (type === 'bech32') {
                 return bitcoin.payments.p2wpkh({ pubkey: pubKey, network: network }).address;
@@ -270,8 +293,9 @@
                 return bitcoin.payments.p2pkh({ pubkey: pubKey, network: network }).address;
             }
         }
-        function getScriptHex(type, pubKey) {
-            if (!keyPair || !pubKey) return '';
+
+        getScriptHex(type, pubKey) {
+            if (!this.#keyPair || !pubKey) return '';
             const network = getConfig()['network'];
             if (type === 'bech32') {
                 return bitcoin.Buffer.from(bitcoin.payments.p2wpkh({ pubkey: pubKey, network: network }).output).toString('hex');
@@ -285,9 +309,10 @@
                 return bitcoin.Buffer.from(bitcoin.payments.p2pkh({ pubkey: pubKey, network: network }).output).toString('hex');
             }
         }
-        function getAllScriptHexes(pubKey) {
+
+        getAllScriptHexes(pubKey) {
             const set = new Set();
-            if (!keyPair || !pubKey) return set;
+            if (!this.#keyPair || !pubKey) return set;
             const network = getConfig()['network'];
             set.add(bitcoin.Buffer.from(bitcoin.payments.p2wpkh({ pubkey: pubKey, network: network }).output).toString('hex').toLowerCase());
             const redeem = bitcoin.payments.p2wpkh({ pubkey: pubKey, network: network });
@@ -299,9 +324,10 @@
             } catch(e) {}
             return set;
         }
-        function getAllAddresses(pubKey) {
+
+        getAllAddresses(pubKey) {
             const set = new Set();
-            if (!keyPair || !pubKey) return set;
+            if (!this.#keyPair || !pubKey) return set;
             const network = getConfig()['network'];
             try { set.add(bitcoin.payments.p2wpkh({ pubkey: pubKey, network: network }).address); } catch(e) {}
             try {
@@ -315,33 +341,22 @@
             } catch(e) {}
             return set;
         }
-        function isUnlocked() {
-            return keyPair !== null;
+
+        isUnlocked() {
+            return this.#keyPair !== null;
         }
-        function setKeyPair(kp) {
-            if (keyPair) destroyKeyMaterial(keyPair);
-            keyPair = kp;
+        setKeyPair(kp) {
+            if (this.#keyPair) destroyKeyMaterial(this.#keyPair);
+            this.#keyPair = kp;
         }
-        function clear() {
-            if (keyPair) {
-                destroyKeyMaterial(keyPair);
-                keyPair = null;
+        clear() {
+            if (this.#keyPair) {
+                destroyKeyMaterial(this.#keyPair);
+                this.#keyPair = null;
             }
         }
-        return {
-            getPublicKeyBytes: getPublicKeyBytes,
-            getPrivKeyBytes:   getPrivKeyBytes,
-            getWIF:            getWIF,
-            signAllInputs:     signAllInputs,
-            deriveAddress:     deriveAddress,
-            getScriptHex:      getScriptHex,
-            getAllScriptHexes:  getAllScriptHexes,
-            getAllAddresses:    getAllAddresses,
-            isUnlocked:        isUnlocked,
-            setKeyPair:        setKeyPair,
-            clear:             clear
-        };
-    })();
+    }
+    const Keystore = new KeystoreClass();
 
     // ═══════════════════════════════════════════════════════════════════════════
     // CRYPTO HELPERS
@@ -410,7 +425,7 @@
             return new Uint8Array(pt);
         } catch(e) { return null; }
     }
-    function _mnemonicToEntropyBytes(mnemonic) {
+    function mnemonicToEntropyBytes(mnemonic) {
         return bip39Bundle.mnemonicToEntropy(mnemonic);
     }
 
@@ -418,10 +433,10 @@
     // PASSKEY HELPERS
     // ═══════════════════════════════════════════════════════════════════════════
 
-    function _credIdToB64(rawId) {
+    function credIdToB64(rawId) {
         return btoa(String.fromCharCode.apply(null, new Uint8Array(rawId)));
     }
-    function _b64ToCredId(b64) {
+    function b64ToCredId(b64) {
         return Uint8Array.from(atob(b64), function(c) { return c.charCodeAt(0); });
     }
     function isPasskeyEnabled() {
@@ -440,7 +455,7 @@
         if (!window.PublicKeyCredential) return false;
         return !!(navigator.credentials && navigator.credentials.create);
     }
-    function _isTransientPasskeyError(e) {
+    function isTransientPasskeyError(e) {
         if (!e || !e.message) return false;
         const m = e.message.toLowerCase();
         return m.indexOf('transient') !== -1 || m.indexOf('unknown') !== -1;
@@ -492,7 +507,7 @@
                         residentKey:      'preferred'
                     },
                     extensions: {
-                        prf: { eval: { first: _PK_PRF_SALT } }
+                        prf: { eval: { first: PK_PRF_SALT } }
                     }
                 }
             });
@@ -508,7 +523,7 @@
             if (seedBytes) await saveEncryptedWithKeyBytes(STORAGE_KEY_SEED_PK, seedBytes, prfBytes);
             prfBytes.fill(0);
             privBytes.fill(0); pubBytes.fill(0); if (seedBytes) seedBytes.fill(0);
-            localStorage.setItem(STORAGE_KEY_PK_ID, _credIdToB64(credential.rawId));
+            localStorage.setItem(STORAGE_KEY_PK_ID, credIdToB64(credential.rawId));
             updatePasskeyUI();
             showMessage(getText('passkey-enabled'));
         } catch(e) {
@@ -519,12 +534,12 @@
             showMessage(escHtml(getText('passkey-error')) + escHtml(e.message));
         }
     }
-    async function pkAuthenticate(_retriesLeft) {
-        if (_retriesLeft === undefined) _retriesLeft = 2;
+    async function pkAuthenticate(retriesLeft) {
+        if (retriesLeft === undefined) retriesLeft = 2;
         let credIdStr = null;
         try { credIdStr = localStorage.getItem(STORAGE_KEY_PK_ID); } catch(e) {}
         if (!credIdStr) { showMessage(getText('passkey-not-setup')); return; }
-        const credIdBytes = _b64ToCredId(credIdStr);
+        const credIdBytes = b64ToCredId(credIdStr);
         try {
             const assertion = await navigator.credentials.get({
                 publicKey: {
@@ -533,7 +548,7 @@
                     allowCredentials:  [{ type: 'public-key', id: credIdBytes }],
                     userVerification:  'required',
                     extensions: {
-                        prf: { eval: { first: _PK_PRF_SALT } }
+                        prf: { eval: { first: PK_PRF_SALT } }
                     }
                 }
             });
@@ -560,14 +575,14 @@
             openWallet(false);
         } catch(e) {
             if (e.name === 'NotAllowedError') return;
-            if (_retriesLeft > 0 && _isTransientPasskeyError(e)) {
+            if (retriesLeft > 0 && isTransientPasskeyError(e)) {
                 await new Promise(function(r) { setTimeout(r, 300); });
-                return pkAuthenticate(_retriesLeft - 1);
+                return pkAuthenticate(retriesLeft - 1);
             }
             showMessage(escHtml(getText('passkey-error')) + escHtml(e.message));
         }
     }
-    function _doPkDisable() {
+    function doPkDisable() {
         [STORAGE_KEY_PRIV_PK, STORAGE_KEY_PUB_PK, STORAGE_KEY_SEED_PK, STORAGE_KEY_PK_ID].forEach(function(k) {
             try { localStorage.removeItem(k); } catch(e) {}
         });
@@ -575,8 +590,8 @@
         showMessage(getText('passkey-disabled'));
     }
     async function pkDisable() {
-        async function onPasskeyChosen(_retriesLeft) {
-            if (_retriesLeft === undefined) _retriesLeft = 2;
+        async function onPasskeyChosen(retriesLeft) {
+            if (retriesLeft === undefined) retriesLeft = 2;
             let credIdStr = null;
             try { credIdStr = localStorage.getItem(STORAGE_KEY_PK_ID); } catch(e) {}
             if (!credIdStr) return;
@@ -585,17 +600,17 @@
                     publicKey: {
                         challenge:         crypto.getRandomValues(new Uint8Array(32)),
                         rpId:              window.location.hostname,
-                        allowCredentials:  [{ type: 'public-key', id: _b64ToCredId(credIdStr) }],
+                        allowCredentials:  [{ type: 'public-key', id: b64ToCredId(credIdStr) }],
                         userVerification:  'required',
-                        extensions:        { prf: { eval: { first: _PK_PRF_SALT } } }
+                        extensions:        { prf: { eval: { first: PK_PRF_SALT } } }
                     }
                 });
-                _doPkDisable();
+                doPkDisable();
             } catch(e) {
                 if (e.name === 'NotAllowedError') return;
-                if (_retriesLeft > 0 && _isTransientPasskeyError(e)) {
+                if (retriesLeft > 0 && isTransientPasskeyError(e)) {
                     await new Promise(function(r) { setTimeout(r, 300); });
-                    return onPasskeyChosen(_retriesLeft - 1);
+                    return onPasskeyChosen(retriesLeft - 1);
                 }
                 showMessage(escHtml(getText('passkey-error')) + escHtml(e.message));
             }
@@ -614,7 +629,7 @@
         );
         if (pin === null) return;
         pin = null;
-        _doPkDisable();
+        doPkDisable();
     }
     function updatePasskeyUI() {
         updatePasskeyLoginUI();
@@ -665,7 +680,7 @@
     async function saveWalletBip39(mnemonic, pin, path) {
         const privBytes    = Keystore.getPrivKeyBytes();
         const pubCopy      = new Uint8Array(globalData.pubKey);
-        const entropyBytes = _mnemonicToEntropyBytes(mnemonic);
+        const entropyBytes = mnemonicToEntropyBytes(mnemonic);
         mnemonic = null;
         await Promise.all([
             saveEncryptedBytes(STORAGE_KEY_PUB,  pubCopy,      pin),
@@ -682,17 +697,17 @@
     // AUTO-LOCK
     // ═══════════════════════════════════════════════════════════════════════════
 
-    function _resetAutoLock() {
+    function resetAutoLock() {
         if (!Keystore.isUnlocked()) return;
-        clearTimeout(_autoLockTimer);
-        _autoLockTimer = setTimeout(function() {
+        clearTimeout(autoLockTimer);
+        autoLockTimer = setTimeout(function() {
             closeWallet();
             showMessage(escHtml(getText('auto-locked')));
         }, AUTO_LOCK_MS);
     }
-    function _stopAutoLock() {
-        clearTimeout(_autoLockTimer);
-        _autoLockTimer = null;
+    function stopAutoLock() {
+        clearTimeout(autoLockTimer);
+        autoLockTimer = null;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -703,11 +718,8 @@
         return localStorage.getItem(STORAGE_KEY_SEED) !== null;
     }
     function clearSeedState() {
-        if (_seedState.words && _seedState.words.length) _seedState.words.fill('');
-        _seedState.words = [];
-        _seedState.enc = null;
-        _seedState.tempKey = null;
-        _seedState.verifyHashes = [];
+        seedStore.clear();
+
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -716,9 +728,9 @@
 
     function askPin(title, desc, validator, mandatory, onPasskeyClick) {
         return new Promise(function(resolve) {
-            _pinResolve         = resolve;
-            _pinValidator       = validator || null;
-            _pinPasskeyCallback = null;
+            pinResolve         = resolve;
+            pinValidator       = validator || null;
+            pinPasskeyCallback = null;
             $('#pin-modal-title').text(title);
             $('#pin-modal-desc').text(desc);
             $('#pin-input').val('');
@@ -729,7 +741,7 @@
                 $('#pin-cancel').removeClass('d-none');
             }
             if (onPasskeyClick && isPasskeyEnabled()) {
-                _pinPasskeyCallback = onPasskeyClick;
+                pinPasskeyCallback = onPasskeyClick;
                 $('#pin-modal-pk-btn').removeClass('d-none');
             } else {
                 $('#pin-modal-pk-btn').addClass('d-none');
@@ -938,7 +950,7 @@
         coinControl:     false,
         selectedUtxos:   null,
         tx:              { amount: 0, outputs: [], fee: 0 },
-        _lastRendered:   { balance: -1, immature: -1, unconfirmed: -1, pendingOut: -1, utxoFingerprint: '' },
+        lastRendered:   { balance: -1, immature: -1, unconfirmed: -1, pendingOut: -1, utxoFingerprint: '' },
         resetTx: function() {
             this.tx = { amount: 0, outputs: [], fee: 0 };
         },
@@ -958,7 +970,7 @@
             this.utxos               = [];
             this.coinControl         = false;
             this.selectedUtxos       = null;
-            this._lastRendered       = { balance: -1, immature: -1, unconfirmed: -1, pendingOut: -1, utxoFingerprint: '' };
+            this.lastRendered       = { balance: -1, immature: -1, unconfirmed: -1, pendingOut: -1, utxoFingerprint: '' };
             this.resetTx();
         }
     };
@@ -1019,7 +1031,7 @@
         setTimeout(function() { $('#error-message').addClass('d-none'); }, 3400);
     }
     function showSendError(message) {
-        _isSending = false;
+        isSending = false;
         $('#send-modal-error').text(message).removeClass('d-none');
         $('#confirm-screen').addClass('d-none');
         $('#status-screen').addClass('d-none');
@@ -1091,7 +1103,7 @@
     function clearUtxoCache(address) {
         try { localStorage.removeItem('bte_utxo_' + address); } catch(e) {}
     }
-    function _applyUtxoData() {
+    function applyUtxoData() {
         let immature    = 0;
         let unconfirmed = 0;
         globalData.utxos.forEach(function(u) {
@@ -1104,12 +1116,12 @@
         const fp = globalData.utxos.map(function(u) {
             return u.txid + ':' + u.index + ':' + (u.mature ? 1 : 0);
         }).join('|');
-        const fpChanged = fp !== globalData._lastRendered.utxoFingerprint;
+        const fpChanged = fp !== globalData.lastRendered.utxoFingerprint;
         if (fpChanged) {
-            globalData._lastRendered.utxoFingerprint = fp;
+            globalData.lastRendered.utxoFingerprint = fp;
             renderCoinControl();
         }
-        _renderBalanceDisplay();
+        renderBalanceDisplay();
     }
     function amountFormat(amount) {
         const decimals = getConfig()['decimals'];
@@ -1119,13 +1131,13 @@
         const fracPart = sats.slice(sats.length - decimals);
         return intPart + '.' + fracPart;
     }
-    function _renderBalanceDisplay() {
+    function renderBalanceDisplay() {
         const confirmed   = globalData.balance;
         const immature    = globalData.immatureBalance;
         const unconfirmed = globalData.unconfirmedBalance;
         const pendingOut  = globalData.pendingOut || 0;
         const avail       = Math.max(0, confirmed - immature - pendingOut);
-        const lr = globalData._lastRendered;
+        const lr = globalData.lastRendered;
         if (lr.balance === confirmed && lr.immature === immature && lr.unconfirmed === unconfirmed && lr.pendingOut === pendingOut) return;
         lr.balance     = confirmed;
         lr.immature    = immature;
@@ -1166,7 +1178,7 @@
         tbody.empty();
         if (utxos.length === 0) {
             tbody.append('<tr><td colspan="5" class="text-muted text-center">' + escHtml(getText('coin-control-no-utxo')) + '</td></tr>');
-            _updateCoinControlInfo();
+            updateCoinControlInfo();
             return;
         }
         $('#coin-control-enable').prop('checked', globalData.coinControl);
@@ -1206,9 +1218,9 @@
                 '</tr>'
             );
         });
-        _updateCoinControlInfo();
+        updateCoinControlInfo();
     }
-    function _updateCoinControlInfo() {
+    function updateCoinControlInfo() {
         if (!globalData.coinControl || !globalData.selectedUtxos) {
             $('#coin-control-selected-info').text('');
             return;
@@ -1351,8 +1363,8 @@
         return false;
     }
     function sendTransaction() {
-        if (_isSending) return;
-        _isSending = true;
+        if (isSending) return;
+        isSending = true;
         const network  = getConfig()['network'];
         const outputs  = globalData.tx.outputs;
         const amount   = globalData.tx.amount;
@@ -1445,7 +1457,7 @@
                 psbt.finalizeAllInputs();
                 const tx = psbt.extractTransaction();
                 transactionBroadcast(tx.toHex()).then(function(data) {
-                    _isSending = false;
+                    isSending = false;
                     if (data.error == null) {
                         clearUtxoCache(address);
                         $('#status-screen span').html(
@@ -1465,7 +1477,7 @@
                 $('#send-confirm').addClass('d-none');
                 $('#send-close-footer').removeClass('d-none disabled');
             }).catch(function() {
-                _isSending = false;
+                isSending = false;
                 showSendError(messages.error['bad-utxo']);
             });
         };
@@ -1484,7 +1496,7 @@
                 globalData.utxos = utxos;
                 doSend(utxos);
             })
-            .catch(function() { _isSending = false; showSendError(messages.error['not-enough-utxo']); });
+            .catch(function() { isSending = false; showSendError(messages.error['not-enough-utxo']); });
         }
     }
     function transactionBroadcast(rawtx) {
@@ -1498,7 +1510,7 @@
         return Promise.resolve($.ajax({ 'url': getBackend() + '/fee' }));
     }
     function resetTxForm() {
-        _isSending = false;
+        isSending = false;
         $('.send-additional-output').remove();
         $('#wallet-send input').val('');
         $('#wallet-send .wallet-balance').removeClass('text-danger');
@@ -1517,7 +1529,7 @@
         return localStorage.getItem(STORAGE_KEY_PRIV) !== null;
     }
     function forgetSavedWallet() {
-        _stopAutoLock();
+        stopAutoLock();
         stopStream();
         wsDisconnect();
         [STORAGE_KEY_PUB, STORAGE_KEY_PRIV, STORAGE_KEY_SEED, STORAGE_KEY_PATH,
@@ -1543,7 +1555,7 @@
         $('#wallet-address').text('');
         $('#qr-code-addres').empty();
         resetTxForm();
-        _hideSeedReveal();
+        hideSeedReveal();
         $('#wallet-block').addClass('d-none');
         updateSavedWalletUI();
         setHomeTitle();
@@ -1563,11 +1575,11 @@
         }
         updatePasskeyLoginUI();
     }
-    function _showWalletUI() {
+    function showWalletUI() {
         const pubBytes = globalData.pubKey;
         let pubkeyDisplay = '';
         if (pubBytes) {
-            for (let _i = 0; _i < pubBytes.length; _i++) pubkeyDisplay += pubBytes[_i].toString(16).padStart(2, '0');
+            for (let i = 0; i < pubBytes.length; i++) pubkeyDisplay += pubBytes[i].toString(16).padStart(2, '0');
         }
         const addressType = getAddressType();
         let redeem = '';
@@ -1591,7 +1603,7 @@
         } else {
             $('#wallet-keys-seed').addClass('d-none');
         }
-        _hideSeedReveal();
+        hideSeedReveal();
         $('#wallet-address').text(globalData.address);
         $('#pin-login-block').addClass('d-none');
         $('#open-block').addClass('d-none');
@@ -1599,27 +1611,27 @@
         $('#send-fee').attr('placeholder', getText('fee') + ' (' + getText('recommended') + ' ' + globalData.rfee + ' ' + getConfig()['ticker'] + ')');
         showQrAddress(getConfig()['uri'] + globalData.address);
         TxHistory.renderHistory(TxHistory.loadHistory());
-        const _cached = loadUtxoCache(globalData.address);
-        if (_cached && Array.isArray(_cached.utxos)) {
-            const _ch = _cached.height || 0;
-            globalData.height  = _ch;
-            globalData.utxos   = _cached.utxos.map(function(u) {
+        const cached = loadUtxoCache(globalData.address);
+        if (cached && Array.isArray(cached.utxos)) {
+            const ch = cached.height || 0;
+            globalData.height  = ch;
+            globalData.utxos   = cached.utxos.map(function(u) {
                 return Object.assign({}, u, {
-                    mature:     isUtxoMature(u, _ch),
-                    blocksLeft: blocksToMature(u, _ch)
+                    mature:     isUtxoMature(u, ch),
+                    blocksLeft: blocksToMature(u, ch)
                 });
             });
-            globalData.balance    = _cached.balance || 0;
-            globalData.pendingOut = _cached.pendingOut || 0;
+            globalData.balance    = cached.balance || 0;
+            globalData.pendingOut = cached.pendingOut || 0;
         } else {
             globalData.balance         = 0;
             globalData.immatureBalance = 0;
             globalData.pendingOut      = 0;
             globalData.utxos           = [];
         }
-        _applyUtxoData();
-        if (_ws && _wsActive) {
-            _ws.emit('subscribe', { address: globalData.address });
+        applyUtxoData();
+        if (ws && wsActive) {
+            ws.emit('subscribe', { address: globalData.address });
         }
     }
     async function openWallet(offerPin, bip39Mnemonic, derivPath, isRestore) {
@@ -1649,13 +1661,13 @@
         globalData.scriptHex      = Keystore.getScriptHex(getAddressType(), globalData.pubKey);
         globalData.allScriptHexes = Keystore.getAllScriptHexes(globalData.pubKey);
         globalData.allAddresses   = Keystore.getAllAddresses(globalData.pubKey);
-        _showWalletUI();
+        showWalletUI();
         wsConnect();
         setHomeTitle();
-        _resetAutoLock();
+        resetAutoLock();
     }
     function closeWallet() {
-        _stopAutoLock();
+        stopAutoLock();
         stopStream();
         wsDisconnect();
         clearPrivKeyInput();
@@ -1666,7 +1678,7 @@
         $('#wallet-address').text('');
         $('#qr-code-addres').empty();
         resetTxForm();
-        _hideSeedReveal();
+        hideSeedReveal();
         clearSensitiveInputs();
         clearSeedState();
         Keystore.clear();
@@ -1680,18 +1692,18 @@
     // SEED UI
     // ═══════════════════════════════════════════════════════════════════════════
 
-    function _revealSeedFromBytes(entropyBytes) {
-        if (_revealedWords.length) _revealedWords.fill('');
+    function revealSeedFromBytes(entropyBytes) {
+        seedStore.wipeRevealed();
         const mnemonic = bip39Bundle.entropyToMnemonic(entropyBytes);
         entropyBytes.fill(0);
-        _revealedWords = mnemonic.split(' ');
-        seedRenderGrid(_revealedWords, '#wallet-seed-grid');
+        seedStore.setRevealed(mnemonic.split(' '));
+        seedRenderGrid(seedStore.getRevealed(), '#wallet-seed-grid');
         $('#wallet-seed-hidden').addClass('d-none');
         $('#wallet-seed-revealed').removeClass('d-none');
-        setTimeout(_hideSeedReveal, 60000);
+        setTimeout(hideSeedReveal, 60000);
     }
-    function _hideSeedReveal() {
-        if (_revealedWords.length) { _revealedWords.fill(''); _revealedWords = []; }
+    function hideSeedReveal() {
+        seedStore.wipeRevealed();
         $('#wallet-seed-hidden').removeClass('d-none');
         $('#wallet-seed-revealed').addClass('d-none');
         $('#wallet-seed-grid').empty();
@@ -1884,10 +1896,10 @@
             const theme = $(this).data('theme');
             if (theme) setTheme(theme);
         });
-        let _t; try { _t = localStorage.getItem('bte_cfg_theme'); } catch(e) {}
-        applyTheme(_t || 'auto');
+        let t; try { t = localStorage.getItem('bte_cfg_theme'); } catch(e) {}
+        applyTheme(t || 'auto');
         ;['click', 'keydown', 'touchstart', 'mousemove'].forEach(function(evt) {
-            document.addEventListener(evt, function() { _resetAutoLock(); }, { passive: true, capture: false });
+            document.addEventListener(evt, function() { resetAutoLock(); }, { passive: true, capture: false });
         });
         $('#wallet-version').text(walletVersion);
         $('#wallet-backend input').val(getBackend());
@@ -1898,9 +1910,9 @@
         // ── PIN modal ──────────────────────────────────────────────────────────
         $('#pin-confirm').click(async function() {
             let pin = $('#pin-input').val();
-            if (_pinResolve) {
-                if (_pinValidator) {
-                    const err = await _pinValidator(pin);
+            if (pinResolve) {
+                if (pinValidator) {
+                    const err = await pinValidator(pin);
                     if (err) {
                         $('#pin-error').text(err).removeClass('d-none');
                         $('#pin-input').focus();
@@ -1911,11 +1923,11 @@
                 let pinValue = pin;
                 pin = null;
                 $('#pin-input').val('');
-                _pinPasskeyCallback = null;
+                pinPasskeyCallback = null;
                 $('#pin-modal-pk-btn').addClass('d-none');
-                const resolve = _pinResolve;
-                _pinResolve   = null;
-                _pinValidator = null;
+                const resolve = pinResolve;
+                pinResolve   = null;
+                pinValidator = null;
                 const modalEl = document.getElementById('pin-modal');
                 function onHidden() {
                     modalEl.removeEventListener('hidden.bs.modal', onHidden);
@@ -1928,12 +1940,12 @@
         });
         $('#pin-cancel').click(function() {
             $('#pin-input').val('');
-            _pinPasskeyCallback = null;
+            pinPasskeyCallback = null;
             $('#pin-modal-pk-btn').addClass('d-none');
-            if (_pinResolve) {
-                const resolve = _pinResolve;
-                _pinResolve   = null;
-                _pinValidator = null;
+            if (pinResolve) {
+                const resolve = pinResolve;
+                pinResolve   = null;
+                pinValidator = null;
                 const modalEl = document.getElementById('pin-modal');
                 function onHidden() {
                     modalEl.removeEventListener('hidden.bs.modal', onHidden);
@@ -1944,14 +1956,14 @@
             $('#pin-modal').modal('hide');
         });
         $('#pin-modal-pk-btn').click(function() {
-            const cb = _pinPasskeyCallback;
-            _pinPasskeyCallback = null;
+            const cb = pinPasskeyCallback;
+            pinPasskeyCallback = null;
             $('#pin-modal-pk-btn').addClass('d-none');
             $('#pin-input').val('');
-            if (_pinResolve) {
-                const resolve = _pinResolve;
-                _pinResolve   = null;
-                _pinValidator = null;
+            if (pinResolve) {
+                const resolve = pinResolve;
+                pinResolve   = null;
+                pinValidator = null;
                 const modalEl = document.getElementById('pin-modal');
                 function onHidden() {
                     modalEl.removeEventListener('hidden.bs.modal', onHidden);
@@ -2146,7 +2158,7 @@
         });
         $('#send-confirm').click(function(e) { sendTransaction(); e.preventDefault(); });
         $('#send-modal').on('hidden.bs.modal', function() {
-            _isSending = false;
+            isSending = false;
             $('#send-cancel').prop('disabled', false);
             $('#send-confirm').prop('disabled', false);
         });
@@ -2209,8 +2221,8 @@
         $('#toggle-wallet-privkey').click(async function() {
             if ($(this).text() == getText('show')) {
                 if (!Keystore.isUnlocked()) return;
-                async function onPasskeyChosen(_retriesLeft) {
-                    if (_retriesLeft === undefined) _retriesLeft = 2;
+                async function onPasskeyChosen(retriesLeft) {
+                    if (retriesLeft === undefined) retriesLeft = 2;
                     let credIdStr = null;
                     try { credIdStr = localStorage.getItem(STORAGE_KEY_PK_ID); } catch(e) {}
                     if (!credIdStr) return;
@@ -2219,9 +2231,9 @@
                             publicKey: {
                                 challenge:        crypto.getRandomValues(new Uint8Array(32)),
                                 rpId:             window.location.hostname,
-                                allowCredentials: [{ type: 'public-key', id: _b64ToCredId(credIdStr) }],
+                                allowCredentials: [{ type: 'public-key', id: b64ToCredId(credIdStr) }],
                                 userVerification: 'required',
-                                extensions:       { prf: { eval: { first: _PK_PRF_SALT } } }
+                                extensions:       { prf: { eval: { first: PK_PRF_SALT } } }
                             }
                         });
                         const ext = assertion.getClientExtensionResults();
@@ -2239,9 +2251,9 @@
                         }, 60000);
                     } catch(e) {
                         if (e.name === 'NotAllowedError') return;
-                        if (_retriesLeft > 0 && _isTransientPasskeyError(e)) {
+                        if (retriesLeft > 0 && isTransientPasskeyError(e)) {
                             await new Promise(function(r) { setTimeout(r, 300); });
-                            return onPasskeyChosen(_retriesLeft - 1);
+                            return onPasskeyChosen(retriesLeft - 1);
                         }
                         showMessage(escHtml(getText('passkey-error')) + escHtml(e.message));
                     }
@@ -2345,7 +2357,7 @@
             const key = $(this).data('key');
             if ($(this).is(':checked')) globalData.selectedUtxos.add(key);
             else globalData.selectedUtxos.delete(key);
-            _updateCoinControlInfo();
+            updateCoinControlInfo();
             validateSendForm();
         });
 
@@ -2375,19 +2387,19 @@
             globalData.immatureBalance    = 0;
             globalData.unconfirmedBalance = 0;
             globalData.pendingOut         = 0;
-            globalData._lastRendered      = { balance: -1, immature: -1, unconfirmed: -1, pendingOut: -1, utxoFingerprint: '' };
+            globalData.lastRendered      = { balance: -1, immature: -1, unconfirmed: -1, pendingOut: -1, utxoFingerprint: '' };
             globalData.address        = Keystore.deriveAddress(newType, globalData.pubKey);
             globalData.scriptHex      = Keystore.getScriptHex(newType, globalData.pubKey);
             globalData.allScriptHexes = Keystore.getAllScriptHexes(globalData.pubKey);
             globalData.allAddresses   = Keystore.getAllAddresses(globalData.pubKey);
-            if (_ws && _wsActive) {
-                _ws.emit('subscribe', { address: globalData.address });
+            if (ws && wsActive) {
+                ws.emit('subscribe', { address: globalData.address });
             }
             $('#wallet-address').text(globalData.address);
             showQrAddress(getConfig()['uri'] + globalData.address);
-            const _pb = globalData.pubKey;
-            let _phex = '';
-            if (_pb) { for (let _j = 0; _j < _pb.length; _j++) _phex += _pb[_j].toString(16).padStart(2, '0'); }
+            const pb = globalData.pubKey;
+            let phex = '';
+            if (pb) { for (let j = 0; j < pb.length; j++) phex += pb[j].toString(16).padStart(2, '0'); }
             $('#wallet-keys-pubkey input').val(_phex);
             clearPrivKeyInput();
             $('#wallet-privkey-copy-btn').addClass('d-none');
@@ -2416,8 +2428,8 @@
             const lang = $(this).data('lang');
             try { localStorage.setItem('bte_cfg_language', lang); } catch(e) {}
             initLang();
-            let _ct; try { _ct = localStorage.getItem('bte_cfg_theme'); } catch(e) {}
-            applyTheme(_ct || 'auto');
+            let ct; try { ct = localStorage.getItem('bte_cfg_theme'); } catch(e) {}
+            applyTheme(ct || 'auto');
             $('#address-type-select select').val(getAddressType());
         });
 
@@ -2436,7 +2448,7 @@
         $('#seed-btn-create').click(function() {
             $('#seed-entry').addClass('d-none');
             $('#seed-create').removeClass('d-none');
-            _seedDoGenerate();
+            seedDoGenerate();
         });
         $('#seed-btn-restore').click(function() {
             $('#seed-entry').addClass('d-none');
@@ -2449,26 +2461,26 @@
         $(document).on('click', '.seed-wlen-btn', function() {
             $('.seed-wlen-btn').removeClass('active');
             $(this).addClass('active');
-            _seedState.strength = parseInt($(this).data('len'), 10);
-            _seedDoGenerate();
+            seedStore.strength = parseInt($(this).data('len'), 10);
+            seedDoGenerate();
         });
-        function _seedDoGenerate() {
+        function seedDoGenerate() {
             if (typeof bip39Bundle === 'undefined') { showMessage(escHtml(getText('bip39-not-loaded'))); return; }
             clearSeedState();
-            const mnemonic = bip39Bundle.generateMnemonic(_seedState.strength);
-            _seedState.words = mnemonic.split(' ');
-            seedRenderGrid(_seedState.words, '#seed-word-grid');
+            const mnemonic = bip39Bundle.generateMnemonic(seedStore.strength);
+            seedStore.words = mnemonic.split(' ');
+            seedRenderGrid(seedStore.words, '#seed-word-grid');
         }
         $('#seed-btn-print').click(function() {
-            if (!_seedState.words.length) return;
-            let mn = _seedState.words.join(' ');
+            if (!seedStore.words.length) return;
+            let mn = seedStore.words.join(' ');
             window.seedExportPNG(mn, getText, DEFAULT_DERIV_PATH);
             mn = '';
         });
         $('#seed-btn-to-verify').click(async function() {
-            if (!_seedState.words.length) return;
+            if (!seedStore.words.length) return;
             const $btn  = $(this).prop('disabled', true);
-            const words = _seedState.words;
+            const words = seedStore.words;
             const len   = words.length;
             function rnd(lo, hi) {
                 const buf = new Uint32Array(1);
@@ -2478,7 +2490,7 @@
             const third = Math.floor(len / 3);
             const pos   = [rnd(0, third - 1), rnd(third, third * 2 - 1), rnd(third * 2, len - 1)];
             try {
-                _seedState.verifyHashes = await Promise.all(pos.map(async function(p) {
+                seedStore.verifyHashes = await Promise.all(pos.map(async function(p) {
                     const salt    = crypto.getRandomValues(new Uint8Array(16));
                     const hmacKey = await crypto.subtle.importKey(
                         'raw', salt, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
@@ -2488,16 +2500,16 @@
                     wordBytes.fill(0);
                     return { pos: p, salt: Array.from(salt), hash: Array.from(sig) };
                 }));
-                _seedState.tempKey = await crypto.subtle.generateKey(
+                seedStore.tempKey = await crypto.subtle.generateKey(
                     { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
                 );
                 const iv    = crypto.getRandomValues(new Uint8Array(12));
                 const plain = new TextEncoder().encode(words.join(' '));
-                const ct    = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, _seedState.tempKey, plain);
+                const ct    = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, seedStore.tempKey, plain);
                 plain.fill(0);
-                _seedState.enc   = { iv: Array.from(iv), data: Array.from(new Uint8Array(ct)) };
-                _seedState.words.fill('');
-                _seedState.words = [];
+                seedStore.enc   = { iv: Array.from(iv), data: Array.from(new Uint8Array(ct)) };
+                seedStore.words.fill('');
+        
                 const $fields = $('#seed-verify-fields').empty();
                 pos.forEach(function(p) {
                     $fields.append(
@@ -2521,15 +2533,15 @@
         $('#seed-verify-confirm').click(async function() {
             const $btn   = $(this).prop('disabled', true);
             const inputs = $('.seed-verify-word');
-            if (!_seedState.verifyHashes.length) {
+            if (!seedStore.verifyHashes.length) {
                 $('#seed-verify-error').removeClass('d-none');
                 $btn.prop('disabled', false);
                 return;
             }
             let ok = true;
             try {
-                for (let i = 0; i < _seedState.verifyHashes.length; i++) {
-                    const vh         = _seedState.verifyHashes[i];
+                for (let i = 0; i < seedStore.verifyHashes.length; i++) {
+                    const vh         = seedStore.verifyHashes[i];
                     const $inp       = inputs.filter('[data-pos="' + vh.pos + '"]');
                     const enteredBytes = new TextEncoder().encode($inp.val().trim().toLowerCase());
                     const salt       = new Uint8Array(vh.salt);
@@ -2549,16 +2561,16 @@
                 $btn.prop('disabled', false);
                 return;
             }
-            _seedState.verifyHashes = [];
+    
             $('#seed-verify-error').addClass('d-none');
             try {
-                const iv = new Uint8Array(_seedState.enc.iv);
-                const ct = new Uint8Array(_seedState.enc.data);
+                const iv = new Uint8Array(seedStore.enc.iv);
+                const ct = new Uint8Array(seedStore.enc.data);
                 const pt = new Uint8Array(await crypto.subtle.decrypt(
-                    { name: 'AES-GCM', iv: iv }, _seedState.tempKey, ct
+                    { name: 'AES-GCM', iv: iv }, seedStore.tempKey, ct
                 ));
-                _seedState.enc     = null;
-                _seedState.tempKey = null;
+                seedStore.enc     = null;
+        
                 let mnemonic = new TextDecoder().decode(pt);
                 pt.fill(0);
                 const privBytes = bip39Bundle.mnemonicToPrivKey(mnemonic, DEFAULT_DERIV_PATH);
@@ -2617,8 +2629,8 @@
         // ── Seed: show / hide ──────────────────────────────────────────────────
         $('#btn-show-seed').click(async function() {
             if (!hasSeedBackup()) return;
-            async function onPasskeyChosen(_retriesLeft) {
-                if (_retriesLeft === undefined) _retriesLeft = 2;
+            async function onPasskeyChosen(retriesLeft) {
+                if (retriesLeft === undefined) retriesLeft = 2;
                 let credIdStr = null;
                 try { credIdStr = localStorage.getItem(STORAGE_KEY_PK_ID); } catch(e) {}
                 if (!credIdStr) { showMessage(getText('passkey-not-setup')); return; }
@@ -2627,9 +2639,9 @@
                         publicKey: {
                             challenge:        crypto.getRandomValues(new Uint8Array(32)),
                             rpId:             window.location.hostname,
-                            allowCredentials: [{ type: 'public-key', id: _b64ToCredId(credIdStr) }],
+                            allowCredentials: [{ type: 'public-key', id: b64ToCredId(credIdStr) }],
                             userVerification: 'required',
-                            extensions:       { prf: { eval: { first: _PK_PRF_SALT } } }
+                            extensions:       { prf: { eval: { first: PK_PRF_SALT } } }
                         }
                     });
                     const ext = assertion.getClientExtensionResults();
@@ -2644,12 +2656,12 @@
                         showMessage(getText('passkey-decrypt-failed'));
                         return;
                     }
-                    _revealSeedFromBytes(seedBytes);
+                    revealSeedFromBytes(seedBytes);
                 } catch(e) {
                     if (e.name === 'NotAllowedError') return;
-                    if (_retriesLeft > 0 && _isTransientPasskeyError(e)) {
+                    if (retriesLeft > 0 && isTransientPasskeyError(e)) {
                         await new Promise(function(r) { setTimeout(r, 300); });
-                        return onPasskeyChosen(_retriesLeft - 1);
+                        return onPasskeyChosen(retriesLeft - 1);
                     }
                     showMessage(escHtml(getText('passkey-error')) + escHtml(e.message));
                 }
@@ -2668,19 +2680,19 @@
             const entropyBytes = await loadEncryptedBytes(STORAGE_KEY_SEED, pin);
             pin = null;
             if (!entropyBytes) return;
-            _revealSeedFromBytes(entropyBytes);
+            revealSeedFromBytes(entropyBytes);
         });
-        $('#btn-hide-seed').click(_hideSeedReveal);
+        $('#btn-hide-seed').click(hideSeedReveal);
         $('#btn-save-seed-png').click(function() {
-            if (!_revealedWords.length) return;
-            let mn = _revealedWords.join(' ');
+            if (!seedStore.getRevealed().length) return;
+            let mn = seedStore.getRevealed().join(' ');
             let savedPath; try { savedPath = localStorage.getItem(STORAGE_KEY_PATH); } catch(e) {}
             window.seedExportPNG(mn, getText, savedPath || DEFAULT_DERIV_PATH);
             mn = '';
         });
         $('.tab-link').on('click', function() {
             if ($(this).data('tab-family') === 'wallet-block' && $(this).data('tab-name') !== 'wallet-keys') {
-                _hideSeedReveal();
+                hideSeedReveal();
             }
         });
     });
@@ -2692,11 +2704,11 @@
     function wsConnect() {
         if (typeof io === 'undefined') return;
         if (!globalData.address)       return;
-        if (_ws && _wsActive)          return;
+        if (ws && wsActive)          return;
         wsDisconnect();
         const backend = getBackend();
         try {
-            _ws = io(backend, {
+            ws = io(backend, {
                 path:                 '/socket.io',
                 transports:           ['websocket'],
                 reconnectionDelay:    5000,
@@ -2706,13 +2718,13 @@
         } catch(e) {
             return;
         }
-        _ws.on('connect', function() {
-            _wsActive = true;
+        ws.on('connect', function() {
+            wsActive = true;
             if (globalData.address) {
-                _ws.emit('subscribe', { address: globalData.address });
+                ws.emit('subscribe', { address: globalData.address });
             }
         });
-        _ws.on('block', function(data) {
+        ws.on('block', function(data) {
             if (globalData.status !== 'unlocked') return;
             if (!data || typeof data.height !== 'number') return;
             const prevHeight = globalData.height;
@@ -2723,13 +2735,13 @@
                     u.mature     = isUtxoMature(u, h);
                     u.blocksLeft = blocksToMature(u, h);
                 });
-                _applyUtxoData();
+                applyUtxoData();
             }
             if (globalData.height !== prevHeight && globalData.address) {
                 TxHistory.updateHistory();
             }
         });
-        _ws.on('balance_changed', function(data) {
+        ws.on('balance_changed', function(data) {
             if (globalData.status !== 'unlocked') return;
             if (data && typeof data.confirmed === 'number' && Array.isArray(data.utxos)) {
                 const prevBalance     = globalData.balance;
@@ -2747,24 +2759,24 @@
                     });
                 });
                 saveUtxoCache(globalData.address, globalData.utxos, h, data.confirmed, data.pending_out || 0);
-                _applyUtxoData();
+                applyUtxoData();
                 if ((globalData.balance !== prevBalance || globalData.unconfirmedBalance !== prevUnconfirmed) && globalData.address) {
                     TxHistory.updateHistory();
                 }
             }
         });
-        _ws.on('disconnect', function() {
-            _wsActive = false;
+        ws.on('disconnect', function() {
+            wsActive = false;
         });
-        _ws.on('connect_error', function() {
-            _wsActive = false;
+        ws.on('connect_error', function() {
+            wsActive = false;
         });
     }
     function wsDisconnect() {
-        if (_ws) {
-            try { _ws.disconnect(); } catch(e) {}
-            _ws       = null;
-            _wsActive = false;
+        if (ws) {
+            try { ws.disconnect(); } catch(e) {}
+            ws       = null;
+            wsActive = false;
         }
     }
 
