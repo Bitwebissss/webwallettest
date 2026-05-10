@@ -1,7 +1,7 @@
 (function(){
-    var t;
+    let t;
     try { t = localStorage.getItem('bte_cfg_theme') } catch(e) { t = null }
-    var resolved = (!t || t === 'auto')
+    const resolved = (!t || t === 'auto')
         ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
         : t;
     document.documentElement.setAttribute('data-bs-theme', resolved);

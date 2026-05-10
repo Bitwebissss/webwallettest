@@ -1,16 +1,19 @@
 (function () {
     'use strict';
 
-    var _globalData    = null;
-    var _escHtml       = null;
-    var _getText       = null;
-    var _getBackend    = null;
-    var _getConfig     = null;
-    var _amountFormat  = null;
-    var _blockExplorer = null;
+    // ─── Constants ────────────────────────────────────────────────────────────
+    const HISTORY_LIMIT = 10;
 
-    var HISTORY_LIMIT = 10;
+    // ─── Mutable module state (injected via init) ─────────────────────────────
+    let _globalData    = null;
+    let _escHtml       = null;
+    let _getText       = null;
+    let _getBackend    = null;
+    let _getConfig     = null;
+    let _amountFormat  = null;
+    let _blockExplorer = null;
 
+    // ─── Init ─────────────────────────────────────────────────────────────────
     function init(deps) {
         _globalData    = deps.globalData;
         _escHtml       = deps.escHtml;
@@ -21,8 +24,9 @@
         _blockExplorer = deps.blockExplorer;
     }
 
+    // ─── Persistence ──────────────────────────────────────────────────────────
     function loadHistory() {
-        var key = 'bte_history_' + _globalData.address;
+        const key = 'bte_history_' + _globalData.address;
         try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { return []; }
     }
 
@@ -33,18 +37,19 @@
         } catch (e) {}
     }
 
+    // ─── Network fetch ────────────────────────────────────────────────────────
     function updateHistory() {
         if (_globalData.status !== 'unlocked') return;
 
-        var requestedAddress = _globalData.address;
+        const requestedAddress = _globalData.address;
 
         $('#history-list').html(
             '<div class="text-muted text-center py-3 small">' +
             _escHtml(_getText('history-loading')) + '</div>'
         );
 
-        var url = _getBackend() + '/history/' + requestedAddress
-                + '?limit=' + HISTORY_LIMIT;
+        const url = _getBackend() + '/history/' + requestedAddress
+                  + '?limit=' + HISTORY_LIMIT;
 
         fetch(url)
             .then(function (r) { return r.json(); })
@@ -59,12 +64,12 @@
                     return;
                 }
 
-                var txs = data.result || [];
+                const txs = data.result || [];
                 saveHistory(txs);
                 renderHistory(txs);
             })
             .catch(function () {
-                var cached = loadHistory();
+                const cached = loadHistory();
                 if (cached.length) {
                     renderHistory(cached);
                 } else {
@@ -76,14 +81,16 @@
             });
     }
 
+    // ─── Helpers ──────────────────────────────────────────────────────────────
     function _formatTs(ts) {
         if (!ts) return '';
-        var d   = new Date(ts * 1000);
-        var pad = function (n) { return n < 10 ? '0' + n : String(n); };
+        const d   = new Date(ts * 1000);
+        const pad = function (n) { return n < 10 ? '0' + n : String(n); };
         return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' +
                d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
     }
 
+    // ─── Render ───────────────────────────────────────────────────────────────
     function renderHistory(txs) {
         if (!txs || txs.length === 0) {
             $('#history-list').html(
@@ -93,13 +100,13 @@
             return;
         }
 
-        var html   = '';
-        var ticker = _getConfig()['ticker'];
+        let html         = '';
+        const ticker     = _getConfig()['ticker'];
 
         txs.forEach(function (tx) {
-            var confirmed = tx.height !== 0;
+            const confirmed = tx.height !== 0;
 
-            var confBadge = confirmed
+            const confBadge = confirmed
                 ? '<span class="badge text-bg-success ms-1">' +
                   _escHtml(
                       _globalData.height > 0
@@ -109,10 +116,10 @@
                 : '<span class="badge text-bg-warning ms-1">' +
                   _escHtml(_getText('history-pending')) + '</span>';
 
-            var dir = tx.direction || 'unknown';
-            var amt = (tx.amount != null) ? _amountFormat(tx.amount) : '?';
+            const dir = tx.direction || 'unknown';
+            const amt = (tx.amount != null) ? _amountFormat(tx.amount) : '?';
 
-            var dirLabel;
+            let dirLabel;
             if (dir === 'in') {
                 dirLabel = '<span class="fw-bold text-success tx-dir-label">' +
                            '&#x2193; +' + _escHtml(String(amt)) + ' ' + _escHtml(ticker) +
@@ -130,9 +137,9 @@
                            _escHtml(ticker) + '</span>';
             }
 
-            var safeHash  = _escHtml(tx.txid || '');
-            var txUrl     = _escHtml(_blockExplorer.tx(tx.txid || ''));
-            var tsHtml    = tx.timestamp
+            const safeHash = _escHtml(tx.txid || '');
+            const txUrl    = _escHtml(_blockExplorer.tx(tx.txid || ''));
+            const tsHtml   = tx.timestamp
                 ? '<div class="text-muted history-ts">' +
                   _escHtml(_formatTs(tx.timestamp)) + '</div>'
                 : '';
@@ -149,7 +156,7 @@
         });
 
         if (txs.length >= HISTORY_LIMIT) {
-            var explorerUrl = _escHtml(_blockExplorer.address(_globalData.address));
+            const explorerUrl = _escHtml(_blockExplorer.address(_globalData.address));
             html += '<div class="text-center py-2"><small>' +
                     '<a href="' + explorerUrl + '" target="_blank" rel="noopener noreferrer">' +
                     _escHtml(_getText('history-view-all')) + ' &#x2197;' +
@@ -158,6 +165,7 @@
 
         $('#history-list').html(html);
     }
+
     window.TxHistory = {
         init:          init,
         loadHistory:   loadHistory,
