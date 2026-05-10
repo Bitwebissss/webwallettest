@@ -1195,7 +1195,6 @@
             const typeLabel = isCbase
                 ? '<span class="badge text-bg-secondary">' + escHtml(getText('coin-control-coinbase')) + '</span>'
                 : '<span class="badge text-bg-secondary">' + escHtml(getText('coin-control-regular')) + '</span>';
-            const shortTx = escHtml(u.txid.substr(0,6)) + '…' + escHtml(u.txid.substr(-4));
             const amt     = amountFormat(u.value);
             tbody.append(
                 '<tr class="' + rowClass + '" data-key="' + key + '">' +
