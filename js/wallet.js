@@ -87,6 +87,7 @@
     // WebSocket
     let _ws       = null;
     let _wsActive = false;
+    let messages  = null;
 
     // ═══════════════════════════════════════════════════════════════════════════
     // UTILITY FUNCTIONS
