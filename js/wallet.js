@@ -1492,7 +1492,6 @@
                 transactionBroadcast(tx.toHex()).then(function(data) {
                     if (data.error == null) {
                         clearUtxoCache(address);
-                        TxHistory.addPending(data.result, globalData.tx.amount);
                         $('#status-screen span').html(
                             '<a href="' + escHtml(blockExplorer.tx(data.result)) + '" target="_blank" rel="noopener noreferrer">' + escHtml(data.result) + '</a>'
                         );
