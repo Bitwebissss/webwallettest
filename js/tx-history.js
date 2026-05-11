@@ -85,13 +85,13 @@
                 const confirmed = tx.height !== 0;
                 const confBadge = confirmed
                     ? '<span class="badge text-bg-success ms-1">' +
-                      this.#escHtml(
-                          this.#globalData.height > 0
-                              ? (this.#globalData.height - tx.height + 1) + ' ' + this.#getText('history-conf')
-                              : this.#getText('history-confirmed')
+                      (this.#globalData.height > 0
+                          ? this.#escHtml(String(this.#globalData.height - tx.height + 1)) +
+                            ' <span tkey="history-conf">' + this.#escHtml(this.#getText('history-conf')) + '</span>'
+                          : '<span tkey="history-confirmed">' + this.#escHtml(this.#getText('history-confirmed')) + '</span>'
                       ) + '</span>'
-                    : '<span class="badge text-bg-warning ms-1">' +
-                      this.#escHtml(this.#getText('history-pending')) + '</span>';
+                    : '<span class="badge text-bg-warning ms-1"><span tkey="history-pending">' +
+                      this.#escHtml(this.#getText('history-pending')) + '</span></span>';
                 const dir = tx.direction || 'unknown';
                 const amt = (tx.amount != null) ? this.#amountFormat(tx.amount) : '?';
                 let dirLabel;

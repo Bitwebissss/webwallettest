@@ -1095,18 +1095,18 @@
             let status       = '';
             let disabledTitle = '';
             if (!confirmed) {
-                status = '<span class="text-secondary"><span class="fa-solid fa-hourglass-half"></span> ' + escHtml(getText('history-pending')) + '</span>';
+                status = '<span class="text-secondary"><span class="fa-solid fa-hourglass-half"></span> <span tkey="history-pending">' + escHtml(getText('history-pending')) + '</span></span>';
                 disabledTitle = ' title="' + escHtml(getText('coin-control-unconfirmed-title')) + '"';
             } else if (!mature) {
                 status = '<span class="text-warning" title="' + escHtml(getText('coin-control-matures-in')) + ' ' + escHtml(String(u.blocksLeft)) + ' ' + escHtml(getText('coin-control-blocks')) + '">' +
                     '<span class="fa-solid fa-lock"></span> ' + escHtml(String(u.blocksLeft)) + ' blk</span>';
                 disabledTitle = ' title="' + escHtml(getText('coin-control-immature-title')) + '"';
             } else {
-                status = '<span class="text-success"><span class="fa-solid fa-unlock"></span> ' + escHtml(getText('coin-control-mature')) + '</span>';
+                status = '<span class="text-success"><span class="fa-solid fa-unlock"></span> <span tkey="coin-control-mature">' + escHtml(getText('coin-control-mature')) + '</span></span>';
             }
             const typeLabel = isCbase
-                ? '<span class="badge text-bg-secondary">' + escHtml(getText('coin-control-coinbase')) + '</span>'
-                : '<span class="badge text-bg-secondary">' + escHtml(getText('coin-control-regular')) + '</span>';
+                ? '<span class="badge text-bg-secondary" tkey="coin-control-coinbase">' + escHtml(getText('coin-control-coinbase')) + '</span>'
+                : '<span class="badge text-bg-secondary" tkey="coin-control-regular">' + escHtml(getText('coin-control-regular')) + '</span>';
             const amt     = amountFormat(u.value);
             tbody.append(
                 '<tr class="' + rowClass + '" data-key="' + key + '">' +
@@ -2283,6 +2283,14 @@
             let ct; try { ct = localStorage.getItem('bte_cfg_theme'); } catch(e) {}
             applyTheme(ct || 'auto');
             $('#address-type-select select').val(getAddressType());
+            // Passkey status + button have no tkey on their elements – must re-render
+            updatePasskeySettingsUI();
+            // Fee placeholder mixes runtime value (rfee, ticker) with translations – can't use tkey
+            if (globalData.status === 'unlocked') {
+                $('#send-fee').attr('placeholder',
+                    getText('fee') + ' (' + getText('recommended') + ' ' + globalData.rfee + ' ' + getConfig()['ticker'] + ')'
+                );
+            }
         });
         estimateFee().then(function(data) {
             if (data.error == null) globalData.rfee = amountFormat(data.result.feerate);
@@ -2366,7 +2374,7 @@
                 pos.forEach(function(p) {
                     $fields.append(
                         '<div class="input-group input-group-sm mb-2">' +
-                        '<span class="input-group-text seed-verify-num">' + escHtml(getText('seed-word-num')) + ' ' + (p + 1) + '</span>' +
+                        '<span class="input-group-text seed-verify-num"><span tkey="seed-word-num">' + escHtml(getText('seed-word-num')) + '</span> ' + (p + 1) + '</span>' +
                         '<input type="text" class="form-control font-monospace seed-verify-word" data-pos="' + p + '" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">' +
                         '</div>'
                     );
