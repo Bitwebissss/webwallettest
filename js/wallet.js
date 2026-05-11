@@ -767,12 +767,12 @@
     }
     function initLang() {
         let language; try { language = localStorage.getItem('bte_cfg_language'); } catch(e) {}
-        let userLang = 'en';
+        let setLang = 'en';
         if (language == null || walletLanguages[language] == undefined) {
             const userLang = navigator.language.substr(0, 2);
-            if (userLang in walletLanguages) userLang = userLang;
-            try { localStorage.setItem('bte_cfg_language', userLang); } catch(e) {}
-            language = userLang;
+            if (userLang in walletLanguages) setLang = userLang;
+            try { localStorage.setItem('bte_cfg_language', setLang); } catch(e) {}
+            language = setLang;
         }
         const $menu = $('#lang-dropdown-menu');
         $menu.empty();
