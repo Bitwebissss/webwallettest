@@ -2374,7 +2374,7 @@
                 pos.forEach(function(p) {
                     $fields.append(
                         '<div class="input-group input-group-sm mb-2">' +
-                        '<span class="input-group-text seed-verify-num"><span tkey="seed-word-num">' + escHtml(getText('seed-word-num')) + '</span> ' + (p + 1) + '</span>' +
+                        '<span class="input-group-text seed-verify-num"><span tkey="seed-word-num">' + escHtml(getText('seed-word-num')) + '</span>&nbsp;' + (p + 1) + '</span>' +
                         '<input type="text" class="form-control font-monospace seed-verify-word" data-pos="' + p + '" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">' +
                         '</div>'
                     );
