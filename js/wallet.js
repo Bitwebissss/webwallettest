@@ -841,19 +841,20 @@
         }
         return backend;
     }
-    function switchBackend(url) {
+    async function switchBackend(url) {
         if (!isValidBackendUrl(url)) {
             showMessage(messages.settings.backendNotWorking(url));
             $('#wallet-backend input').val(getBackend());
             return;
         }
-        Promise.resolve($.ajax({ 'url': url + '/info' })).then(function() {
+        try {
+            await Promise.resolve($.ajax({ 'url': url + '/info' }));
             try { localStorage.setItem('bte_cfg_backend', url); } catch(e) {}
             showMessage(messages.settings.backendSwitched(url));
-        }).catch(function() {
+        } catch(e) {
             showMessage(messages.settings.backendNotWorking(url));
             $('#wallet-backend input').val(getBackend());
-        });
+        }
     }
     const globalData = {
         status:             'locked',
@@ -903,7 +904,7 @@
         amountFormat:  amountFormat,
         blockExplorer: blockExplorer
     });
-    function copyToClipboard(text, $btn) {
+    async function copyToClipboard(text, $btn) {
         const doFeedback = function(ok) {
             const $icon    = $btn.find('.fa-solid, .fa-regular, .fa-brands').first();
             const origClass = $icon.attr('class');
@@ -917,11 +918,12 @@
             }, 1500);
         };
         if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text).then(function() {
+            try {
+                await navigator.clipboard.writeText(text);
                 doFeedback(true);
-            }).catch(function() {
+            } catch(e) {
                 doFeedback(false);
-            });
+            }
         } else {
             const ta = document.createElement('textarea');
             ta.value = text;
@@ -1227,13 +1229,11 @@
         globalData.tx.amount = totalSats;
         globalData.tx.fee    = feeSats;
     }
-    function getRawTx(txid) {
-        return fetch(getBackend() + '/rawtx/' + txid)
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (data.error !== null) throw new Error('rawtx fetch failed');
-                return data.result;
-            });
+    async function getRawTx(txid) {
+        const r    = await fetch(getBackend() + '/rawtx/' + txid);
+        const data = await r.json();
+        if (data.error !== null) throw new Error('rawtx fetch failed');
+        return data.result;
     }
     function getScriptType(script) {
         if (script[0] == bitcoin.opcodes.OP_0 && script[1] == 20) return 'bech32';
@@ -1275,7 +1275,7 @@
             psbt.addOutput({ address: outputs[i].address, value: BigInt(outputs[i].amount) });
         }
         $('#status-screen span').text(messages.tx['loading-utxo']);
-        const doSend = function(utxos) {
+        const doSend = async function(utxos) {
             let spendable;
             if (globalData.coinControl && globalData.selectedUtxos && globalData.selectedUtxos.size > 0) {
                 spendable = utxos.filter(function(u) {
@@ -1336,60 +1336,63 @@
             }
             const legacyFetches = inputMeta
                 .filter(function(m) { return m.type === 'legacy'; })
-                .map(function(m) {
-                    return getRawTx(m.txid).then(function(rawHex) {
-                        psbt.updateInput(m.psbtIdx, {
-                            nonWitnessUtxo: bitcoin.Buffer.from(rawHex, 'hex')
-                        });
+                .map(async function(m) {
+                    const rawHex = await getRawTx(m.txid);
+                    psbt.updateInput(m.psbtIdx, {
+                        nonWitnessUtxo: bitcoin.Buffer.from(rawHex, 'hex')
                     });
                 });
-            Promise.all(legacyFetches).then(function() {
+            try {
+                await Promise.all(legacyFetches);
                 const change = value - amount;
                 if (change > 0) psbt.addOutput({ address: address, value: BigInt(change) });
                 Keystore.signAllInputs(psbt);
                 psbt.finalizeAllInputs();
-                const tx = psbt.extractTransaction();
-                transactionBroadcast(tx.toHex()).then(function(data) {
-                    isSending = false;
-                    if (data.error == null) {
-                        clearUtxoCache(address);
-                        $('#status-screen span').html(
-                            '<a href="' + escHtml(blockExplorer.tx(data.result)) + '" target="_blank" rel="noopener noreferrer">' + escHtml(data.result) + '</a>'
-                        );
-                        $('#send-title').text(messages.title['success']);
-                    } else {
-                        $('#status-screen span').text(messages.error['broadcast-failed']);
-                        $('#send-title').text(messages.title['failed']);
-                        $('#status-screen .extra-info').html(
-                            '<div class="mt-3"><textarea class="form-control" readonly cols="30" rows="10">' + escHtml(data.error.message) + '</textarea></div>'
-                        );
-                    }
-                    resetTxForm();
-                });
+                const tx   = psbt.extractTransaction();
+                const data = await transactionBroadcast(tx.toHex());
+                isSending = false;
+                if (data.error == null) {
+                    clearUtxoCache(address);
+                    $('#status-screen span').html(
+                        '<a href="' + escHtml(blockExplorer.tx(data.result)) + '" target="_blank" rel="noopener noreferrer">' + escHtml(data.result) + '</a>'
+                    );
+                    $('#send-title').text(messages.title['success']);
+                } else {
+                    $('#status-screen span').text(messages.error['broadcast-failed']);
+                    $('#send-title').text(messages.title['failed']);
+                    $('#status-screen .extra-info').html(
+                        '<div class="mt-3"><textarea class="form-control" readonly cols="30" rows="10">' + escHtml(data.error.message) + '</textarea></div>'
+                    );
+                }
+                resetTxForm();
                 $('#send-cancel').addClass('d-none');
                 $('#send-confirm').addClass('d-none');
                 $('#send-close-footer').removeClass('d-none disabled');
-            }).catch(function() {
+            } catch(e) {
                 isSending = false;
                 showSendError(messages.error['bad-utxo']);
-            });
+            }
         };
         if (globalData.utxos.length > 0) {
             doSend(globalData.utxos);
         } else {
-            fetch(getBackend() + '/unspent/' + address + '?confirmed=true')
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                const utxos = (data && data.error === null) ? data.result : [];
-                const h     = globalData.height;
-                utxos.forEach(function(u) {
-                    u.mature     = isUtxoMature(u, h);
-                    u.blocksLeft = blocksToMature(u, h);
-                });
-                globalData.utxos = utxos;
-                doSend(utxos);
-            })
-            .catch(function() { isSending = false; showSendError(messages.error['not-enough-utxo']); });
+            (async function() {
+                try {
+                    const r     = await fetch(getBackend() + '/unspent/' + address + '?confirmed=true');
+                    const data  = await r.json();
+                    const utxos = (data && data.error === null) ? data.result : [];
+                    const h     = globalData.height;
+                    utxos.forEach(function(u) {
+                        u.mature     = isUtxoMature(u, h);
+                        u.blocksLeft = blocksToMature(u, h);
+                    });
+                    globalData.utxos = utxos;
+                    doSend(utxos);
+                } catch(e) {
+                    isSending = false;
+                    showSendError(messages.error['not-enough-utxo']);
+                }
+            })();
         }
     }
     function transactionBroadcast(rawtx) {
@@ -1723,23 +1726,26 @@
         stopStream();
         scanSession = session;
         scanVideo   = video;
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(function(gstream) {
-            if (session !== scanSession) {
-                try { gstream.getTracks().forEach(function(t) { t.stop(); }); } catch(e) {}
-                return;
+        (async function() {
+            try {
+                const gstream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                if (session !== scanSession) {
+                    try { gstream.getTracks().forEach(function(t) { t.stop(); }); } catch(e) {}
+                    return;
+                }
+                stream    = gstream;
+                scanVideo = video;
+                video.srcObject = stream;
+                video.setAttribute('playsinline', true);
+                video.play();
+                scanRafId = requestAnimationFrame(tick);
+            } catch(e) {
+                if (session !== scanSession) return;
+                stopStream();
+                $('#loading-message').text(getText('webcam-message')).removeClass('d-none');
+                showMessage(escHtml(getText('webcam-message')));
             }
-            stream    = gstream;
-            scanVideo = video;
-            video.srcObject = stream;
-            video.setAttribute('playsinline', true);
-            video.play();
-            scanRafId = requestAnimationFrame(tick);
-        }).catch(function() {
-            if (session !== scanSession) return;
-            stopStream();
-            $('#loading-message').text(getText('webcam-message')).removeClass('d-none');
-            showMessage(escHtml(getText('webcam-message')));
-        });
+        })();
         function tick() {
             if (session !== scanSession) return;
             $('#loading-message').text(getText('webcam-loading'));
@@ -1909,18 +1915,17 @@
             e.preventDefault();
             pkAuthenticate();
         });
-        $(document).on('click', '#passkey-settings-btn', function(e) {
+        $(document).on('click', '#passkey-settings-btn', async function(e) {
             e.preventDefault();
             if (isPasskeyEnabled()) {
                 pkDisable();
             } else {
-                checkPasskeySupport().then(function(supported) {
-                    if (!supported) {
-                        showMessage(escHtml(getText('passkey-unsupported')));
-                        return;
-                    }
-                    pkEnable();
-                });
+                const supported = await checkPasskeySupport();
+                if (!supported) {
+                    showMessage(escHtml(getText('passkey-unsupported')));
+                    return;
+                }
+                pkEnable();
             }
         });
         function showForgetWalletModal() {
@@ -2152,7 +2157,7 @@
         $('#privkey-hide-btn').click(function() {
             clearPrivKeyCanvas();
         });
-        $('#wallet-privkey-copy-btn').click(function() {
+        $('#wallet-privkey-copy-btn').click(async function() {
             if (!Keystore.isUnlocked()) return;
             let wif = Keystore.getWIF();
             if (!wif) return;
@@ -2168,13 +2173,14 @@
                 }, 1500);
             };
             if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(wif).then(function() {
+                try {
+                    await navigator.clipboard.writeText(wif);
                     wif = null;
                     doFeedback(true);
                     setTimeout(function() {
                         navigator.clipboard.writeText('').catch(function(){});
                     }, 60000);
-                }).catch(function() { wif = null; doFeedback(false); });
+                } catch(e) { wif = null; doFeedback(false); }
             } else {
                 const ta = document.createElement('textarea');
                 ta.value = wif;
@@ -2253,16 +2259,16 @@
             updateCoinControlInfo();
             validateSendForm();
         });
-        $('#footer-broadcast').click(function() {
-            const rawtx = $('#transaction-broadcast-raw');
-            transactionBroadcast(rawtx.val()).then(function(data) {
-                if (data.error == null) {
-                    showMessage(escHtml(messages.tx['success']) + '<a href="' + escHtml(blockExplorer.tx(data.result)) + '" target="_blank" rel="noopener noreferrer">' + escHtml(data.result) + '</a>');
-                } else {
-                    showMessage(messages.error['broadcast-failed']);
-                }
-            });
-            rawtx.val('');
+        $('#footer-broadcast').click(async function() {
+            const rawtx  = $('#transaction-broadcast-raw');
+            const rawHex = rawtx.val();
+            rawtx.val('');                                   // сбрасываем до await — защита от двойного клика
+            const data = await transactionBroadcast(rawHex);
+            if (data.error == null) {
+                showMessage(escHtml(messages.tx['success']) + '<a href="' + escHtml(blockExplorer.tx(data.result)) + '" target="_blank" rel="noopener noreferrer">' + escHtml(data.result) + '</a>');
+            } else {
+                showMessage(messages.error['broadcast-failed']);
+            }
         });
         $('#address-type-select select').on('change', function() {
             const newType = $(this).val();
@@ -2325,10 +2331,11 @@
                 );
             }
         });
-        estimateFee().then(function(data) {
+        (async function() {
+            const data = await estimateFee();
             if (data.error == null) globalData.rfee = amountFormat(data.result.feerate);
             else globalData.rfee = getConfig()['fee'];
-        });
+        })();
         $('#scan-modal').on('hide.bs.modal', function() { stopStream(); });
         $(window).on('beforeunload', stopStream);
         $('#copy-address-btn').click(function() {

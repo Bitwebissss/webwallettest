@@ -28,7 +28,7 @@
                 localStorage.setItem('bte_history_' + this.#globalData.address, JSON.stringify(txs));
             } catch (e) {}
         }
-        updateHistory() {
+        async updateHistory() {
             if (this.#globalData.status !== 'unlocked') return;
             const requestedAddress = this.#globalData.address;
             $('#history-list').html(
@@ -37,32 +37,31 @@
             );
             const url = this.#getBackend() + '/history/' + requestedAddress
                       + '?limit=' + HISTORY_LIMIT;
-            fetch(url)
-                .then(r => r.json())
-                .then(data => {
-                    if (this.#globalData.address !== requestedAddress) return;
-                    if (data.error != null) {
-                        $('#history-list').html(
-                            '<div class="text-danger text-center py-3 small">' +
-                            this.#escHtml(this.#getText('history-failed')) + '</div>'
-                        );
-                        return;
-                    }
-                    const txs = data.result || [];
-                    this.saveHistory(txs);
-                    this.renderHistory(txs);
-                })
-                .catch(() => {
-                    const cached = this.loadHistory();
-                    if (cached.length) {
-                        this.renderHistory(cached);
-                    } else {
-                        $('#history-list').html(
-                            '<div class="text-danger text-center py-3 small">' +
-                            this.#escHtml(this.#getText('history-network-error')) + '</div>'
-                        );
-                    }
-                });
+            try {
+                const r    = await fetch(url);
+                const data = await r.json();
+                if (this.#globalData.address !== requestedAddress) return;
+                if (data.error != null) {
+                    $('#history-list').html(
+                        '<div class="text-danger text-center py-3 small">' +
+                        this.#escHtml(this.#getText('history-failed')) + '</div>'
+                    );
+                    return;
+                }
+                const txs = data.result || [];
+                this.saveHistory(txs);
+                this.renderHistory(txs);
+            } catch {
+                const cached = this.loadHistory();
+                if (cached.length) {
+                    this.renderHistory(cached);
+                } else {
+                    $('#history-list').html(
+                        '<div class="text-danger text-center py-3 small">' +
+                        this.#escHtml(this.#getText('history-network-error')) + '</div>'
+                    );
+                }
+            }
         }
         #formatTs(ts) {
             if (!ts) return '';
