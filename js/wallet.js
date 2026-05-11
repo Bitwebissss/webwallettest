@@ -55,36 +55,31 @@
     let pinPasskeyCallback = null;
 
     class SeedStore {
-        #pendingEntropy = null;  // Uint8Array ownership — wiped with fill(0) in wipePending()
-        #entropy        = null;
-        #enc            = null;
-        #tempKey        = null;
-        #verifyPos      = [];    // [{pos, idx}] — plain word-list indices, no HMAC
-        #strength       = 256;
-        setPending(arr) {
-            this.wipePending();
-            this.#pendingEntropy = arr;          // take ownership, no copy
-        }
-        getPending()    { return this.#pendingEntropy; }
-        wipePending() {
-            if (this.#pendingEntropy) { this.#pendingEntropy.fill(0); this.#pendingEntropy = null; }
-        }
-        get entropy()      { return this.#entropy; }
-        set entropy(v)     { this.#entropy = v; }
-        get enc()          { return this.#enc; }
-        set enc(v)         { this.#enc = v; }
-        get tempKey()      { return this.#tempKey; }
-        set tempKey(v)     { this.#tempKey = v; }
-        get verifyPos()    { return this.#verifyPos; }
-        set verifyPos(v)   { this.#verifyPos = v; }
-        get strength()     { return this.#strength; }
-        set strength(v)    { this.#strength = v; }
+        #revealedWords = [];
+        #entropy       = null;
+        #enc           = null;
+        #tempKey       = null;
+        #verifyHashes  = [];
+        #strength      = 256;
+        getRevealed()       { return this.#revealedWords; }
+        setRevealed(arr)    { this.#revealedWords = arr; }
+        wipeRevealed()      { if (this.#revealedWords.length) this.#revealedWords.fill(''); this.#revealedWords = []; }
+        get entropy()       { return this.#entropy; }
+        set entropy(v)      { this.#entropy = v; }
+        get enc()           { return this.#enc; }
+        set enc(v)          { this.#enc = v; }
+        get tempKey()       { return this.#tempKey; }
+        set tempKey(v)      { this.#tempKey = v; }
+        get verifyHashes()  { return this.#verifyHashes; }
+        set verifyHashes(v) { this.#verifyHashes = v; }
+        get strength()      { return this.#strength; }
+        set strength(v)     { this.#strength = v; }
         clear() {
-            this.wipePending();
+            this.wipeRevealed();
             if (this.#entropy) { this.#entropy.fill(0); this.#entropy = null; }
-            this.#enc       = null;
-            this.#tempKey   = null;
-            this.#verifyPos = [];
+            this.#enc          = null;
+            this.#tempKey      = null;
+            this.#verifyHashes = [];
         }
     }
     const seedStore = new SeedStore();
@@ -1453,7 +1448,6 @@
         $('#wallet-block').addClass('d-none');
         updateSavedWalletUI();
         setHomeTitle();
-        window.location.reload(true);
     }
     function updateSavedWalletUI() {
         if (hasSavedWallet() && !Keystore.isUnlocked()) {
@@ -1560,25 +1554,6 @@
         setHomeTitle();
         resetAutoLock();
     }
-    // Convert raw entropy bytes to BIP39 word indices (0-2047) without
-    // ever building the full mnemonic string, so words stay binary.
-    function entropyToIndices(entropyBytes) {
-        const hash     = bitcoin.crypto.sha256(entropyBytes);
-        const ENT      = entropyBytes.length * 8;
-        const CS       = ENT / 32;
-        const wordCount = (ENT + CS) / 11;
-        let bits = BigInt(0);
-        for (let i = 0; i < entropyBytes.length; i++) {
-            bits = (bits << 8n) | BigInt(entropyBytes[i]);
-        }
-        bits = (bits << BigInt(CS)) | (BigInt(hash[0]) >> (8 - CS));
-        const indices = new Array(wordCount);
-        for (let i = wordCount - 1; i >= 0; i--) {
-            indices[i] = Number(bits & 0x7FFn);
-            bits >>= 11n;
-        }
-        return indices;
-    }
     function closeWallet() {
         stopAutoLock();
         stopStream();
@@ -1597,22 +1572,20 @@
         $('#wallet-block').addClass('d-none');
         updateSavedWalletUI();
         setHomeTitle();
-        window.location.reload(true);
     }
     function revealSeedFromBytes(entropyBytes) {
-        seedStore.setPending(entropyBytes);          // take ownership
-        const indices  = entropyToIndices(entropyBytes);
-        const wordlist = bip39Bundle.wordlist;
-        const words    = indices.map(function(i) { return wordlist[i]; });
-        seedRenderGrid(words, '#wallet-seed-grid');
-        words.fill('');
-        indices.fill(0);                             // derived from entropy — zero after use
+        seedStore.wipeRevealed();
+        let mnemonic = bip39Bundle.entropyToMnemonic(entropyBytes);
+        entropyBytes.fill(0);
+        seedStore.setRevealed(mnemonic.split(' '));
+        mnemonic = null;
+        seedRenderGrid(seedStore.getRevealed(), '#wallet-seed-grid');
         $('#wallet-seed-hidden').addClass('d-none');
         $('#wallet-seed-revealed').removeClass('d-none');
         setTimeout(hideSeedReveal, 60000);
     }
     function hideSeedReveal() {
-        seedStore.wipePending();
+        seedStore.wipeRevealed();
         $('#wallet-seed-hidden').removeClass('d-none');
         $('#wallet-seed-revealed').addClass('d-none');
         $('#wallet-seed-grid').empty();
@@ -2366,8 +2339,10 @@
         $('#seed-btn-to-verify').click(async function() {
             if (!seedStore.entropy) return;
             const $btn = $(this).prop('disabled', true);
-            const indices = entropyToIndices(seedStore.entropy);
-            const len     = indices.length;
+            let mnStr = bip39Bundle.entropyToMnemonic(seedStore.entropy);
+            const words = mnStr.split(' ');
+            mnStr = null;
+            const len   = words.length;
             function rnd(lo, hi) {
                 const buf = new Uint32Array(1);
                 crypto.getRandomValues(buf);
@@ -2375,9 +2350,18 @@
             }
             const third = Math.floor(len / 3);
             const pos   = [rnd(0, third - 1), rnd(third, third * 2 - 1), rnd(third * 2, len - 1)];
-            seedStore.verifyPos = pos.map(function(p) { return { pos: p, idx: indices[p] }; });
-            indices.fill(0);                         // derived from entropy — zero before async gap
             try {
+                seedStore.verifyHashes = await Promise.all(pos.map(async function(p) {
+                    const salt    = crypto.getRandomValues(new Uint8Array(16));
+                    const hmacKey = await crypto.subtle.importKey(
+                        'raw', salt, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+                    );
+                    const wordBytes = new TextEncoder().encode(words[p].toLowerCase());
+                    const sig = new Uint8Array(await crypto.subtle.sign('HMAC', hmacKey, wordBytes));
+                    wordBytes.fill(0);
+                    return { pos: p, salt: Array.from(salt), hash: Array.from(sig) };
+                }));
+                words.fill('');
                 seedStore.tempKey = await crypto.subtle.generateKey(
                     { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
                 );
@@ -2400,6 +2384,7 @@
                 $('#seed-create-step2').removeClass('d-none');
                 setTimeout(function() { $('.seed-verify-word').first().focus(); }, 100);
             } catch(e) {
+                words.fill('');
                 $btn.prop('disabled', false);
                 showMessage(escHtml(getText('seed-crypto-error')) + ' ' + escHtml(e.message || String(e)));
             }
@@ -2407,51 +2392,58 @@
         $('#seed-verify-confirm').click(async function() {
             const $btn   = $(this).prop('disabled', true);
             const inputs = $('.seed-verify-word');
-            if (!seedStore.verifyPos.length) {
+            if (!seedStore.verifyHashes.length) {
                 $('#seed-verify-error').removeClass('d-none');
                 $btn.prop('disabled', false);
                 return;
             }
             let ok = true;
-            const wordlist = bip39Bundle.wordlist;
-            for (let i = 0; i < seedStore.verifyPos.length; i++) {
-                const vp   = seedStore.verifyPos[i];
-                const $inp = inputs.filter('[data-pos="' + vp.pos + '"]');
-                const entered = $inp.val().trim().toLowerCase();
-                if (wordlist.indexOf(entered) !== vp.idx) { ok = false; break; }
-            }
+            try {
+                for (let i = 0; i < seedStore.verifyHashes.length; i++) {
+                    const vh         = seedStore.verifyHashes[i];
+                    const $inp       = inputs.filter('[data-pos="' + vh.pos + '"]');
+                    const enteredBytes = new TextEncoder().encode($inp.val().trim().toLowerCase());
+                    const salt       = new Uint8Array(vh.salt);
+                    const hmacKey    = await crypto.subtle.importKey(
+                        'raw', salt, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+                    );
+                    const sig = new Uint8Array(await crypto.subtle.sign('HMAC', hmacKey, enteredBytes));
+                    enteredBytes.fill(0);
+                    if (sig.length !== vh.hash.length) { ok = false; break; }
+                    let diff = 0;
+                    for (let j = 0; j < sig.length; j++) diff |= sig[j] ^ vh.hash[j];
+                    if (diff !== 0) { ok = false; break; }
+                }
+            } catch(e) { ok = false; }
             if (!ok) {
                 $('#seed-verify-error').removeClass('d-none');
                 $btn.prop('disabled', false);
                 return;
             }
-            seedStore.verifyPos = [];
+            seedStore.verifyHashes = [];
             $('#seed-verify-error').addClass('d-none');
-            let _verifyEntropy, _verifyPriv;
             try {
                 const iv = new Uint8Array(seedStore.enc.iv);
                 const ct = new Uint8Array(seedStore.enc.data);
-                _verifyEntropy = new Uint8Array(await crypto.subtle.decrypt(
+                const entropyBytes = new Uint8Array(await crypto.subtle.decrypt(
                     { name: 'AES-GCM', iv: iv }, seedStore.tempKey, ct
                 ));
                 seedStore.enc     = null;
                 seedStore.tempKey = null;
-                let interimMnemonic = bip39Bundle.entropyToMnemonic(_verifyEntropy);
-                _verifyPriv = bip39Bundle.mnemonicToPrivKey(interimMnemonic, DEFAULT_DERIV_PATH);
+                let interimMnemonic = bip39Bundle.entropyToMnemonic(entropyBytes);
+                const privBytes = bip39Bundle.mnemonicToPrivKey(interimMnemonic, DEFAULT_DERIV_PATH);
                 interimMnemonic = null;
-                const keyPair = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(_verifyPriv));
-                _verifyPriv.fill(0); _verifyPriv = null;
+                const keyPair = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes));
+                privBytes.fill(0);
                 Keystore.setKeyPair(keyPair);
-                await openWallet(true, _verifyEntropy, DEFAULT_DERIV_PATH);
+                await openWallet(true, entropyBytes, DEFAULT_DERIV_PATH);
+                entropyBytes.fill(0);
                 inputs.each(function() { this.value = ''; });
                 seedReset();
                 $btn.prop('disabled', false);
             } catch(err) {
                 $btn.prop('disabled', false);
                 showMessage(escHtml(getText('seed-deriv-error')) + ' ' + escHtml(err.message));
-            } finally {
-                _verifyPriv?.fill(0);   _verifyPriv   = null;
-                _verifyEntropy?.fill(0); _verifyEntropy = null;
             }
         });
         $('#restore-wordcount').change(function() {
@@ -2478,25 +2470,22 @@
                 return;
             }
             const path = ($('#restore-path').val().trim() || DEFAULT_DERIV_PATH);
-            let _restorePriv, _restoreEntropy;
             try {
                 const $inp = $('#restore-input');
                 $inp.val(' '.repeat($inp.val().length));
                 $inp.val('');
-                _restorePriv    = bip39Bundle.mnemonicToPrivKey(raw, path);
-                _restoreEntropy = bip39Bundle.mnemonicToEntropy(raw);
+                const privBytes    = bip39Bundle.mnemonicToPrivKey(raw, path);
+                const entropyBytes = bip39Bundle.mnemonicToEntropy(raw);
                 raw = null;
-                const keyPair = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(_restorePriv));
-                _restorePriv.fill(0); _restorePriv = null;
+                const keyPair = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes));
+                privBytes.fill(0);
                 Keystore.setKeyPair(keyPair);
-                await openWallet(true, _restoreEntropy, path, true);
+                await openWallet(true, entropyBytes, path, true);
+                entropyBytes.fill(0);
                 seedReset();
             } catch(err) {
                 raw = null;
                 $('#restore-word-error').text(getText('seed-deriv-error') + ' ' + err.message).removeClass('d-none');
-            } finally {
-                _restorePriv?.fill(0);    _restorePriv    = null;
-                _restoreEntropy?.fill(0); _restoreEntropy = null;
             }
         });
         $('#btn-show-seed').click(async function() {
@@ -2556,9 +2545,8 @@
         });
         $('#btn-hide-seed').click(hideSeedReveal);
         $('#btn-save-seed-png').click(function() {
-            const pending = seedStore.getPending();
-            if (!pending) return;
-            let mn = bip39Bundle.entropyToMnemonic(pending);
+            if (!seedStore.getRevealed().length) return;
+            let mn = seedStore.getRevealed().join(' ');
             let savedPath; try { savedPath = localStorage.getItem(STORAGE_KEY_PATH); } catch(e) {}
             window.seedExportPNG(mn, getText, savedPath || DEFAULT_DERIV_PATH);
             mn = null;
