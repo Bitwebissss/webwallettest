@@ -147,6 +147,11 @@
                 keyPair.privateKey.fill(0);
             }
         } catch (ignore) { /* not critical */ }
+        try {
+            if (keyPair.__D && keyPair.__D instanceof Uint8Array) {
+                keyPair.__D.fill(0);
+            }
+        } catch (ignore) { /* not critical */ }
     }
     function clearPrivKeyCanvas() {
         const canvas = document.getElementById('wallet-privkey-canvas');
