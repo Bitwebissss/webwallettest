@@ -148,11 +148,6 @@
                 keyPair.privateKey.fill(0);
             }
         } catch (ignore) { /* not critical */ }
-        try {
-            if (keyPair.__D && keyPair.__D instanceof Uint8Array) {
-                keyPair.__D.fill(0);
-            }
-        } catch (ignore) { /* not critical */ }
     }
     function clearPrivKeyCanvas() {
         const canvas = document.getElementById('wallet-privkey-canvas');
@@ -406,9 +401,6 @@
                    localStorage.getItem(STORAGE_KEY_PRIV_PK) !== null;
         } catch(e) { return false; }
     }
-    function hasPasskeyCredential() {
-        return isPasskeyEnabled();
-    }
     function hasSeedPkBackup() {
         try { return localStorage.getItem(STORAGE_KEY_SEED_PK) !== null; } catch(e) { return false; }
     }
@@ -597,7 +589,7 @@
         updatePasskeySettingsUI();
     }
     function updatePasskeyLoginUI() {
-        if (isPasskeyEnabled() && hasPasskeyCredential()) {
+        if (isPasskeyEnabled()) {
             $('#pk-login-wrapper').removeClass('d-none');
         } else {
             $('#pk-login-wrapper').addClass('d-none');
@@ -1784,7 +1776,6 @@
     }
     $(document).ready(function() {
         initLang();
-		messages = initMessages();
         $(document).on('click', '.theme-option', function(e) {
             e.preventDefault();
             const theme = $(this).data('theme');
@@ -1941,11 +1932,13 @@
             forgetSavedWallet();
             showMessage(escHtml(getText('wallet-deleted')));
         });
-        $('.tab-link').click(function(e) {
+        $(document).on('click', '.tab-link', function(e) {
+            e.preventDefault();
             const tabFamily = $(this).data('tab-family');
             const tabName   = $(this).data('tab-name');
             if (tabFamily === 'wallet-block' && tabName !== 'wallet-keys') {
                 clearPrivKeyCanvas();
+                hideSeedReveal();
             }
             $('#' + tabFamily + ' .tab-item').addClass('d-none');
             $('#' + tabFamily + ' .card-header .card-header-tabs .nav-link').removeClass('active');
@@ -1962,7 +1955,6 @@
                 }
                 updatePasskeySettingsUI();
             }
-            e.preventDefault();
         });
         $(window).on('hashchange', routePage);
         if (window.location.hash) $(window).trigger('hashchange');
@@ -2125,7 +2117,7 @@
                     showMessage(escHtml(getText('passkey-error')) + escHtml(e.message));
                 }
             }
-            const canUsePasskey = isPasskeyEnabled() && hasPasskeyCredential();
+            const canUsePasskey = isPasskeyEnabled();
             const privKeyValidator = async function(candidate) {
                 const pub = await loadEncryptedBytes(STORAGE_KEY_PUB, candidate);
                 if (!pub) return getText('pin-login-error');
@@ -2482,7 +2474,6 @@
             let privBytes, entropyBytes;
             try {
                 const $inp = $('#restore-input');
-                $inp.val(' '.repeat($inp.val().length));
                 $inp.val('');
                 privBytes    = bip39Bundle.mnemonicToPrivKey(raw, path);
                 entropyBytes = bip39Bundle.mnemonicToEntropy(raw);
@@ -2563,11 +2554,6 @@
             let savedPath; try { savedPath = localStorage.getItem(STORAGE_KEY_PATH); } catch(e) {}
             window.seedExportPNG(mn, getText, savedPath || DEFAULT_DERIV_PATH);
             mn = null;
-        });
-        $('.tab-link').on('click', function() {
-            if ($(this).data('tab-family') === 'wallet-block' && $(this).data('tab-name') !== 'wallet-keys') {
-                hideSeedReveal();
-            }
         });
     });
     function wsConnect() {
