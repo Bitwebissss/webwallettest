@@ -729,7 +729,9 @@
     function initMessages() {
         return {
             'settings': {
-                'typeSwitched': function(type) { return getText('address-type-changed') + ' <b>' + escHtml(type) + '</b>'; }
+                'typeSwitched':     function(type) { return getText('address-type-changed') + ' <b>' + escHtml(type) + '</b>'; },
+                'backendSwitched':  function(url)  { return getText('backend-switched') + ' <b>' + escHtml(url) + '</b>'; },
+                'backendNotWorking': function(url) { return '<b>' + escHtml(url) + '</b> ' + getText('backend-down'); }
             },
             'error': {
                 'bad-utxo':            getText('bad-utxo'),
@@ -816,6 +818,7 @@
         if (networkConfigs[network] != undefined && networkConfigs[network] != getConfig()) {
             try { localStorage.setItem('bte_cfg_network', network); } catch(e) {}
             closeWallet();
+            switchBackend(networkConfigs[network]['api']);
         }
         switchPage(page);
     }
@@ -831,7 +834,27 @@
         if (['bech32', 'segwit', 'legacy', 'taproot'].includes(type)) try { localStorage.setItem('bte_cfg_type', type); } catch(e) {}
     }
     function getBackend() {
-        return getConfig()['api'];
+        let backend; try { backend = localStorage.getItem('bte_cfg_backend'); } catch(e) {}
+        if (backend == null) {
+            backend = getConfig()['api'];
+            try { localStorage.setItem('bte_cfg_backend', backend); } catch(e) {}
+        }
+        return backend;
+    }
+    async function switchBackend(url) {
+        if (!isValidBackendUrl(url)) {
+            showMessage(messages.settings.backendNotWorking(url));
+            $('#wallet-backend input').val(getBackend());
+            return;
+        }
+        try {
+            await Promise.resolve($.ajax({ 'url': url + '/info' }));
+            try { localStorage.setItem('bte_cfg_backend', url); } catch(e) {}
+            showMessage(messages.settings.backendSwitched(url));
+        } catch(e) {
+            showMessage(messages.settings.backendNotWorking(url));
+            $('#wallet-backend input').val(getBackend());
+        }
     }
     const globalData = {
         status:             'locked',
@@ -1772,7 +1795,7 @@
             document.addEventListener(evt, function() { resetAutoLock(); }, { passive: true, capture: false });
         });
         $('#wallet-version').text(walletVersion);
-        $('#wallet-backend-url').text(getBackend());
+        $('#wallet-backend input').val(getBackend());
         $('#address-type-select select').val(getAddressType());
         routePage();
         updateSavedWalletUI();
@@ -1945,7 +1968,7 @@
             if (tabName === 'wallet-history') TxHistory.updateHistory();
             if (tabName === 'wallet-settings') {
                 $('#address-type-select select').val(getAddressType());
-                $('#wallet-backend-url').text(getBackend());
+                $('#wallet-backend input').val(getBackend());
                 if (hasSavedWallet()) {
                     $('#forget-wallet-section').removeClass('d-none');
                 } else {
@@ -2289,6 +2312,9 @@
                 $('#wallet-keys-script').removeClass('d-none');
             }
             setHomeTitle();
+        });
+        $('#wallet-backend button').click(function() {
+            switchBackend($('#wallet-backend input').val());
         });
         $(document).on('click', '.lang-switch-item', function(e) {
             e.preventDefault();
