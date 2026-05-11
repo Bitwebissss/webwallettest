@@ -53,17 +53,16 @@
     let pinResolve         = null;
     let pinValidator       = null;
     let pinPasskeyCallback = null;
-
     class SeedStore {
-        #pendingEntropy = null;  // Uint8Array ownership — wiped with fill(0) in wipePending()
+        #pendingEntropy = null;
         #entropy        = null;
         #enc            = null;
         #tempKey        = null;
-        #verifyPos      = [];    // [{pos, idx}] — plain word-list indices, no HMAC
+        #verifyPos      = [];
         #strength       = 256;
         setPending(arr) {
             this.wipePending();
-            this.#pendingEntropy = arr;          // take ownership, no copy
+            this.#pendingEntropy = arr; // take ownership, no copy
         }
         getPending()    { return this.#pendingEntropy; }
         wipePending() {
@@ -654,7 +653,6 @@
     }
     function clearSeedState() {
         seedStore.clear();
-
     }
     function askPin(title, desc, validator, mandatory, onPasskeyClick) {
         return new Promise(function(resolve) {
@@ -1597,13 +1595,13 @@
         window.location.reload(true);
     }
     function revealSeedFromBytes(entropyBytes) {
-        seedStore.setPending(entropyBytes);          // take ownership
+        seedStore.setPending(entropyBytes); // take ownership
         const indices  = entropyToIndices(entropyBytes);
         const wordlist = bip39Bundle.wordlist;
         const words    = indices.map(function(i) { return wordlist[i]; });
         seedRenderGrid(words, '#wallet-seed-grid');
         words.fill('');
-        indices.fill(0);                             // derived from entropy — zero after use
+        indices.fill(0);
         $('#wallet-seed-hidden').addClass('d-none');
         $('#wallet-seed-revealed').removeClass('d-none');
         setTimeout(hideSeedReveal, 60000);
@@ -2264,7 +2262,7 @@
         $('#footer-broadcast').click(async function() {
             const rawtx  = $('#transaction-broadcast-raw');
             const rawHex = rawtx.val();
-            rawtx.val('');                                   // сбрасываем до await — защита от двойного клика
+            rawtx.val('');
             const data = await transactionBroadcast(rawHex);
             if (data.error == null) {
                 showMessage(escHtml(messages.tx['success']) + '<a href="' + escHtml(blockExplorer.tx(data.result)) + '" target="_blank" rel="noopener noreferrer">' + escHtml(data.result) + '</a>');
@@ -2391,7 +2389,7 @@
             const third = Math.floor(len / 3);
             const pos   = [rnd(0, third - 1), rnd(third, third * 2 - 1), rnd(third * 2, len - 1)];
             seedStore.verifyPos = pos.map(function(p) { return { pos: p, idx: indices[p] }; });
-            indices.fill(0);                         // derived from entropy — zero before async gap
+            indices.fill(0);
             try {
                 seedStore.tempKey = await crypto.subtle.generateKey(
                     { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']

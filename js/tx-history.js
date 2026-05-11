@@ -78,11 +78,9 @@
                 );
                 return;
             }
-        
             let html     = '';
             const ticker = this.#getConfig()['ticker'];
             const chainHeight = Number(this.#globalData.height);
-        
             txs.forEach(tx => {
                 const h = Number(tx.height);
                 const confirmed = h > 0;
@@ -99,7 +97,6 @@
                 const dir = tx.direction || 'unknown';
                 const amt = (tx.amount != null) ? this.#amountFormat(tx.amount) : '?';
                 let dirLabel;
-        
                 if (dir === 'in') {
                     dirLabel = '<span class="fw-bold text-success tx-dir-label">' +
                                '&#x2193; +' + this.#escHtml(String(amt)) + ' ' + this.#escHtml(ticker) +
@@ -116,14 +113,12 @@
                     dirLabel = '<span class="text-muted tx-dir-label">— ? ' +
                                this.#escHtml(ticker) + '</span>';
                 }
-        
                 const safeHash = this.#escHtml(tx.txid || '');
                 const txUrl = this.#escHtml(this.#blockExplorer.tx(tx.txid || ''));
                 const tsHtml = tx.timestamp
                     ? '<div class="text-muted history-ts">' +
                       this.#escHtml(this.#formatTs(tx.timestamp)) + '</div>'
                     : '';
-        
                 html += '<div class="history-item d-flex align-items-center border-bottom history-item-inner">' +
                         dirLabel +
                         '<div class="font-monospace flex-grow-1 history-tx-hash break-word">' +
@@ -134,7 +129,6 @@
                         '<div class="flex-shrink-0">' + confBadge + '</div>' +
                         '</div>';
             });
-        
             if (txs.length >= HISTORY_LIMIT) {
                 const explorerUrl = this.#escHtml(this.#blockExplorer.address(this.#globalData.address));
                 html += '<div class="text-center py-2"><small>' +
@@ -142,7 +136,6 @@
                         this.#escHtml(this.#getText('history-view-all')) + ' &#x2197;' +
                         '</a></small></div>';
             }
-        
             $('#history-list').html(html);
         }
     }
