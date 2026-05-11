@@ -1,5 +1,4 @@
 const walletLanguages = {
-    'use strict';
     'en': {
         'lang-alias': 'English',
         'open-regular': 'Regular wallet',
