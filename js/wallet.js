@@ -1923,14 +1923,28 @@
                 });
             }
         });
+        function showForgetWalletModal() {
+            const $input  = $('#forget-wallet-confirm-input');
+            const $yesBtn = $('#forget-wallet-modal-yes');
+            $input.val('');
+            $yesBtn.prop('disabled', true);
+            $('#forget-wallet-modal').modal({ backdrop: 'static', keyboard: false });
+            $('#forget-wallet-modal').modal('show');
+        }
+        $('#forget-wallet-confirm-input').on('input', function() {
+            const val = $(this).val().trim();
+            $('#forget-wallet-modal-yes').prop('disabled', val !== 'Yes');
+        });
+        $('#forget-wallet-modal-yes').click(function() {
+            $('#forget-wallet-modal').modal('hide');
+            forgetSavedWallet();
+        });
         $('#pin-login-forget').click(function(e) {
             e.preventDefault();
-            forgetSavedWallet();
-            showMessage(escHtml(getText('wallet-deleted')));
+            showForgetWalletModal();
         });
         $('#settings-forget-wallet').click(function() {
-            forgetSavedWallet();
-            showMessage(escHtml(getText('wallet-deleted')));
+            showForgetWalletModal();
         });
         $(document).on('click', '.tab-link', function(e) {
             e.preventDefault();

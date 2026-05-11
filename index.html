@@ -26,9 +26,7 @@
         <link rel="stylesheet" href="css/bootstrap.min.css"
                 integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
                 crossorigin="anonymous">
-        <link rel="stylesheet" href="css/style.css"
-                integrity="sha512-D/2KWX0fz1/Kdbf3r7vPswa+Uvo5IqKLMpEE639gBVhhzOSO3+DOFgVsVJNts+cQ6rKBo0Zl7kK1A+0TUX+NxA=="
-                crossorigin="anonymous">
+        <link rel="stylesheet" href="css/style.css">
         <link rel="icon" type="image/svg+xml" href="images/logo.svg">
         <script src="js/theme.js"
                 integrity="sha512-JDNXCkyLWirZa0moaay6/HeCfjI80P9Q3EG75w1lQpnsnQf9uVH6SO8yMp1drofap5lI84y+u+RjTMr1I49Dqw=="
@@ -53,9 +51,7 @@
         <script src="js/jsQR.min.js"
                 integrity="sha512-KbmR1Et+8VJSKLeI7vJKCWY9q5ZrdU21KcHFG8OUSeI0NPQK+dkABkTs1WUYWVINZwgv8ePueskqbquPjrQNVw=="
                 crossorigin="anonymous"></script>
-        <script src="js/multilang.js"
-                integrity="sha512-99fP7B6kUXD3SM3u+RF0ZnajcCc6NLzhCpshTQY2f+R4RW79ubscadFvH4FO4y0AxYEwyqLa82BOFCf48tIg6Q=="
-                crossorigin="anonymous"></script>
+        <script src="js/multilang.js"></script>
         <!-- Self build see BUILD4_bip39.md -->
         <script src="js/bip39-bundle.min.js"
                 integrity="sha512-YJ6VjXPoRMNMa7pH+GteqOWduipc5YDzp00uZ/6MuBfPYz1YQQ8Riyll1Yx6uUmOhXBfR5TlmRMkuXeKzLKdzQ=="
@@ -548,6 +544,28 @@
                     <div class="modal-footer">
                         <button id="pin-cancel" type="button" class="btn btn-danger" data-bs-dismiss="modal" tkey="cancel">Cancel</button>
                         <button id="pin-confirm" type="button" class="btn btn-primary" tkey="ok">OK</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Forget Wallet Confirmation Modal -->
+        <div id="forget-wallet-modal" class="modal" tabindex="-1" role="dialog">
+            <div class="modal-dialog modal-md" role="document">
+                <div class="modal-content">
+                    <div class="modal-header modal-header-danger">
+                        <h5 class="modal-title" tkey="forget-wallet-modal-title">⚠️ Clear Wallet</h5>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-danger mb-3">
+                            <strong><span class="fa-solid fa-triangle-exclamation"></span> <span tkey="forget-wallet-irreversible-label">Irreversible operation!</span></strong><br>
+                            <span tkey="forget-wallet-warning-text">If you do not have a backup of your seed phrase or private key, you will permanently lose access to your funds.</span>
+                        </div>
+                        <p class="text-muted small" tkey="forget-wallet-type-to-confirm">To confirm, type <strong>Yes</strong> in the field below:</p>
+                        <input id="forget-wallet-confirm-input" type="text" class="form-control" autocomplete="off" placeholder="Yes">
+                    </div>
+                    <div class="modal-footer">
+                        <button id="forget-wallet-modal-no" type="button" class="btn btn-secondary me-auto" data-bs-dismiss="modal" tkey="forget-wallet-btn-no">No, cancel</button>
+                        <button id="forget-wallet-modal-yes" type="button" class="btn btn-danger" disabled tkey="forget-wallet-btn-yes">Yes, clear wallet</button>
                     </div>
                 </div>
             </div>

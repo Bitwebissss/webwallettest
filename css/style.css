@@ -118,3 +118,8 @@ body {
 	left: 0;
 	pointer-events: none;
 }
+/* Forget-wallet confirmation modal — danger header */
+.modal-header-danger {
+	background-color: var(--bs-danger);
+	color: #fff;
+}
