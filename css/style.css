@@ -44,19 +44,19 @@ body {
 .pin-login-card .card-body { padding: 1.5rem; }
 .pin-login-title { font-size: 15px; color: var(--bs-secondary-color); margin-bottom: 12px; text-align: center; }
 /* Seed phrase print area — hidden on screen, shown only when printing */
-#_seed_print_area_ { display: none; }
+#seed-print-area { display: none; }
 @media print {
-	body > *:not(#_seed_print_area_) { display: none !important; }
-	#_seed_print_area_ {
+	body > *:not(#seed-print-area) { display: none !important; }
+	#seed-print-area {
 		display: block !important;
 		font-family: monospace;
 		font-size: 15px;
 		padding: 24px;
 	}
-	#_seed_print_area_ h2 { margin-bottom: 16px; }
-	#_seed_print_area_ ol { columns: 2; column-gap: 2em; padding-left: 1.5em; }
-	#_seed_print_area_ li { margin-bottom: 6px; }
-	#_seed_print_area_ ._seed_print_path_ { margin-top: 16px; color: #555; font-size: 12px; }
+	#seed-print-area h2 { margin-bottom: 16px; }
+	#seed-print-area ol { columns: 2; column-gap: 2em; padding-left: 1.5em; }
+	#seed-print-area li { margin-bottom: 6px; }
+	#seed-print-area .seed-print-path { margin-top: 16px; color: #555; font-size: 12px; }
 }
 /* ── Extracted from inline styles ─────────────────────────────────────────── */
 /* Seed word grids (create + revealed backup) */

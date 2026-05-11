@@ -1,4 +1,5 @@
 (function(){
+    'use strict';
     let t;
     try { t = localStorage.getItem('bte_cfg_theme') } catch(e) { t = null }
     const resolved = (!t || t === 'auto')
