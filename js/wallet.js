@@ -41,8 +41,8 @@
         }
     };
     const blockExplorer = {
-        'address': function(address) { return 'https://explorer.bitwebcore.net/address/' + address + '/' },
-        'tx':      function(tx)      { return 'https://explorer.bitwebcore.net/tx/' + tx + '/' }
+        'address': function(address) { return 'https://explorer.bitwebcore.net/address/' + encodeURIComponent(address) + '/' },
+        'tx':      function(tx)      { return 'https://explorer.bitwebcore.net/tx/' + encodeURIComponent(tx) + '/' }
     };
     let stream      = null;
     let scanVideo   = null;
@@ -979,15 +979,17 @@
         return m;
     }
     function isUtxoMature(utxo, currentHeight) {
+        const h = Number(utxo.height);
+        if (!Number.isFinite(h) || h <= 0) return false;
         if (!utxo.coinbase) return true;
-        if (utxo.height === 0) return false;
-        const required = getRequiredMaturity(utxo.height);
-        return (currentHeight - utxo.height) >= required;
+        const required = getRequiredMaturity(h);
+        return (currentHeight - h) >= required;
     }
     function blocksToMature(utxo, currentHeight) {
-        if (!utxo.coinbase || utxo.height === 0) return 0;
-        const required = getRequiredMaturity(utxo.height);
-        return Math.max(0, required - (currentHeight - utxo.height));
+        const h = Number(utxo.height);
+        if (!utxo.coinbase || !Number.isFinite(h) || h <= 0) return 0;
+        const required = getRequiredMaturity(h);
+        return Math.max(0, required - (currentHeight - h));
     }
     function loadUtxoCache(address) {
         try {
@@ -1084,7 +1086,7 @@
         $('#coin-control-enable').prop('checked', globalData.coinControl);
         utxos.forEach(function(u) {
             const key       = escHtml(u.txid + ':' + u.index);
-            const confirmed = u.height !== 0;
+            const confirmed = Number(u.height) > 0;
             const mature    = u.mature;
             const spendable = confirmed && mature;
             const checked   = globalData.coinControl && globalData.selectedUtxos && globalData.selectedUtxos.has(u.txid + ':' + u.index);
@@ -1188,13 +1190,13 @@
         if (globalData.coinControl && globalData.selectedUtxos && globalData.selectedUtxos.size > 0) {
             spendableSats = 0;
             globalData.utxos.forEach(function(u) {
-                if (globalData.selectedUtxos.has(u.txid + ':' + u.index) && u.height !== 0 && u.mature)
+                if (globalData.selectedUtxos.has(u.txid + ':' + u.index) && Number(u.height) > 0 && u.mature)
                     spendableSats += u.value;
             });
         } else {
             spendableSats = 0;
             globalData.utxos.forEach(function(u) {
-                if (u.height !== 0 && u.mature) spendableSats += u.value;
+                if (Number(u.height) > 0 && u.mature) spendableSats += u.value;
             });
         }
         const overLimit = totalSats > spendableSats && totalSats > 0;
@@ -1279,10 +1281,10 @@
             let spendable;
             if (globalData.coinControl && globalData.selectedUtxos && globalData.selectedUtxos.size > 0) {
                 spendable = utxos.filter(function(u) {
-                    return globalData.selectedUtxos.has(u.txid + ':' + u.index) && u.height !== 0 && u.mature;
+                    return globalData.selectedUtxos.has(u.txid + ':' + u.index) && Number(u.height) > 0 && u.mature;
                 });
             } else {
-                spendable = utxos.filter(function(u) { return u.height !== 0 && u.mature; });
+                spendable = utxos.filter(function(u) { return Number(u.height) > 0 && u.mature; });
             }
             let value         = 0;
             const inputMeta   = [];
@@ -2006,14 +2008,14 @@
             if (globalData.coinControl && globalData.selectedUtxos && globalData.selectedUtxos.size > 0) {
                 spendableSats = 0;
                 globalData.utxos.forEach(function(u) {
-                    if (globalData.selectedUtxos.has(u.txid + ':' + u.index) && u.height !== 0 && u.mature) {
+                    if (globalData.selectedUtxos.has(u.txid + ':' + u.index) && Number(u.height) > 0 && u.mature) {
                         spendableSats += u.value;
                     }
                 });
             } else {
                 spendableSats = 0;
                 globalData.utxos.forEach(function(u) {
-                    if (u.height !== 0 && u.mature) spendableSats += u.value;
+                    if (Number(u.height) > 0 && u.mature) spendableSats += u.value;
                 });
             }
             if (!error) {
@@ -2226,7 +2228,7 @@
             if (globalData.coinControl) {
                 globalData.selectedUtxos = new Set();
                 globalData.utxos.forEach(function(u) {
-                    if (u.height !== 0 && u.mature) globalData.selectedUtxos.add(u.txid + ':' + u.index);
+                    if (Number(u.height) > 0 && u.mature) globalData.selectedUtxos.add(u.txid + ':' + u.index);
                 });
             } else {
                 globalData.selectedUtxos = null;
@@ -2238,7 +2240,7 @@
             if (!globalData.coinControl) return e.preventDefault();
             globalData.selectedUtxos = new Set();
             globalData.utxos.forEach(function(u) {
-                if (u.height !== 0 && u.mature) globalData.selectedUtxos.add(u.txid + ':' + u.index);
+                if (Number(u.height) > 0 && u.mature) globalData.selectedUtxos.add(u.txid + ':' + u.index);
             });
             renderCoinControl();
             validateSendForm();
