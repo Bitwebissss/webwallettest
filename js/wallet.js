@@ -1554,6 +1554,7 @@
                 hideSeedReveal();
                 if (bip39Entropy && !isRestore) {
                     bip39Entropy.fill(0);
+                    seedReset();
                     showMessage(escHtml(getText('seed-pin-cancel')));
                 }
                 return;
@@ -1670,6 +1671,7 @@
         $('#seed-generate-warning, #seed-verify-error').addClass('d-none');
         $('#seed-verify-fields').empty();
         $('#seed-btn-to-verify').prop('disabled', false);
+        $('#seed-verify-confirm').prop('disabled', false);
         clearSensitiveInputs();
         $('#restore-word-error').addClass('d-none');
         $('#restore-path').val(DEFAULT_DERIV_PATH);
