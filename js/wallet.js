@@ -192,8 +192,6 @@
     }
     class KeystoreClass {
         #keyPair = null;
-        #gen     = 0;          // incremented on every setKeyPair — used to detect concurrent openWallet
-        getGen()  { return this.#gen; }
         getPublicKeyBytes() {
             return this.#keyPair ? this.#keyPair.publicKey : null;
         }
@@ -323,16 +321,6 @@
         setKeyPair(kp) {
             if (this.#keyPair) destroyKeyMaterial(this.#keyPair);
             this.#keyPair = kp;
-            this.#gen++;          // mark that a new key owner took over
-        }
-        clearIfGen(expectedGen) {
-            // Only clear if no newer setKeyPair() has been called since we saved expectedGen.
-            // This prevents a stale cancel-branch from wiping a concurrently-set key pair.
-            if (this.#gen === expectedGen) {
-                this.clear();
-                return true;
-            }
-            return false;
         }
         clear() {
             if (this.#keyPair) {
@@ -1541,11 +1529,10 @@
         }
     }
     async function openWallet(offerPin, bip39Entropy, derivPath, isRestore) {
-        const myGen = Keystore.getGen();
         if (offerPin && !hasSavedWallet()) {
             let pin = await askPinSetup();
             if (pin === null) {
-                Keystore.clearIfGen(myGen);
+                Keystore.clear();
                 globalData.clear();
                 clearSensitiveInputs();
                 resetTxForm();
