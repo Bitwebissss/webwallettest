@@ -529,7 +529,7 @@
             );
             privBytes.fill(0);
             globalData.pubKey = pubBytes;
-            openWallet(false);
+            await openWallet(false);
         } catch(e) {
             if (e.name === 'NotAllowedError') return;
             if (retriesLeft > 0 && isTransientPasskeyError(e)) {
@@ -619,6 +619,7 @@
     }
     async function saveWalletWif(pin) {
         const privBytes = Keystore.getPrivKeyBytes();
+        if (!privBytes) throw new Error('Private key is not available');
         const pubCopy   = new Uint8Array(globalData.pubKey);
         await Promise.all([
             saveEncryptedBytes(STORAGE_KEY_PUB,  pubCopy,   pin),
@@ -631,6 +632,7 @@
     }
     async function saveWalletBip39(entropyBytes, pin, path) {
         const privBytes = Keystore.getPrivKeyBytes();
+        if (!privBytes) throw new Error('Private key is not available');
         const pubCopy   = new Uint8Array(globalData.pubKey);
         await Promise.all([
             saveEncryptedBytes(STORAGE_KEY_PUB,  pubCopy,      pin),
@@ -1531,7 +1533,13 @@
         if (offerPin && !hasSavedWallet()) {
             let pin = await askPinSetup();
             if (pin === null) {
+                // Полный откат к состоянию до попытки открытия
                 Keystore.clear();
+                globalData.clear();                 // очищаем глобальные данные
+                clearSensitiveInputs();             // очищаем поля ввода
+                resetTxForm();                      // сбрасываем форму отправки
+                clearPrivKeyCanvas();               // убираем отображение приватного ключа
+                hideSeedReveal();                   // скрываем seed-фразу (если была)
                 if (bip39Entropy && !isRestore) {
                     bip39Entropy.fill(0);
                     seedReset();
@@ -1907,7 +1915,7 @@
                 privBytes.fill(0);
                 globalData.pubKey = pubBytes;
                 pin = '';
-                openWallet(false);
+                await openWallet(false);
             } catch (e) {
                 $('#pin-login-btn').prop('disabled', false).text(getText('pin-login-btn'));
                 $('#pin-login-error').text(getText('pin-login-error')).removeClass('d-none');
@@ -2056,13 +2064,13 @@
             $('#send-cancel').prop('disabled', false);
             $('#send-confirm').prop('disabled', false);
         });
-        $('#open-key-form').submit(function(e) {
+        $('#open-key-form').submit(async function(e) {
             let wif = $('#passphrase').val().trim();
             if ([51, 52].includes(wif.length)) {
                 try {
                     Keystore.setKeyPair(bitcoin.ECPair.fromWIF(wif, getConfig()['network']));
                     $('#passphrase').val('');
-                    openWallet(true);
+                    await openWallet(true);
                 } catch(err) {
                     showMessage(messages.error['bad-priv-key']);
                 } finally {
@@ -2074,7 +2082,7 @@
             }
             e.preventDefault();
         });
-        $('#open-regular-form').submit(function(e) {
+        $('#open-regular-form').submit(async function(e) {
             const identity  = $('#open-email').val().trim();
             let pass        = $('#open-password').val();
             let passConfirm = $('#open-password-confirm').val();
@@ -2102,7 +2110,7 @@
                         privBytes.fill(0);
                         pass = '';
                         passConfirm = '';
-                        openWallet(true);
+                        await openWallet(true);
                     } else { showMessage(messages.error['pass-not-match']); pass = ''; passConfirm = ''; }
                 } else { showMessage(messages.error['pass-too-short']); pass = ''; passConfirm = ''; }
             } else { showMessage(escHtml(getText('identity-too-short'))); pass = ''; passConfirm = ''; }
