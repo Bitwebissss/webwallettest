@@ -192,6 +192,8 @@
     }
     class KeystoreClass {
         #keyPair = null;
+        #gen     = 0;          // incremented on every setKeyPair — used to detect concurrent openWallet
+        getGen()  { return this.#gen; }
         getPublicKeyBytes() {
             return this.#keyPair ? this.#keyPair.publicKey : null;
         }
@@ -321,6 +323,16 @@
         setKeyPair(kp) {
             if (this.#keyPair) destroyKeyMaterial(this.#keyPair);
             this.#keyPair = kp;
+            this.#gen++;          // mark that a new key owner took over
+        }
+        clearIfGen(expectedGen) {
+            // Only clear if no newer setKeyPair() has been called since we saved expectedGen.
+            // This prevents a stale cancel-branch from wiping a concurrently-set key pair.
+            if (this.#gen === expectedGen) {
+                this.clear();
+                return true;
+            }
+            return false;
         }
         clear() {
             if (this.#keyPair) {
@@ -1530,11 +1542,18 @@
         }
     }
     async function openWallet(offerPin, bip39Entropy, derivPath, isRestore) {
+        // Snapshot the Keystore generation BEFORE any async gap.
+        // If the user cancels and re-submits without a page reload, a second
+        // openWallet() call will call Keystore.setKeyPair() which bumps the
+        // generation.  Our cancel-branch checks the generation so it never
+        // calls Keystore.clear() on a key pair it doesn't own.
+        const myGen = Keystore.getGen();
         if (offerPin && !hasSavedWallet()) {
             let pin = await askPinSetup();
             if (pin === null) {
-                // Полный откат к состоянию до попытки открытия
-                Keystore.clear();
+                // Полный откат к состоянию до попытки открытия.
+                // clearIfGen is a no-op when a newer setKeyPair() has already run.
+                Keystore.clearIfGen(myGen);
                 globalData.clear();                 // очищаем глобальные данные
                 clearSensitiveInputs();             // очищаем поля ввода
                 resetTxForm();                      // сбрасываем форму отправки
