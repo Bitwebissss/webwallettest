@@ -693,8 +693,7 @@
             } else {
                 $('#pin-modal-pk-btn').addClass('d-none');
             }
-            $('#pin-modal').modal({ backdrop: 'static', keyboard: false });
-            $('#pin-modal').modal('show');
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('pin-modal'), { backdrop: 'static', keyboard: false }).show();
             setTimeout(function() { $('#pin-input').focus(); }, 400);
         });
     }
@@ -1850,7 +1849,7 @@
                     pinValue = null;
                 }
                 modalEl.addEventListener('hidden.bs.modal', onHidden);
-                $('#pin-modal').modal('hide');
+                bootstrap.Modal.getInstance(modalEl).hide();
             }
         });
         $('#pin-cancel').click(function() {
@@ -1867,8 +1866,9 @@
                     resolve(null);
                 }
                 modalEl.addEventListener('hidden.bs.modal', onHidden);
+                const inst = bootstrap.Modal.getInstance(modalEl);
+                if (inst) inst.hide();
             }
-            $('#pin-modal').modal('hide');
         });
         $('#pin-modal-pk-btn').click(function() {
             const cb = pinPasskeyCallback;
@@ -1886,7 +1886,8 @@
                     if (cb) cb();
                 }
                 modalEl.addEventListener('hidden.bs.modal', onHidden);
-                $('#pin-modal').modal('hide');
+                const inst = bootstrap.Modal.getInstance(modalEl);
+                if (inst) inst.hide();
             }
         });
         $('#pin-input').on('keydown', function(e) {
