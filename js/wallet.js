@@ -965,9 +965,9 @@
         $('#send-cancel').prop('disabled', false).removeClass('disabled d-none');
         $('#send-confirm').prop('disabled', false).addClass('d-none');
         $('#send-close-footer').addClass('d-none disabled');
-        if (!$('#send-modal').hasClass('show')) {
+        if (!document.getElementById('send-modal').classList.contains('show')) {
             $('#send-title').text(messages.title['sure']);
-            $('#send-modal').modal('show');
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('send-modal')).show();
         }
     }
     function showQrAddress(text) {
@@ -1230,7 +1230,7 @@
     function showConfirmation(amount, totalSats, feeSats, outputsSats) {
         $('#confirm-amount').text(amount + ' ' + getConfig()['ticker']);
         $('#send-modal-error').addClass('d-none').empty();
-        $('#send-modal').modal('show');
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('send-modal')).show();
         $('#send-title').text(messages.title['sure']);
         $('#send-cancel').removeClass('disabled d-none');
         $('#send-confirm').removeClass('disabled d-none');
@@ -1797,12 +1797,12 @@
             if (!stop) {
                 scanRafId = requestAnimationFrame(tick);
             } else {
-                $('#scan-modal').modal('hide'); stopStream();
+                bootstrap.Modal.getInstance(document.getElementById('scan-modal')).hide(); stopStream();
             }
         }
     }
     function showScanModal() {
-        $('#scan-modal').modal('toggle');
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('scan-modal')).toggle();
         startStream();
     }
     $(document).ready(function() {
@@ -1960,15 +1960,16 @@
             const $yesBtn = $('#forget-wallet-modal-yes');
             $input.val('');
             $yesBtn.prop('disabled', true);
-            $('#forget-wallet-modal').modal({ backdrop: 'static', keyboard: false });
-            $('#forget-wallet-modal').modal('show');
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('forget-wallet-modal'), {
+                backdrop: 'static', keyboard: false
+            }).show();
         }
         $('#forget-wallet-confirm-input').on('input', function() {
             const val = $(this).val().trim();
             $('#forget-wallet-modal-yes').prop('disabled', val !== 'Yes');
         });
         $('#forget-wallet-modal-yes').click(function() {
-            $('#forget-wallet-modal').modal('hide');
+            bootstrap.Modal.getInstance(document.getElementById('forget-wallet-modal')).hide();
             forgetSavedWallet();
         });
         $('#pin-login-forget').click(function(e) {
@@ -2073,7 +2074,7 @@
             }, 0);
         });
         $('#send-confirm').click(function(e) { sendTransaction(); e.preventDefault(); });
-        $('#send-modal').on('hidden.bs.modal', function() {
+        document.getElementById('send-modal').addEventListener('hidden.bs.modal', function() {
             isSending = false;
             $('#send-cancel').prop('disabled', false);
             $('#send-confirm').prop('disabled', false);
@@ -2363,7 +2364,7 @@
             if (data.error == null) globalData.rfee = amountFormat(data.result.feerate);
             else globalData.rfee = getConfig()['fee'];
         })();
-        $('#scan-modal').on('hide.bs.modal', function() { stopStream(); });
+        document.getElementById('scan-modal').addEventListener('hide.bs.modal', function() { stopStream(); });
         $(window).on('beforeunload', stopStream);
         $('#copy-address-btn').click(function() {
             if (globalData.address) copyToClipboard(globalData.address, $(this));
