@@ -1532,6 +1532,9 @@
             let pin = await askPinSetup();
             if (pin === null) {
                 Keystore.clear();
+                globalData.clear();
+                clearSensitiveInputs();
+                resetTxForm();
                 if (bip39Entropy && !isRestore) {
                     bip39Entropy.fill(0);
                     seedReset();
