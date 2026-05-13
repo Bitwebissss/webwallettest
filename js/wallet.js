@@ -152,7 +152,9 @@
             }
         } catch (ignore) { /* not critical */ }
     }
+    let revealedWif = null;
     function clearPrivKeyCanvas() {
+        revealedWif = null;
         const canvas = document.getElementById('wallet-privkey-canvas');
         if (canvas) {
             const ctx = canvas.getContext('2d');
@@ -173,7 +175,7 @@
         if (!canvas) { wif = null; return; }
         $('#privkey-show-row').addClass('d-none');
         $('#privkey-reveal-row').removeClass('d-none');
-        const capturedWif = wif;
+        revealedWif = wif;
         wif = null;
         requestAnimationFrame(function() {
             const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -190,7 +192,7 @@
             ctx.fillStyle    = cs.getPropertyValue('--bs-body-color').trim() || '#212529';
             ctx.font         = '13px monospace';
             ctx.textBaseline = 'middle';
-            ctx.fillText(capturedWif, 8, H / 2);
+            ctx.fillText(revealedWif, 8, H / 2);
         });
     }
     class KeystoreClass {
@@ -302,7 +304,6 @@
             } catch(e) {}
             return set;
         }
-
         clear() {
             this.clearTempKeyPair();
             if (this.#pubKeyBytes) { this.#pubKeyBytes.fill(0); this.#pubKeyBytes = null; }
@@ -2164,16 +2165,41 @@
         $('#wallet-privkey-copy-btn').click(async function() {
             if (!Keystore.isUnlocked()) return;
             const $btn = $(this);
-            const doFeedback = function(ok) {
-                const $icon    = $btn.find('.fa-solid, .fa-regular').first();
-                const origClass = $icon.attr('class');
-                if ($icon.length) $icon.attr('class', 'fa-solid ' + (ok ? 'fa-check' : 'fa-times'));
-                $btn.addClass(ok ? 'btn-success' : 'btn-danger').removeClass('btn-outline-secondary');
-                setTimeout(function() {
-                    if ($icon.length) $icon.attr('class', origClass);
-                    $btn.removeClass('btn-success btn-danger').addClass('btn-outline-secondary');
-                }, 1500);
-            };
+            if (revealedWif) {
+                const wifCopy = revealedWif;
+                doPrivKeyCopy($btn, wifCopy);
+                return;
+            }
+            async function doPrivKeyCopy($b, wif) {
+                const doFeedback = function(ok) {
+                    const $icon    = $b.find('.fa-solid, .fa-regular').first();
+                    const origClass = $icon.attr('class');
+                    if ($icon.length) $icon.attr('class', 'fa-solid ' + (ok ? 'fa-check' : 'fa-times'));
+                    $b.addClass(ok ? 'btn-success' : 'btn-danger').removeClass('btn-outline-secondary');
+                    setTimeout(function() {
+                        if ($icon.length) $icon.attr('class', origClass);
+                        $b.removeClass('btn-success btn-danger').addClass('btn-outline-secondary');
+                    }, 1500);
+                };
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    try {
+                        await navigator.clipboard.writeText(wif);
+                        doFeedback(true);
+                        setTimeout(function() { navigator.clipboard.writeText('').catch(function(){}); }, 60000);
+                    } catch(e) { doFeedback(false); }
+                } else {
+                    const ta = document.createElement('textarea');
+                    ta.value = wif;
+                    ta.className = 'clip-scratch';
+                    document.body.appendChild(ta);
+                    ta.focus(); ta.select();
+                    let ok = false;
+                    try { ok = document.execCommand('copy'); } catch(e) {}
+                    ta.value = '';
+                    document.body.removeChild(ta);
+                    doFeedback(ok);
+                }
+            }
             const privBytes = await askPrivKeyBytes(
                 getText('pin-title-default'),
                 getText('privkey-pin-desc')
@@ -2185,26 +2211,8 @@
             privBytes.fill(0);
             let wif = kp.toWIF();
             destroyKeyMaterial(kp);
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                try {
-                    await navigator.clipboard.writeText(wif);
-                    wif = null;
-                    doFeedback(true);
-                    setTimeout(function() { navigator.clipboard.writeText('').catch(function(){}); }, 60000);
-                } catch(e) { wif = null; doFeedback(false); }
-            } else {
-                const ta = document.createElement('textarea');
-                ta.value = wif;
-                wif = null;
-                ta.className = 'clip-scratch';
-                document.body.appendChild(ta);
-                ta.focus(); ta.select();
-                let ok = false;
-                try { ok = document.execCommand('copy'); } catch(e) {}
-                ta.value = '';
-                document.body.removeChild(ta);
-                doFeedback(ok);
-            }
+            await doPrivKeyCopy($btn, wif);
+            wif = null;
         });
         $('#add-output').click(function(e) {
             $('#send-outputs').append(
