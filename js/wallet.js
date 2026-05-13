@@ -2098,6 +2098,7 @@
             $('#send-confirm').prop('disabled', false);
         });
         $('#open-key-form').submit(async function(e) {
+            e.preventDefault();
             let wif = $('#passphrase').val().trim();
             if ([51, 52].includes(wif.length)) {
                 try {
@@ -2113,9 +2114,9 @@
                 showMessage(messages.error['bad-priv-key']);
                 wif = null;
             }
-            e.preventDefault();
         });
         $('#open-regular-form').submit(async function(e) {
+            e.preventDefault();
             const identity  = $('#open-email').val().trim();
             let pass        = $('#open-password').val();
             let passConfirm = $('#open-password-confirm').val();
@@ -2147,7 +2148,6 @@
                     } else { showMessage(messages.error['pass-not-match']); pass = ''; passConfirm = ''; }
                 } else { showMessage(messages.error['pass-too-short']); pass = ''; passConfirm = ''; }
             } else { showMessage(escHtml(getText('identity-too-short'))); pass = ''; passConfirm = ''; }
-            e.preventDefault();
         });
         $('#toggle-wallet-privkey').click(async function() {
             if (!Keystore.isUnlocked()) return;
@@ -2436,7 +2436,8 @@
                 showMessage(escHtml(getText('seed-crypto-error')) + ' ' + escHtml(e.message || String(e)));
             }
         });
-        $('#seed-verify-confirm').click(async function() {
+        $('#seed-verify-confirm').click(async function(e) {
+            e.preventDefault();
             const $btn   = $(this).prop('disabled', true);
             const inputs = $('.seed-verify-word');
             if (!seedStore.verifyPos.length) {
@@ -2493,7 +2494,8 @@
             }
             $('#restore-word-error').addClass('d-none');
         });
-        $('#seed-restore-btn').click(async function() {
+        $('#seed-restore-btn').click(async function(e) {
+            e.preventDefault();
             if (typeof bip39Bundle === 'undefined') { showMessage(escHtml(getText('bip39-not-loaded'))); return; }
             $('#restore-word-error').addClass('d-none');
             let raw          = $('#restore-input').val().trim().toLowerCase().replace(/\s+/g, ' ');
