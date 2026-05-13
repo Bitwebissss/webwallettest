@@ -17,7 +17,7 @@
             'uri':     'bitweb:',
             'title':   'Bitweb Wallet',
             'name':    'Main Network (BTE)',
-            'api':     'https://api.bitwebcore.net',
+            'api':     'https://api2.bitwebcore.net',
             'ticker':  'BTE',
             'decimals': 8,
             'fee':     0.0001,
@@ -40,8 +40,8 @@
         }
     };
     const blockExplorer = {
-        'address': function(address) { return 'https://explorer.bitwebcore.net/address/' + encodeURIComponent(address) + '/' },
-        'tx':      function(tx)      { return 'https://explorer.bitwebcore.net/tx/' + encodeURIComponent(tx) + '/' }
+        'address': function(address) { return 'https://explorertest.bitwebcore.net/address/' + encodeURIComponent(address) + '/' },
+        'tx':      function(tx)      { return 'https://explorertest.bitwebcore.net/tx/' + encodeURIComponent(tx) + '/' }
     };
     let stream      = null;
     let scanVideo   = null;
