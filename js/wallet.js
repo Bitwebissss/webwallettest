@@ -1860,10 +1860,14 @@
         routePage();
         updateSavedWalletUI();
         $('#pin-confirm').click(async function() {
+            const $btn = $(this);
+            if ($btn.prop('disabled')) return;
             let pin = $('#pin-input').val();
             if (pinResolve) {
                 if (pinValidator) {
+                    $btn.prop('disabled', true);
                     const err = await pinValidator(pin);
+                    $btn.prop('disabled', false);
                     if (err) {
                         $('#pin-error').text(err).removeClass('d-none');
                         $('#pin-input').focus();
