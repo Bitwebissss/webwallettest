@@ -16,6 +16,7 @@ Entropy source: `crypto.getRandomValues` (OS CSPRNG, native in all modern browse
 - `child.privateKey.slice()` — returns an independent copy of the buffer
 - Entry point: `var` → `const`/`let` throughout
 - `--target=es2020` — targets modern browsers only; no ES5 transpilation
+- **Added `entropyToPrivKey(entropyBytes, path)`** — derives private key directly from entropy without exposing the intermediate mnemonic string outside the bundle
 
 ---
 
@@ -156,15 +157,31 @@ window.bip39Bundle = {
     seed.fill(0)
     const child = root.derive(path || "m/84'/0'/0'/0/0")
     // Zero root private key and chain code after child derivation is complete.
-    // root.privateKey / root.chainCode are Uint8Array references into HDKey's
-    // internal buffers — fill(0) writes through to the same memory.
     if (root.privateKey) root.privateKey.fill(0)
     if (root.chainCode)  root.chainCode.fill(0)
     // .slice() returns an independent Uint8Array copy.
-    // child.privateKey is a reference into HDKey's internal buffer.
     // Caller MUST fill(0) the returned value after use.
     const privKey = child.privateKey.slice()
     // Zero child internal buffers after copying the key out.
+    if (child.privateKey) child.privateKey.fill(0)
+    if (child.chainCode)  child.chainCode.fill(0)
+    return privKey
+  },
+  // entropyToPrivKey: Uint8Array(16|20|24|28|32) → Uint8Array(32)
+  // Derives the private key directly from raw entropy bytes without ever
+  // exposing the intermediate mnemonic string outside this function.
+  // The mnemonic is a JS string (immutable, cannot be zeroed) — keeping it
+  // inside the bundle closure means it never escapes to the caller's heap.
+  // Caller MUST fill(0) the returned Uint8Array after use.
+  entropyToPrivKey: function(entropyBytes, path) {
+    const mnemonic = entropyToMnemonic(entropyBytes, wordlist)
+    const seed = mnemonicToSeedSync(mnemonic)
+    const root = HDKey.fromMasterSeed(seed)
+    seed.fill(0)
+    const child = root.derive(path || "m/84'/738'/0'/0/0")
+    if (root.privateKey) root.privateKey.fill(0)
+    if (root.chainCode)  root.chainCode.fill(0)
+    const privKey = child.privateKey.slice()
     if (child.privateKey) child.privateKey.fill(0)
     if (child.chainCode)  child.chainCode.fill(0)
     return privKey
@@ -203,12 +220,12 @@ No ES5 transpilation — BigInt, arrow functions, and classes are native.
 Expected output:
 
 ```
-  bip39-bundle.min.js  ~67–70 kb
+  bip39-bundle.min.js  ~68–70 kb
 
 ⚡ Done in ~10–50ms
 ```
 
-> Exact size depends on Node/npm version. ~67–70 kb is the correct range.
+> Exact size depends on Node/npm version. ~68–70 kb is the correct range.
 
 ---
 
@@ -294,7 +311,6 @@ for (let i = 0; i < 32; i++) if (pk4[i] !== 0) { stillValid = true; break }
 check('fill(0) on result does not corrupt next call (.slice() works)', stillValid)
 check('seed.fill(0) did not break derivation', stillValid)
 
-// Verify that root+child buffer zeroing does not corrupt subsequent independent calls
 const pk5 = b.mnemonicToPrivKey(m12)
 let sameAsPk = true
 for (let i = 0; i < 32; i++) if (pk5[i] !== pk[i]) { sameAsPk = false; break }
@@ -324,6 +340,54 @@ let pkDiff = false
 for (let i = 0; i < 32; i++) if (pkA[i] !== pkB[i]) { pkDiff = true; break }
 check('different mnemonics → different privkeys', pkDiff)
 
+// ── entropyToPrivKey tests ─────────────────────────────────────────────────
+console.log('\n── entropyToPrivKey ──')
+
+const epk12 = b.entropyToPrivKey(ent12)
+check('entropyToPrivKey returns Uint8Array', epk12 instanceof w.Uint8Array)
+check('entropyToPrivKey result length 32', epk12.length, 32)
+
+const epk12b = b.entropyToPrivKey(ent12)
+let epkSame = true
+for (let i = 0; i < 32; i++) if (epk12[i] !== epk12b[i]) { epkSame = false; break }
+check('entropyToPrivKey deterministic (same entropy → same key)', epkSame)
+
+const BTE_PATH = "m/84'/738'/0'/0/0"
+const twoStep = b.mnemonicToPrivKey(b.entropyToMnemonic(ent12), BTE_PATH)
+const oneStep = b.entropyToPrivKey(ent12, BTE_PATH)
+let consistent = true
+for (let i = 0; i < 32; i++) if (oneStep[i] !== twoStep[i]) { consistent = false; break }
+check('entropyToPrivKey matches entropyToMnemonic→mnemonicToPrivKey (default BTE path)', consistent)
+
+const epk24 = b.entropyToPrivKey(ent24, BTE_PATH)
+check('entropyToPrivKey 24-word entropy: length 32', epk24.length, 32)
+const twoStep24 = b.mnemonicToPrivKey(b.entropyToMnemonic(ent24), BTE_PATH)
+let consistent24 = true
+for (let i = 0; i < 32; i++) if (epk24[i] !== twoStep24[i]) { consistent24 = false; break }
+check('entropyToPrivKey 24-word matches two-step', consistent24)
+
+const epkCustom = b.entropyToPrivKey(ent12, "m/44'/0'/0'/0/0")
+check('entropyToPrivKey custom path: length 32', epkCustom.length, 32)
+let customDiff = false
+for (let i = 0; i < 32; i++) if (epkCustom[i] !== epk12[i]) { customDiff = true; break }
+check('entropyToPrivKey custom path gives different key than default', customDiff)
+
+const epkZ = b.entropyToPrivKey(ent12, BTE_PATH)
+epkZ.fill(0)
+const epkAfterZ = b.entropyToPrivKey(ent12, BTE_PATH)
+let notAllZero = false
+for (let i = 0; i < 32; i++) if (epkAfterZ[i] !== 0) { notAllZero = true; break }
+check('fill(0) on entropyToPrivKey result does not corrupt next call', notAllZero)
+
+const ent12alt = new w.Uint8Array(16)
+w.crypto.getRandomValues(ent12alt)
+const epkAlt = b.entropyToPrivKey(ent12alt, BTE_PATH)
+let entDiff = false
+for (let i = 0; i < 32; i++) if (epkAlt[i] !== epk12[i]) { entDiff = true; break }
+check('entropyToPrivKey different entropy → different key', entDiff)
+
+// ── end entropyToPrivKey tests ─────────────────────────────────────────────
+
 console.log('')
 if (allOk) { console.log('✅ ALL TESTS PASSED\nBundle is safe to deploy.') }
 else { console.log('❌ SOME TESTS FAILED'); process.exit(1) }
@@ -332,7 +396,7 @@ EOF
 node test_bip39.js
 ```
 
-All 22 checks must show `✅` and the final line `ALL TESTS PASSED`.
+All 31 checks must show `✅` and the final line `ALL TESTS PASSED`.
 
 ---
 
@@ -349,8 +413,8 @@ echo "sha512-$(openssl dgst -sha512 -binary bip39-bundle.min.js | openssl base64
 
 **Verified hashes (Node 22.22.2 + npm 10.9.7):**
 ```
-69445 bytes
-sha512-7aYM9huquYOZqPDO3l83vrB1AUzjSAECXBHT5g5B1eCP+g9+4usX+op6wZftZ7DbooYfBF4hthQ/RQhcAvc92Q==
+69744 bytes
+sha512-zWLd7XWjt9cD9f6X2WC1reAjLwa1L0lMRoCjIzaTgLZ1WNkuwKqF8hADVPSrolVUi3xuwrpk63ZmC8XDvECTsg==
 ```
 
 ```bash
@@ -379,6 +443,7 @@ In `index.html`:
 | `root.privateKey/chainCode.fill(0)` | ✅ Applied | Root HDKey zeroed after child derivation completes |
 | `child.privateKey/chainCode.fill(0)` | ✅ Applied | Child HDKey zeroed after private key is copied out |
 | `privKey.slice()` | ✅ Applied | Independent copy returned; `fill(0)` on result is safe |
+| Mnemonic string scope | ✅ Bundle-internal | `entropyToPrivKey` keeps mnemonic inside closure; never exits to caller |
 | `@scure/bip32` RNG | ✅ None needed | BIP32 derivation is deterministic HMAC-SHA512 |
 | Duplicate deps | ✅ None | v2.x: shared `@noble/hashes` — 3 getRandomValues vs 9 in v1.x |
 | Library audit | ✅ Cure53 | Same audit as `@noble` family |
@@ -391,5 +456,6 @@ In `index.html`:
 | Remaining | Reason |
 |-----------|--------|
 | Intermediate HDKey nodes during deep path derivation | `@scure/bip32` `derive()` allocates intermediate HDKey objects internally; their private keys are not accessible without forking the library. GC-eligible. Low practical risk for single-level derivation. |
+| Mnemonic string GC (entropyToPrivKey) | JS strings are immutable and cannot be zeroed. `entropyToPrivKey` prevents the string from leaving the bundle scope, but it remains in heap until GC. This is the best achievable without WASM. |
 | WIF strings in vault (`saveWif`/`saveBip39`) | JS strings are immutable; cannot be zeroed. Requires vault redesign to store entropy hex + privkey hex instead. |
 | BigInt values holding key material | Immutable in JS — unavoidable in any pure-JS crypto library without WASM. Applies to `@noble/hashes` and `@scure/bip32` internals. |

@@ -2494,9 +2494,7 @@
                 ));
                 seedStore.enc     = null;
                 seedStore.tempKey = null;
-                let interimMnemonic = bip39Bundle.entropyToMnemonic(entropyBytes);
-                privBytes = bip39Bundle.mnemonicToPrivKey(interimMnemonic, DEFAULT_DERIV_PATH);
-                interimMnemonic = null;
+                privBytes = bip39Bundle.entropyToPrivKey(entropyBytes, DEFAULT_DERIV_PATH);
                 const keyPair = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes));
                 privBytes.fill(0);
                 privBytes = null;
