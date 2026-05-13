@@ -8,7 +8,6 @@
     const STORAGE_KEY_PRIV    = 'bte_wallet_privkey';
     const STORAGE_KEY_SEED    = 'bte_wallet_seed';
     const STORAGE_KEY_PATH    = 'bte_wallet_path';
-    // STORAGE_KEY_PUB_PK removed — public key is now stored plain (STORAGE_KEY_PUB).
     const STORAGE_KEY_PRIV_PK = 'bte_wallet_privkey_pk';
     const STORAGE_KEY_SEED_PK = 'bte_wallet_seed_pk';
     const STORAGE_KEY_PK_ID   = 'bte_pk_credential_id';
@@ -162,7 +161,6 @@
         $('#privkey-reveal-row').addClass('d-none');
         $('#privkey-show-row').removeClass('d-none');
     }
-    // privBytes: freshly-decrypted Uint8Array — wiped before this function returns.
     function revealPrivKeyCanvas(privBytes) {
         if (!Keystore.isUnlocked()) { privBytes.fill(0); return; }
         const kp = bitcoin.ECPair.fromPrivateKey(
@@ -196,44 +194,28 @@
         });
     }
     class KeystoreClass {
-        // Only public key bytes live in memory during normal session.
         #pubKeyBytes = null;
-        // Temporary full keypair — set during wallet creation/import ONLY,
-        // cleared immediately after the keys are encrypted and stored.
         #tempKeyPair = null;
-
-        // ── public-key access ─────────────────────────────────────────────
         getPublicKeyBytes() { return this.#pubKeyBytes; }
-
         isUnlocked() { return this.#pubKeyBytes !== null; }
-
-        // Set public key only (used at unlock — no PIN required).
         setPubOnly(pubBytes) {
             this.clearTempKeyPair();
             if (this.#pubKeyBytes) this.#pubKeyBytes.fill(0);
             this.#pubKeyBytes = new Uint8Array(pubBytes);
         }
-
-        // ── temp keypair (wallet creation / import only) ──────────────────
-        // Store full keypair temporarily so saveWallet* can extract bytes.
         setTempKeyPair(kp) {
             this.clearTempKeyPair();
             if (this.#pubKeyBytes) this.#pubKeyBytes.fill(0);
             this.#pubKeyBytes = new Uint8Array(kp.publicKey);
             this.#tempKeyPair = kp;
         }
-        // Get private bytes for encrypting to storage — call once, wipe result after use.
         getTempPrivBytes() {
             if (!this.#tempKeyPair || !this.#tempKeyPair.privateKey) return null;
             return new Uint8Array(this.#tempKeyPair.privateKey);
         }
-        // Wipe temp keypair after keys have been saved to storage.
         clearTempKeyPair() {
             if (this.#tempKeyPair) { destroyKeyMaterial(this.#tempKeyPair); this.#tempKeyPair = null; }
         }
-
-        // ── signing (privBytes passed in, wiped inside) ───────────────────
-        // Call with freshly-decrypted privBytes; they are zeroed before return.
         signAllInputsWithKey(psbt, privBytes) {
             if (!this.#pubKeyBytes) throw new Error('Wallet locked');
             const network = getConfig()['network'];
@@ -260,8 +242,6 @@
                 privBytes.fill(0);
             }
         }
-
-        // ── address / script derivation (pubKey passed in, no priv needed) ─
         deriveAddress(type, pubKey) {
             if (!this.#pubKeyBytes || !pubKey) return '';
             const network = getConfig()['network'];
@@ -328,7 +308,6 @@
             if (this.#pubKeyBytes) { this.#pubKeyBytes.fill(0); this.#pubKeyBytes = null; }
         }
     }
-    // Taproot signer builder — standalone so signAllInputsWithKey can use it.
     function makeTaprootSignerWith(kp, onSigned) {
         const ecc = bitcoin.ecc;
         if (!ecc || typeof ecc.privateAdd !== 'function' ||
@@ -426,7 +405,6 @@
             return new Uint8Array(pt);
         } catch(e) { return null; }
     }
-    // ── Plain public key storage (no encryption needed) ───────────────────
     function savePublicKeyPlain(pubBytes) {
         try { localStorage.setItem(STORAGE_KEY_PUB, JSON.stringify(Array.from(pubBytes))); } catch(e) {}
     }
@@ -437,8 +415,6 @@
             return new Uint8Array(JSON.parse(raw));
         } catch(e) { return null; }
     }
-    // ── Shared helper: ask PIN or passkey → return privBytes or null ──────
-    // privBytes are freshly decrypted; caller must wipe them after use.
     function askPrivKeyBytes(title, desc) {
         return new Promise(function(outerResolve) {
             let done = false;
@@ -568,7 +544,6 @@
                 return;
             }
             const prfBytes = new Uint8Array(ext.prf.results.first);
-            // Public key is stored plain — only priv (and seed) go under passkey encryption.
             await saveEncryptedWithKeyBytes(STORAGE_KEY_PRIV_PK, privBytes, prfBytes);
             if (seedBytes) await saveEncryptedWithKeyBytes(STORAGE_KEY_SEED_PK, seedBytes, prfBytes);
             prfBytes.fill(0);
@@ -583,8 +558,6 @@
             showMessage(escHtml(getText('passkey-error')) + escHtml(e.message));
         }
     }
-    // Passkey login: public key is now plain — just verify the assertion is valid,
-    // then load pub key from localStorage (no private key in memory at unlock).
     async function pkAuthenticate(retriesLeft) {
         if (retriesLeft === undefined) retriesLeft = 2;
         let credIdStr = null;
@@ -601,7 +574,6 @@
                     extensions: { prf: { eval: { first: PK_PRF_SALT } } }
                 }
             });
-            // Assertion succeeded — load public key plain and open wallet.
             const pubBytes = loadPublicKeyPlain();
             if (!pubBytes) { showMessage(escHtml(getText('passkey-decrypt-failed'))); return; }
             Keystore.setPubOnly(pubBytes);
@@ -1419,7 +1391,6 @@
                 await Promise.all(legacyFetches);
                 const change = value - amount;
                 if (change > 0) psbt.addOutput({ address: address, value: BigInt(change) });
-                // Hide send modal before PIN prompt — avoids stacking two modals on top of each other.
                 const sendModalInst = bootstrap.Modal.getInstance(document.getElementById('send-modal'));
                 if (sendModalInst) sendModalInst.hide();
                 const privBytes = await askPrivKeyBytes(
@@ -1431,7 +1402,7 @@
                     showMessage(escHtml(getText('tx-cancelled')));
                     return;
                 }
-                Keystore.signAllInputsWithKey(psbt, privBytes); // privBytes wiped inside
+                Keystore.signAllInputsWithKey(psbt, privBytes);
                 psbt.finalizeAllInputs();
                 const tx   = psbt.extractTransaction();
                 const data = await transactionBroadcast(tx.toHex());
@@ -1449,7 +1420,6 @@
                         '<div class="mt-3"><textarea class="form-control" readonly cols="30" rows="10">' + escHtml(data.error.message) + '</textarea></div>'
                     );
                 }
-                // Re-show send modal so the user sees the success / fail result.
                 bootstrap.Modal.getOrCreateInstance(document.getElementById('send-modal')).show();
                 resetTxForm();
                 $('#send-cancel').addClass('d-none');
@@ -1632,7 +1602,6 @@
                 await saveWalletWif(pin);
             }
             pin = null;
-            // Private key was needed only for saving — wipe it now.
             Keystore.clearTempKeyPair();
             showMessage(escHtml(getText('wallet-saved')));
             updateSavedWalletUI();
@@ -1648,8 +1617,6 @@
         setHomeTitle();
         resetAutoLock();
     }
-    // Convert raw entropy bytes to BIP39 word indices (0-2047) without
-    // ever building the full mnemonic string, so words stay binary.
     function entropyToIndices(entropyBytes) {
         const hash     = bitcoin.crypto.sha256(entropyBytes);
         const ENT      = entropyBytes.length * 8;
@@ -1952,14 +1919,9 @@
                 function onHidden() {
                     modalEl.removeEventListener('hidden.bs.modal', onHidden);
                     if (cb) {
-                        // Passkey path: do NOT resolve the pin promise here.
-                        // onPasskeyChosen will call finish() when the passkey
-                        // result is ready. Resolving null here would cause
-                        // askPrivKeyBytes to call finish(null) immediately,
-                        // before the passkey has a chance to return a key.
                         cb();
                     } else {
-                        resolve(null); // no passkey callback — treat as cancel
+                        resolve(null);
                     }
                 }
                 modalEl.addEventListener('hidden.bs.modal', onHidden);
@@ -1970,8 +1932,6 @@
         $('#pin-input').on('keydown', function(e) {
             if (e.key === 'Enter') $('#pin-confirm').click();
         });
-        // CapsLock warning for the PIN modal input only.
-        // #pin-login-input was removed (no PIN at unlock); handler kept for #pin-input only.
         $(document).on('keyup keydown', '#pin-input', function(e) {
             const capsOn = (e.originalEvent && e.originalEvent.getModifierState)
                 ? e.originalEvent.getModifierState('CapsLock')
@@ -1979,7 +1939,6 @@
             if (capsOn) { $('#pin-caps-warning').removeClass('d-none'); }
             else        { $('#pin-caps-warning').addClass('d-none'); }
         });
-        // Unlock: load public key from plain storage — no PIN needed.
         async function doUnlock() {
             $('#pin-login-btn').prop('disabled', true).text(getText('loading'));
             await new Promise(function(r) { setTimeout(r, 30); });
@@ -1999,7 +1958,6 @@
             }
         }
         $('#pin-login-btn').click(doUnlock);
-        // Keep Enter key on any focused element in login block working.
         $('#pin-login-block').on('keydown', function(e) { if (e.key === 'Enter') doUnlock(); });
         $(document).on('click', '#passkey-settings-btn', async function(e) {
             e.preventDefault();
@@ -2375,9 +2333,7 @@
             let ct; try { ct = localStorage.getItem('bte_cfg_theme'); } catch(e) {}
             applyTheme(ct || 'auto');
             $('#address-type-select select').val(getAddressType());
-            // Passkey status + button have no tkey on their elements – must re-render
             updatePasskeySettingsUI();
-            // Fee placeholder mixes runtime value (rfee, ticker) with translations – can't use tkey
             if (globalData.status === 'unlocked') {
                 $('#send-fee').attr('placeholder',
                     getText('fee') + ' (' + getText('recommended') + ' ' + globalData.rfee + ' ' + getConfig()['ticker'] + ')'
@@ -2415,6 +2371,10 @@
         });
         function seedDoGenerate() {
             if (typeof bip39Bundle === 'undefined') { showMessage(escHtml(getText('bip39-not-loaded'))); return; }
+            if (typeof crypto === 'undefined' || typeof crypto.getRandomValues !== 'function') {
+                showMessage('Secure random number generator (crypto.getRandomValues) is not available in this browser.');
+                return;
+            }
             clearSeedState();
             seedStore.entropy = crypto.getRandomValues(new Uint8Array(seedStore.strength / 8));
             const words = bip39Bundle.entropyToMnemonic(seedStore.entropy).split(' ');
