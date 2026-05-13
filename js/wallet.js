@@ -1951,8 +1951,16 @@
                 const modalEl = document.getElementById('pin-modal');
                 function onHidden() {
                     modalEl.removeEventListener('hidden.bs.modal', onHidden);
-                    resolve(null);
-                    if (cb) cb();
+                    if (cb) {
+                        // Passkey path: do NOT resolve the pin promise here.
+                        // onPasskeyChosen will call finish() when the passkey
+                        // result is ready. Resolving null here would cause
+                        // askPrivKeyBytes to call finish(null) immediately,
+                        // before the passkey has a chance to return a key.
+                        cb();
+                    } else {
+                        resolve(null); // no passkey callback — treat as cancel
+                    }
                 }
                 modalEl.addEventListener('hidden.bs.modal', onHidden);
                 const inst = bootstrap.Modal.getInstance(modalEl);
@@ -2494,7 +2502,9 @@
                 ));
                 seedStore.enc     = null;
                 seedStore.tempKey = null;
-                privBytes = bip39Bundle.entropyToPrivKey(entropyBytes, DEFAULT_DERIV_PATH);
+                let interimMnemonic = bip39Bundle.entropyToMnemonic(entropyBytes);
+                privBytes = bip39Bundle.mnemonicToPrivKey(interimMnemonic, DEFAULT_DERIV_PATH);
+                interimMnemonic = null;
                 const keyPair = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes));
                 privBytes.fill(0);
                 privBytes = null;
