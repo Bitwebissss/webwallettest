@@ -183,6 +183,8 @@ const walletLanguages = {
         'bip39-not-loaded': 'BIP39 library not loaded. Please reload the page.',
         'seed-crypto-error': 'Cryptographic error',
         'coin-control-unconfirmed-title': 'Cannot spend unconfirmed output',
+        'tx-sign-pin-desc': 'Enter PIN to sign transaction',
+        'tx-cancelled': 'Transaction cancelled.',
     },
     'uk': {
         'lang-alias': 'Українська',
@@ -368,6 +370,8 @@ const walletLanguages = {
         'bip39-not-loaded': 'Бібліотека BIP39 не завантажена. Будь ласка, перезавантажте сторінку.',
         'seed-crypto-error': 'Криптографічна помилка',
         'coin-control-unconfirmed-title': 'Неможливо витратити непідтверджений вихід',
+        'tx-sign-pin-desc': 'Введіть PIN для підпису транзакції',
+        'tx-cancelled': 'Транзакцію скасовано.',
     },
     'id': {
         'lang-alias': 'Indonesian',
@@ -553,6 +557,8 @@ const walletLanguages = {
         'bip39-not-loaded': 'Perpustakaan BIP39 tidak termuat. Silakan muat ulang halaman.',
         'seed-crypto-error': 'Kesalahan kriptografi',
         'coin-control-unconfirmed-title': 'Tidak dapat menggunakan output yang belum dikonfirmasi',
+        'tx-sign-pin-desc': 'Masukkan PIN untuk menandatangani transaksi',
+        'tx-cancelled': 'Transaksi dibatalkan.',
     },
     'ja': {
         'lang-alias': '日本語',
@@ -738,6 +744,8 @@ const walletLanguages = {
         'bip39-not-loaded': 'BIP39ライブラリが読み込まれていません。ページを再読み込みしてください。',
         'seed-crypto-error': '暗号化エラー',
         'coin-control-unconfirmed-title': '未確認のアウトプットは使用できません',
+        'tx-sign-pin-desc': 'トランザクションに署名するためにPINを入力',
+        'tx-cancelled': 'トランザクションはキャンセルされました。',
     },
     'zh': {
         'lang-alias': '简体中文',
@@ -923,6 +931,8 @@ const walletLanguages = {
         'bip39-not-loaded': 'BIP39 库未加载，请重新加载页面。',
         'seed-crypto-error': '加密错误',
         'coin-control-unconfirmed-title': '无法使用未确认的输出',
+        'tx-sign-pin-desc': '输入PIN以签署交易',
+        'tx-cancelled': '交易已取消。',
     },
     'es': {
         'lang-alias': 'Español',
@@ -1108,6 +1118,8 @@ const walletLanguages = {
         'bip39-not-loaded': 'La biblioteca BIP39 no está cargada. Por favor, recarga la página.',
         'seed-crypto-error': 'Error criptográfico',
         'coin-control-unconfirmed-title': 'No se puede gastar una salida no confirmada',
+        'tx-sign-pin-desc': 'Introduce el PIN para firmar la transacción',
+        'tx-cancelled': 'Transacción cancelada.',
     },
     'ru': {
         'lang-alias': 'Русский',
@@ -1293,6 +1305,8 @@ const walletLanguages = {
         'bip39-not-loaded': 'Библиотека BIP39 не загружена. Пожалуйста, перезагрузите страницу.',
         'seed-crypto-error': 'Криптографическая ошибка',
         'coin-control-unconfirmed-title': 'Невозможно потратить неподтверждённый выход',
+        'tx-sign-pin-desc': 'Введите PIN для подписи транзакции',
+        'tx-cancelled': 'Транзакция отменена.',
     },
     'kr': {
         'lang-alias': '한국어',
@@ -1478,6 +1492,8 @@ const walletLanguages = {
         'bip39-not-loaded': 'BIP39 라이브러리가 로드되지 않았습니다. 페이지를 다시 로드해주세요.',
         'seed-crypto-error': '암호화 오류',
         'coin-control-unconfirmed-title': '미확인 출력은 사용할 수 없습니다',
+        'tx-sign-pin-desc': '거래에 서명하려면 PIN을 입력하세요',
+        'tx-cancelled': '거래가 취소되었습니다.',
     },
     'de': {
         'lang-alias': 'Deutsch',
@@ -1663,5 +1679,7 @@ const walletLanguages = {
         'bip39-not-loaded': 'BIP39-Bibliothek nicht geladen. Bitte die Seite neu laden.',
         'seed-crypto-error': 'Kryptografischer Fehler',
         'coin-control-unconfirmed-title': 'Unbestätigten Ausgang kann nicht ausgegeben werden',
+        'tx-sign-pin-desc': 'PIN eingeben, um Transaktion zu signieren',
+        'tx-cancelled': 'Transaktion abgebrochen.',
     }
 }

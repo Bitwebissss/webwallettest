@@ -1419,14 +1419,16 @@
                 await Promise.all(legacyFetches);
                 const change = value - amount;
                 if (change > 0) psbt.addOutput({ address: address, value: BigInt(change) });
-                // TODO: add 'tx-sign-pin-desc' to multilang.js ("Enter PIN to sign transaction")
+                // Hide send modal before PIN prompt — avoids stacking two modals on top of each other.
+                const sendModalInst = bootstrap.Modal.getInstance(document.getElementById('send-modal'));
+                if (sendModalInst) sendModalInst.hide();
                 const privBytes = await askPrivKeyBytes(
                     getText('pin-title-default'),
-                    getText('privkey-pin-desc')  // reuse until tx-sign-pin-desc is added to multilang
+                    getText('tx-sign-pin-desc')
                 );
                 if (!privBytes) {
                     isSending = false;
-                    showSendError(getText('pin-login-error'));
+                    showMessage(escHtml(getText('tx-cancelled')));
                     return;
                 }
                 Keystore.signAllInputsWithKey(psbt, privBytes); // privBytes wiped inside
@@ -1447,6 +1449,8 @@
                         '<div class="mt-3"><textarea class="form-control" readonly cols="30" rows="10">' + escHtml(data.error.message) + '</textarea></div>'
                     );
                 }
+                // Re-show send modal so the user sees the success / fail result.
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('send-modal')).show();
                 resetTxForm();
                 $('#send-cancel').addClass('d-none');
                 $('#send-confirm').addClass('d-none');
