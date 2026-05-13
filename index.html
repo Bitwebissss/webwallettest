@@ -130,18 +130,9 @@
                     <div class="card mb-3 pin-login-card">
                         <div class="card-body">
                             <p class="pin-login-title"><span class="fa-solid fa-lock"></span> <span tkey="pin-login-title">Saved wallet found</span></p>
-                            <div class="input-group mb-2">
-                                <input id="pin-login-input" type="password" class="form-control" tkey="pin-login-placeholder" placeholder="Enter PIN to open" maxlength="32" autocomplete="current-password">
-                                <div id="pin-login-caps-warning" class="text-warning small mt-1 d-none"><span class="fa-solid fa-triangle-exclamation"></span> CAPS LOCK!</div>
-                                                                    <button id="pin-login-btn" class="btn btn-primary b-width" tkey="pin-login-btn">Open</button>
-                            </div>
-                            <div id="pin-login-error" class="text-danger small mb-2 d-none" tkey="pin-login-error">Wrong PIN, try again.</div>
-                            <div id="pk-login-wrapper" class="d-none">
-                                <div class="text-center text-muted small my-2">— or —</div>
-                                <button id="pk-login-btn" class="btn btn-outline-primary w-100" type="button">
-                                    <span class="fa-solid fa-fingerprint"></span>
-                                    <span tkey="passkey-login-btn">Unlock with Passkey</span>
-                                </button>
+                            <!-- PIN input removed: public key loads without PIN (priv key only loaded when signing) -->
+                            <div class="d-grid mb-2">
+                                <button id="pin-login-btn" class="btn btn-primary" tkey="pin-login-btn">Open</button>
                             </div>
                             <div class="text-center mt-2">
                                 <button id="pin-login-forget" class="btn btn-danger btn-sm" type="button" tkey="pin-login-forget">Forget saved wallet</button>

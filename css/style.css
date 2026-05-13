@@ -36,28 +36,12 @@ body {
 	}
 }
 .balance-small { font-size: 15px; }
-.send-balance-fix { padding: 0px 0px 8px 0px; display: inline-block; }
 .break-word { word-wrap: break-word; }
 .history-item { font-size: 13px; padding: 6px 0; }
 .history-item:last-child { border-bottom: none !important; }
 #history-list { max-height: 320px; overflow-y: auto; padding-right: 20px; }
 .pin-login-card .card-body { padding: 1.5rem; }
 .pin-login-title { font-size: 15px; color: var(--bs-secondary-color); margin-bottom: 12px; text-align: center; }
-/* Seed phrase print area — hidden on screen, shown only when printing */
-#seed-print-area { display: none; }
-@media print {
-	body > *:not(#seed-print-area) { display: none !important; }
-	#seed-print-area {
-		display: block !important;
-		font-family: monospace;
-		font-size: 15px;
-		padding: 24px;
-	}
-	#seed-print-area h2 { margin-bottom: 16px; }
-	#seed-print-area ol { columns: 2; column-gap: 2em; padding-left: 1.5em; }
-	#seed-print-area li { margin-bottom: 6px; }
-	#seed-print-area .seed-print-path { margin-top: 16px; color: #555; font-size: 12px; }
-}
 /* ── Extracted from inline styles ─────────────────────────────────────────── */
 /* Seed word grids (create + revealed backup) */
 #seed-word-grid,
@@ -105,7 +89,6 @@ body {
 /* Seed word canvas cell */
 .seed-canvas-cell { overflow: hidden; line-height: 0; }
 .seed-canvas-cell canvas { display: block; max-width: 100%; }
-.seed-word-text { font-size: 12px; }
 /* Seed verify step — word-number badge */
 .seed-verify-num { min-width: 3rem; }
 /* Advanced collapse toggle in seed restore */

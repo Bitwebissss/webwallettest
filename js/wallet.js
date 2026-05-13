@@ -8,7 +8,7 @@
     const STORAGE_KEY_PRIV    = 'bte_wallet_privkey';
     const STORAGE_KEY_SEED    = 'bte_wallet_seed';
     const STORAGE_KEY_PATH    = 'bte_wallet_path';
-    const STORAGE_KEY_PUB_PK  = 'bte_wallet_pubkey_pk';
+    // STORAGE_KEY_PUB_PK removed — public key is now stored plain (STORAGE_KEY_PUB).
     const STORAGE_KEY_PRIV_PK = 'bte_wallet_privkey_pk';
     const STORAGE_KEY_SEED_PK = 'bte_wallet_seed_pk';
     const STORAGE_KEY_PK_ID   = 'bte_pk_credential_id';
@@ -162,10 +162,15 @@
         $('#privkey-reveal-row').addClass('d-none');
         $('#privkey-show-row').removeClass('d-none');
     }
-    function revealPrivKeyCanvas() {
-        if (!Keystore.isUnlocked()) return;
-        let wif = Keystore.getWIF();
-        if (!wif) return;
+    // privBytes: freshly-decrypted Uint8Array — wiped before this function returns.
+    function revealPrivKeyCanvas(privBytes) {
+        if (!Keystore.isUnlocked()) { privBytes.fill(0); return; }
+        const kp = bitcoin.ECPair.fromPrivateKey(
+            bitcoin.Buffer.from(privBytes), { network: getConfig()['network'] }
+        );
+        privBytes.fill(0);
+        let wif = kp.toWIF();
+        destroyKeyMaterial(kp);
         const canvas = document.getElementById('wallet-privkey-canvas');
         if (!canvas) { wif = null; return; }
         $('#privkey-show-row').addClass('d-none');
@@ -191,72 +196,74 @@
         });
     }
     class KeystoreClass {
-        #keyPair = null;
-        getPublicKeyBytes() {
-            return this.#keyPair ? this.#keyPair.publicKey : null;
+        // Only public key bytes live in memory during normal session.
+        #pubKeyBytes = null;
+        // Temporary full keypair — set during wallet creation/import ONLY,
+        // cleared immediately after the keys are encrypted and stored.
+        #tempKeyPair = null;
+
+        // ── public-key access ─────────────────────────────────────────────
+        getPublicKeyBytes() { return this.#pubKeyBytes; }
+
+        isUnlocked() { return this.#pubKeyBytes !== null; }
+
+        // Set public key only (used at unlock — no PIN required).
+        setPubOnly(pubBytes) {
+            this.clearTempKeyPair();
+            if (this.#pubKeyBytes) this.#pubKeyBytes.fill(0);
+            this.#pubKeyBytes = new Uint8Array(pubBytes);
         }
-        getPrivKeyBytes() {
-            if (!this.#keyPair || !this.#keyPair.privateKey) return null;
-            return new Uint8Array(this.#keyPair.privateKey);
+
+        // ── temp keypair (wallet creation / import only) ──────────────────
+        // Store full keypair temporarily so saveWallet* can extract bytes.
+        setTempKeyPair(kp) {
+            this.clearTempKeyPair();
+            if (this.#pubKeyBytes) this.#pubKeyBytes.fill(0);
+            this.#pubKeyBytes = new Uint8Array(kp.publicKey);
+            this.#tempKeyPair = kp;
         }
-        getWIF() {
-            return this.#keyPair ? this.#keyPair.toWIF() : null;
+        // Get private bytes for encrypting to storage — call once, wipe result after use.
+        getTempPrivBytes() {
+            if (!this.#tempKeyPair || !this.#tempKeyPair.privateKey) return null;
+            return new Uint8Array(this.#tempKeyPair.privateKey);
         }
-        #makeTaprootSigner(onSigned) {
-            const ecc = bitcoin.ecc;
-            if (!ecc || typeof ecc.privateAdd !== 'function' ||
-                        typeof ecc.privateNegate !== 'function' ||
-                        typeof ecc.signSchnorr !== 'function' ||
-                        typeof ecc.xOnlyPointAddTweak !== 'function') {
-                throw new Error('bitcoin.ecc unavailable — rebuild bundle (see BUILDBitcoinjs.md)');
-            }
-            const xOnlyPub = this.#keyPair.publicKey.slice(1);
-            const tweak    = bitcoin.crypto.taggedHash('TapTweak', xOnlyPub);
-            const rawD     = new Uint8Array(this.#keyPair.privateKey);
-            let effectiveD = null;
-            let tweakedD   = null;
+        // Wipe temp keypair after keys have been saved to storage.
+        clearTempKeyPair() {
+            if (this.#tempKeyPair) { destroyKeyMaterial(this.#tempKeyPair); this.#tempKeyPair = null; }
+        }
+
+        // ── signing (privBytes passed in, wiped inside) ───────────────────
+        // Call with freshly-decrypted privBytes; they are zeroed before return.
+        signAllInputsWithKey(psbt, privBytes) {
+            if (!this.#pubKeyBytes) throw new Error('Wallet locked');
+            const network = getConfig()['network'];
+            const kp = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes), { network: network });
             try {
-                const oddY = (this.#keyPair.publicKey[0] === 0x03);
-                effectiveD = oddY ? ecc.privateNegate(rawD) : new Uint8Array(rawD);
-                tweakedD   = ecc.privateAdd(effectiveD, tweak);
-                if (!tweakedD) throw new Error('Taproot tweak produced an invalid private key');
-                const tweakedPubResult = ecc.xOnlyPointAddTweak(xOnlyPub, tweak);
-                if (!tweakedPubResult) throw new Error('Taproot xOnlyPointAddTweak failed');
-                const tweakedXOnly = tweakedPubResult.xOnlyPubkey;
-                const td = tweakedD;
-                const signer = {
-                    publicKey:   tweakedXOnly,
-                    signSchnorr: function(hash) { return ecc.signSchnorr(hash, td); }
-                };
-                onSigned(signer);
-            } finally {
-                rawD.fill(0);
-                if (effectiveD) effectiveD.fill(0);
-                if (tweakedD)   tweakedD.fill(0);
-            }
-        }
-        signAllInputs(psbt) {
-            if (!this.#keyPair) throw new Error('Wallet locked');
-            const hasTaproot = psbt.data.inputs.some(function(inp) {
-                return inp.tapInternalKey && inp.tapInternalKey.length === 32;
-            });
-            if (!hasTaproot) {
-                psbt.signAllInputs(this.#keyPair);
-                return;
-            }
-            const kp = this.#keyPair;
-            this.#makeTaprootSigner(function(tapSigner) {
-                psbt.data.inputs.forEach(function(inp, idx) {
-                    if (inp.tapInternalKey && inp.tapInternalKey.length === 32) {
-                        psbt.signInput(idx, tapSigner);
-                    } else {
-                        psbt.signInput(idx, kp);
-                    }
+                const hasTaproot = psbt.data.inputs.some(function(inp) {
+                    return inp.tapInternalKey && inp.tapInternalKey.length === 32;
                 });
-            });
+                if (!hasTaproot) {
+                    psbt.signAllInputs(kp);
+                    return;
+                }
+                makeTaprootSignerWith(kp, function(tapSigner) {
+                    psbt.data.inputs.forEach(function(inp, idx) {
+                        if (inp.tapInternalKey && inp.tapInternalKey.length === 32) {
+                            psbt.signInput(idx, tapSigner);
+                        } else {
+                            psbt.signInput(idx, kp);
+                        }
+                    });
+                });
+            } finally {
+                destroyKeyMaterial(kp);
+                privBytes.fill(0);
+            }
         }
+
+        // ── address / script derivation (pubKey passed in, no priv needed) ─
         deriveAddress(type, pubKey) {
-            if (!this.#keyPair || !pubKey) return '';
+            if (!this.#pubKeyBytes || !pubKey) return '';
             const network = getConfig()['network'];
             if (type === 'bech32') {
                 return bitcoin.payments.p2wpkh({ pubkey: pubKey, network: network }).address;
@@ -271,7 +278,7 @@
             }
         }
         getScriptHex(type, pubKey) {
-            if (!this.#keyPair || !pubKey) return '';
+            if (!this.#pubKeyBytes || !pubKey) return '';
             const network = getConfig()['network'];
             if (type === 'bech32') {
                 return bitcoin.Buffer.from(bitcoin.payments.p2wpkh({ pubkey: pubKey, network: network }).output).toString('hex');
@@ -287,7 +294,7 @@
         }
         getAllScriptHexes(pubKey) {
             const set = new Set();
-            if (!this.#keyPair || !pubKey) return set;
+            if (!this.#pubKeyBytes || !pubKey) return set;
             const network = getConfig()['network'];
             set.add(bitcoin.Buffer.from(bitcoin.payments.p2wpkh({ pubkey: pubKey, network: network }).output).toString('hex').toLowerCase());
             const redeem = bitcoin.payments.p2wpkh({ pubkey: pubKey, network: network });
@@ -301,7 +308,7 @@
         }
         getAllAddresses(pubKey) {
             const set = new Set();
-            if (!this.#keyPair || !pubKey) return set;
+            if (!this.#pubKeyBytes || !pubKey) return set;
             const network = getConfig()['network'];
             try { set.add(bitcoin.payments.p2wpkh({ pubkey: pubKey, network: network }).address); } catch(e) {}
             try {
@@ -315,18 +322,44 @@
             } catch(e) {}
             return set;
         }
-        isUnlocked() {
-            return this.#keyPair !== null;
-        }
-        setKeyPair(kp) {
-            if (this.#keyPair) destroyKeyMaterial(this.#keyPair);
-            this.#keyPair = kp;
-        }
+
         clear() {
-            if (this.#keyPair) {
-                destroyKeyMaterial(this.#keyPair);
-                this.#keyPair = null;
-            }
+            this.clearTempKeyPair();
+            if (this.#pubKeyBytes) { this.#pubKeyBytes.fill(0); this.#pubKeyBytes = null; }
+        }
+    }
+    // Taproot signer builder — standalone so signAllInputsWithKey can use it.
+    function makeTaprootSignerWith(kp, onSigned) {
+        const ecc = bitcoin.ecc;
+        if (!ecc || typeof ecc.privateAdd !== 'function' ||
+                    typeof ecc.privateNegate !== 'function' ||
+                    typeof ecc.signSchnorr !== 'function' ||
+                    typeof ecc.xOnlyPointAddTweak !== 'function') {
+            throw new Error('bitcoin.ecc unavailable — rebuild bundle (see BUILDBitcoinjs.md)');
+        }
+        const xOnlyPub = kp.publicKey.slice(1);
+        const tweak    = bitcoin.crypto.taggedHash('TapTweak', xOnlyPub);
+        const rawD     = new Uint8Array(kp.privateKey);
+        let effectiveD = null;
+        let tweakedD   = null;
+        try {
+            const oddY = (kp.publicKey[0] === 0x03);
+            effectiveD = oddY ? ecc.privateNegate(rawD) : new Uint8Array(rawD);
+            tweakedD   = ecc.privateAdd(effectiveD, tweak);
+            if (!tweakedD) throw new Error('Taproot tweak produced an invalid private key');
+            const tweakedPubResult = ecc.xOnlyPointAddTweak(xOnlyPub, tweak);
+            if (!tweakedPubResult) throw new Error('Taproot xOnlyPointAddTweak failed');
+            const tweakedXOnly = tweakedPubResult.xOnlyPubkey;
+            const td = tweakedD;
+            const signer = {
+                publicKey:   tweakedXOnly,
+                signSchnorr: function(hash) { return ecc.signSchnorr(hash, td); }
+            };
+            onSigned(signer);
+        } finally {
+            rawD.fill(0);
+            if (effectiveD) effectiveD.fill(0);
+            if (tweakedD)   tweakedD.fill(0);
         }
     }
     const Keystore = new KeystoreClass();
@@ -393,6 +426,72 @@
             return new Uint8Array(pt);
         } catch(e) { return null; }
     }
+    // ── Plain public key storage (no encryption needed) ───────────────────
+    function savePublicKeyPlain(pubBytes) {
+        try { localStorage.setItem(STORAGE_KEY_PUB, JSON.stringify(Array.from(pubBytes))); } catch(e) {}
+    }
+    function loadPublicKeyPlain() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY_PUB);
+            if (!raw) return null;
+            return new Uint8Array(JSON.parse(raw));
+        } catch(e) { return null; }
+    }
+    // ── Shared helper: ask PIN or passkey → return privBytes or null ──────
+    // privBytes are freshly decrypted; caller must wipe them after use.
+    function askPrivKeyBytes(title, desc) {
+        return new Promise(function(outerResolve) {
+            let done = false;
+            function finish(result) { if (!done) { done = true; outerResolve(result); } }
+            async function onPasskeyChosen(retriesLeft) {
+                if (retriesLeft === undefined) retriesLeft = 2;
+                let credIdStr = null;
+                try { credIdStr = localStorage.getItem(STORAGE_KEY_PK_ID); } catch(e) {}
+                if (!credIdStr) { finish(null); return; }
+                try {
+                    const assertion = await navigator.credentials.get({
+                        publicKey: {
+                            challenge:        crypto.getRandomValues(new Uint8Array(32)),
+                            rpId:             window.location.hostname,
+                            allowCredentials: [{ type: 'public-key', id: b64ToCredId(credIdStr) }],
+                            userVerification: 'required',
+                            extensions:       { prf: { eval: { first: PK_PRF_SALT } } }
+                        }
+                    });
+                    const ext = assertion.getClientExtensionResults();
+                    if (!ext.prf || !ext.prf.results || !ext.prf.results.first) {
+                        showMessage(escHtml(getText('passkey-prf-unsupported'))); finish(null); return;
+                    }
+                    const prfBytes  = new Uint8Array(ext.prf.results.first);
+                    const privBytes = await loadEncryptedBytesWithKey(STORAGE_KEY_PRIV_PK, prfBytes);
+                    prfBytes.fill(0);
+                    if (!privBytes) { showMessage(escHtml(getText('passkey-decrypt-failed'))); finish(null); return; }
+                    finish(privBytes);
+                } catch(e) {
+                    if (e.name === 'NotAllowedError') { finish(null); return; }
+                    if (retriesLeft > 0 && isTransientPasskeyError(e)) {
+                        await new Promise(function(r) { setTimeout(r, 300); });
+                        return onPasskeyChosen(retriesLeft - 1);
+                    }
+                    showMessage(escHtml(getText('passkey-error')) + escHtml(e.message));
+                    finish(null);
+                }
+            }
+            const validator = async function(candidate) {
+                const priv = await loadEncryptedBytes(STORAGE_KEY_PRIV, candidate);
+                if (!priv) return getText('pin-login-error');
+                priv.fill(0);
+                return null;
+            };
+            askPin(title, desc, validator, false, isPasskeyEnabled() ? onPasskeyChosen : null)
+                .then(async function(pin) {
+                    if (pin === null) { finish(null); return; }
+                    const privBytes = await loadEncryptedBytes(STORAGE_KEY_PRIV, pin);
+                    pin = null;
+                    finish(privBytes);
+                });
+        });
+    }
     function credIdToB64(rawId) {
         return btoa(String.fromCharCode.apply(null, new Uint8Array(rawId)));
     }
@@ -419,9 +518,9 @@
     }
     async function pkEnable() {
         const pkEnableValidator = async function(candidate) {
-            const pub = await loadEncryptedBytes(STORAGE_KEY_PUB, candidate);
-            if (!pub) return getText('pin-login-error');
-            pub.fill(0);
+            const priv = await loadEncryptedBytes(STORAGE_KEY_PRIV, candidate);
+            if (!priv) return getText('pin-login-error');
+            priv.fill(0);
             return null;
         };
         let pin = await askPin(
@@ -431,13 +530,7 @@
         );
         if (pin === null) return;
         const privBytes = await loadEncryptedBytes(STORAGE_KEY_PRIV, pin);
-        const pubBytes  = await loadEncryptedBytes(STORAGE_KEY_PUB,  pin);
-        if (!privBytes || !pubBytes) {
-            if (privBytes) privBytes.fill(0);
-            if (pubBytes)  pubBytes.fill(0);
-            pin = null;
-            return;
-        }
+        if (!privBytes) { pin = null; return; }
         const seedBytes = await loadEncryptedBytes(STORAGE_KEY_SEED, pin);
         pin = null;
         const challenge = crypto.getRandomValues(new Uint8Array(32));
@@ -470,27 +563,28 @@
             });
             const ext = credential.getClientExtensionResults();
             if (!ext.prf || !ext.prf.results || !ext.prf.results.first) {
-                privBytes.fill(0); pubBytes.fill(0); if (seedBytes) seedBytes.fill(0);
+                privBytes.fill(0); if (seedBytes) seedBytes.fill(0);
                 showMessage(escHtml(getText('passkey-prf-unsupported')));
                 return;
             }
             const prfBytes = new Uint8Array(ext.prf.results.first);
+            // Public key is stored plain — only priv (and seed) go under passkey encryption.
             await saveEncryptedWithKeyBytes(STORAGE_KEY_PRIV_PK, privBytes, prfBytes);
-            await saveEncryptedWithKeyBytes(STORAGE_KEY_PUB_PK,  pubBytes,  prfBytes);
             if (seedBytes) await saveEncryptedWithKeyBytes(STORAGE_KEY_SEED_PK, seedBytes, prfBytes);
             prfBytes.fill(0);
-            privBytes.fill(0); pubBytes.fill(0); if (seedBytes) seedBytes.fill(0);
+            privBytes.fill(0); if (seedBytes) seedBytes.fill(0);
             localStorage.setItem(STORAGE_KEY_PK_ID, credIdToB64(credential.rawId));
             updatePasskeyUI();
             showMessage(escHtml(getText('passkey-enabled')));
         } catch(e) {
             if (privBytes) privBytes.fill(0);
-            if (pubBytes)  pubBytes.fill(0);
             if (seedBytes) seedBytes.fill(0);
             if (e.name === 'NotAllowedError') return;
             showMessage(escHtml(getText('passkey-error')) + escHtml(e.message));
         }
     }
+    // Passkey login: public key is now plain — just verify the assertion is valid,
+    // then load pub key from localStorage (no private key in memory at unlock).
     async function pkAuthenticate(retriesLeft) {
         if (retriesLeft === undefined) retriesLeft = 2;
         let credIdStr = null;
@@ -498,36 +592,19 @@
         if (!credIdStr) { showMessage(escHtml(getText('passkey-not-setup'))); return; }
         const credIdBytes = b64ToCredId(credIdStr);
         try {
-            const assertion = await navigator.credentials.get({
+            await navigator.credentials.get({
                 publicKey: {
                     challenge:         crypto.getRandomValues(new Uint8Array(32)),
                     rpId:              window.location.hostname,
                     allowCredentials:  [{ type: 'public-key', id: credIdBytes }],
                     userVerification:  'required',
-                    extensions: {
-                        prf: { eval: { first: PK_PRF_SALT } }
-                    }
+                    extensions: { prf: { eval: { first: PK_PRF_SALT } } }
                 }
             });
-            const ext = assertion.getClientExtensionResults();
-            if (!ext.prf || !ext.prf.results || !ext.prf.results.first) {
-                showMessage(escHtml(getText('passkey-prf-unsupported')));
-                return;
-            }
-            const prfBytes  = new Uint8Array(ext.prf.results.first);
-            const privBytes = await loadEncryptedBytesWithKey(STORAGE_KEY_PRIV_PK, prfBytes);
-            const pubBytes  = await loadEncryptedBytesWithKey(STORAGE_KEY_PUB_PK,  prfBytes);
-            prfBytes.fill(0);
-            if (!privBytes || !pubBytes) {
-                if (privBytes) privBytes.fill(0);
-                if (pubBytes)  pubBytes.fill(0);
-                showMessage(escHtml(getText('passkey-decrypt-failed')));
-                return;
-            }
-            Keystore.setKeyPair(
-                bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes), { network: getConfig()['network'] })
-            );
-            privBytes.fill(0);
+            // Assertion succeeded — load public key plain and open wallet.
+            const pubBytes = loadPublicKeyPlain();
+            if (!pubBytes) { showMessage(escHtml(getText('passkey-decrypt-failed'))); return; }
+            Keystore.setPubOnly(pubBytes);
             globalData.pubKey = pubBytes;
             await openWallet(false);
         } catch(e) {
@@ -540,7 +617,7 @@
         }
     }
     function doPkDisable() {
-        [STORAGE_KEY_PRIV_PK, STORAGE_KEY_PUB_PK, STORAGE_KEY_SEED_PK, STORAGE_KEY_PK_ID].forEach(function(k) {
+        [STORAGE_KEY_PRIV_PK, STORAGE_KEY_SEED_PK, STORAGE_KEY_PK_ID].forEach(function(k) {
             try { localStorage.removeItem(k); } catch(e) {}
         });
         updatePasskeyUI();
@@ -573,9 +650,9 @@
             }
         }
         const pkDisableValidator = async function(candidate) {
-            const pub = await loadEncryptedBytes(STORAGE_KEY_PUB, candidate);
-            if (!pub) return getText('pin-login-error');
-            pub.fill(0);
+            const priv = await loadEncryptedBytes(STORAGE_KEY_PRIV, candidate);
+            if (!priv) return getText('pin-login-error');
+            priv.fill(0);
             return null;
         };
         let pin = await askPin(
@@ -589,15 +666,7 @@
         doPkDisable();
     }
     function updatePasskeyUI() {
-        updatePasskeyLoginUI();
         updatePasskeySettingsUI();
-    }
-    function updatePasskeyLoginUI() {
-        if (isPasskeyEnabled()) {
-            $('#pk-login-wrapper').removeClass('d-none');
-        } else {
-            $('#pk-login-wrapper').addClass('d-none');
-        }
     }
     function updatePasskeySettingsUI() {
         const $section = $('#passkey-settings-section');
@@ -618,24 +687,22 @@
         $section.removeClass('d-none');
     }
     async function saveWalletWif(pin) {
-        const privBytes = Keystore.getPrivKeyBytes();
+        const privBytes = Keystore.getTempPrivBytes();
         if (!privBytes) throw new Error('Private key is not available');
         const pubCopy   = new Uint8Array(globalData.pubKey);
-        await Promise.all([
-            saveEncryptedBytes(STORAGE_KEY_PUB,  pubCopy,   pin),
-            saveEncryptedBytes(STORAGE_KEY_PRIV, privBytes, pin)
-        ]);
+        savePublicKeyPlain(pubCopy);                              // pub → plain
+        await saveEncryptedBytes(STORAGE_KEY_PRIV, privBytes, pin); // priv → encrypted
         pubCopy.fill(0);
         privBytes.fill(0);
         localStorage.removeItem(STORAGE_KEY_SEED);
         localStorage.removeItem(STORAGE_KEY_PATH);
     }
     async function saveWalletBip39(entropyBytes, pin, path) {
-        const privBytes = Keystore.getPrivKeyBytes();
+        const privBytes = Keystore.getTempPrivBytes();
         if (!privBytes) throw new Error('Private key is not available');
         const pubCopy   = new Uint8Array(globalData.pubKey);
+        savePublicKeyPlain(pubCopy);                              // pub → plain
         await Promise.all([
-            saveEncryptedBytes(STORAGE_KEY_PUB,  pubCopy,      pin),
             saveEncryptedBytes(STORAGE_KEY_PRIV, privBytes,    pin),
             saveEncryptedBytes(STORAGE_KEY_SEED, entropyBytes, pin)
         ]);
@@ -1352,7 +1419,17 @@
                 await Promise.all(legacyFetches);
                 const change = value - amount;
                 if (change > 0) psbt.addOutput({ address: address, value: BigInt(change) });
-                Keystore.signAllInputs(psbt);
+                // TODO: add 'tx-sign-pin-desc' to multilang.js ("Enter PIN to sign transaction")
+                const privBytes = await askPrivKeyBytes(
+                    getText('pin-title-default'),
+                    getText('privkey-pin-desc')  // reuse until tx-sign-pin-desc is added to multilang
+                );
+                if (!privBytes) {
+                    isSending = false;
+                    showSendError(getText('pin-login-error'));
+                    return;
+                }
+                Keystore.signAllInputsWithKey(psbt, privBytes); // privBytes wiped inside
                 psbt.finalizeAllInputs();
                 const tx   = psbt.extractTransaction();
                 const data = await transactionBroadcast(tx.toHex());
@@ -1430,7 +1507,7 @@
         stopStream();
         wsDisconnect();
         [STORAGE_KEY_PUB, STORAGE_KEY_PRIV, STORAGE_KEY_SEED, STORAGE_KEY_PATH,
-         STORAGE_KEY_PUB_PK, STORAGE_KEY_PRIV_PK, STORAGE_KEY_SEED_PK, STORAGE_KEY_PK_ID].forEach(function(k) {
+         STORAGE_KEY_PRIV_PK, STORAGE_KEY_SEED_PK, STORAGE_KEY_PK_ID].forEach(function(k) {
             try { localStorage.removeItem(k); } catch(e) {}
         });
         try {
@@ -1469,7 +1546,6 @@
             $('#pin-login-block').addClass('d-none');
             $('#open-block').addClass('d-none');
         }
-        updatePasskeyLoginUI();
     }
     function showWalletUI() {
         const pubBytes = globalData.pubKey;
@@ -1552,6 +1628,8 @@
                 await saveWalletWif(pin);
             }
             pin = null;
+            // Private key was needed only for saving — wipe it now.
+            Keystore.clearTempKeyPair();
             showMessage(escHtml(getText('wallet-saved')));
             updateSavedWalletUI();
         }
@@ -1880,55 +1958,37 @@
         $('#pin-input').on('keydown', function(e) {
             if (e.key === 'Enter') $('#pin-confirm').click();
         });
-        $(document).on('keyup keydown', '#pin-input, #pin-login-input', function(e) {
+        // CapsLock warning for the PIN modal input only.
+        // #pin-login-input was removed (no PIN at unlock); handler kept for #pin-input only.
+        $(document).on('keyup keydown', '#pin-input', function(e) {
             const capsOn = (e.originalEvent && e.originalEvent.getModifierState)
                 ? e.originalEvent.getModifierState('CapsLock')
                 : false;
-            const warnId = (this.id === 'pin-input') ? 'pin-caps-warning' : 'pin-login-caps-warning';
-            if (capsOn) { $('#' + warnId).removeClass('d-none'); }
-            else        { $('#' + warnId).addClass('d-none'); }
+            if (capsOn) { $('#pin-caps-warning').removeClass('d-none'); }
+            else        { $('#pin-caps-warning').addClass('d-none'); }
         });
-        async function doPinLogin() {
-            let pin = $('#pin-login-input').val();
-            if (!pin) {
-                $('#pin-login-error').text(getText('pin-login-error')).removeClass('d-none');
-                return;
-            }
+        // Unlock: load public key from plain storage — no PIN needed.
+        async function doUnlock() {
             $('#pin-login-btn').prop('disabled', true).text(getText('loading'));
-            await new Promise(function(r) { setTimeout(r, 50); });
+            await new Promise(function(r) { setTimeout(r, 30); });
             try {
-                const pubBytes  = await loadEncryptedBytes(STORAGE_KEY_PUB,  pin);
-                const privBytes = await loadEncryptedBytes(STORAGE_KEY_PRIV, pin);
-                $('#pin-login-btn').prop('disabled', false).text(getText('pin-login-btn'));
-                if (!pubBytes || !privBytes) {
-                    if (pubBytes)  pubBytes.fill(0);
-                    if (privBytes) privBytes.fill(0);
-                    $('#pin-login-error').text(getText('pin-login-error')).removeClass('d-none');
-                    $('#pin-login-input').val('').focus();
-                    pin = '';
+                const pubBytes = loadPublicKeyPlain();
+                if (!pubBytes) {
+                    $('#pin-login-btn').prop('disabled', false).text(getText('pin-login-btn'));
+                    showMessage(escHtml(getText('pin-login-error')));
                     return;
                 }
-                $('#pin-login-error').addClass('d-none');
-                $('#pin-login-input').val('');
-                Keystore.setKeyPair(
-                    bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes), { network: getConfig()['network'] })
-                );
-                privBytes.fill(0);
+                Keystore.setPubOnly(pubBytes);
                 globalData.pubKey = pubBytes;
-                pin = '';
                 await openWallet(false);
-            } catch (e) {
+            } catch(e) {
                 $('#pin-login-btn').prop('disabled', false).text(getText('pin-login-btn'));
-                $('#pin-login-error').text(getText('pin-login-error')).removeClass('d-none');
-                pin = '';
+                showMessage(escHtml(getText('pin-login-error')));
             }
         }
-        $('#pin-login-btn').click(doPinLogin);
-        $('#pin-login-input').on('keydown', function(e) { if (e.key === 'Enter') doPinLogin(); });
-        $('#pk-login-btn').click(function(e) {
-            e.preventDefault();
-            pkAuthenticate();
-        });
+        $('#pin-login-btn').click(doUnlock);
+        // Keep Enter key on any focused element in login block working.
+        $('#pin-login-block').on('keydown', function(e) { if (e.key === 'Enter') doUnlock(); });
         $(document).on('click', '#passkey-settings-btn', async function(e) {
             e.preventDefault();
             if (isPasskeyEnabled()) {
@@ -2070,7 +2130,7 @@
             let wif = $('#passphrase').val().trim();
             if ([51, 52].includes(wif.length)) {
                 try {
-                    Keystore.setKeyPair(bitcoin.ECPair.fromWIF(wif, getConfig()['network']));
+                    Keystore.setTempKeyPair(bitcoin.ECPair.fromWIF(wif, getConfig()['network']));
                     $('#passphrase').val('');
                     await openWallet(true);
                 } catch(err) {
@@ -2105,7 +2165,7 @@
                         $('#open-email').val('');
                         $('#open-password').val('');
                         $('#open-password-confirm').val('');
-                        Keystore.setKeyPair(bitcoin.ECPair.fromPrivateKey(
+                        Keystore.setTempKeyPair(bitcoin.ECPair.fromPrivateKey(
                             bitcoin.Buffer.from(privBytes),
                             { 'network': getConfig()['network'] }
                         ));
@@ -2120,53 +2180,12 @@
         });
         $('#toggle-wallet-privkey').click(async function() {
             if (!Keystore.isUnlocked()) return;
-            async function onPasskeyChosen(retriesLeft) {
-                if (retriesLeft === undefined) retriesLeft = 2;
-                let credIdStr = null;
-                try { credIdStr = localStorage.getItem(STORAGE_KEY_PK_ID); } catch(e) {}
-                if (!credIdStr) return;
-                try {
-                    const assertion = await navigator.credentials.get({
-                        publicKey: {
-                            challenge:        crypto.getRandomValues(new Uint8Array(32)),
-                            rpId:             window.location.hostname,
-                            allowCredentials: [{ type: 'public-key', id: b64ToCredId(credIdStr) }],
-                            userVerification: 'required',
-                            extensions:       { prf: { eval: { first: PK_PRF_SALT } } }
-                        }
-                    });
-                    const ext = assertion.getClientExtensionResults();
-                    if (!ext.prf || !ext.prf.results || !ext.prf.results.first) {
-                        showMessage(escHtml(getText('passkey-prf-unsupported')));
-                        return;
-                    }
-                    revealPrivKeyCanvas();
-                    setTimeout(function() { clearPrivKeyCanvas(); }, 60000);
-                } catch(e) {
-                    if (e.name === 'NotAllowedError') return;
-                    if (retriesLeft > 0 && isTransientPasskeyError(e)) {
-                        await new Promise(function(r) { setTimeout(r, 300); });
-                        return onPasskeyChosen(retriesLeft - 1);
-                    }
-                    showMessage(escHtml(getText('passkey-error')) + escHtml(e.message));
-                }
-            }
-            const canUsePasskey = isPasskeyEnabled();
-            const privKeyValidator = async function(candidate) {
-                const pub = await loadEncryptedBytes(STORAGE_KEY_PUB, candidate);
-                if (!pub) return getText('pin-login-error');
-                pub.fill(0);
-                return null;
-            };
-            let pin = await askPin(
+            const privBytes = await askPrivKeyBytes(
                 getText('pin-title-default'),
-                getText('privkey-pin-desc'),
-                privKeyValidator, false,
-                canUsePasskey ? onPasskeyChosen : null
+                getText('privkey-pin-desc')
             );
-            if (pin === null) return;
-            pin = null;
-            revealPrivKeyCanvas();
+            if (!privBytes) return;
+            revealPrivKeyCanvas(privBytes); // wipes privBytes
             setTimeout(function() { clearPrivKeyCanvas(); }, 60000);
         });
         $('#privkey-hide-btn').click(function() {
@@ -2174,8 +2193,6 @@
         });
         $('#wallet-privkey-copy-btn').click(async function() {
             if (!Keystore.isUnlocked()) return;
-            let wif = Keystore.getWIF();
-            if (!wif) return;
             const $btn = $(this);
             const doFeedback = function(ok) {
                 const $icon    = $btn.find('.fa-solid, .fa-regular').first();
@@ -2187,14 +2204,23 @@
                     $btn.removeClass('btn-success btn-danger').addClass('btn-outline-secondary');
                 }, 1500);
             };
+            const privBytes = await askPrivKeyBytes(
+                getText('pin-title-default'),
+                getText('privkey-pin-desc')
+            );
+            if (!privBytes) return;
+            const kp = bitcoin.ECPair.fromPrivateKey(
+                bitcoin.Buffer.from(privBytes), { network: getConfig()['network'] }
+            );
+            privBytes.fill(0);
+            let wif = kp.toWIF();
+            destroyKeyMaterial(kp);
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 try {
                     await navigator.clipboard.writeText(wif);
                     wif = null;
                     doFeedback(true);
-                    setTimeout(function() {
-                        navigator.clipboard.writeText('').catch(function(){});
-                    }, 60000);
+                    setTimeout(function() { navigator.clipboard.writeText('').catch(function(){}); }, 60000);
                 } catch(e) { wif = null; doFeedback(false); }
             } else {
                 const ta = document.createElement('textarea');
@@ -2470,7 +2496,7 @@
                 const keyPair = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes));
                 privBytes.fill(0);
                 privBytes = null;
-                Keystore.setKeyPair(keyPair);
+                Keystore.setTempKeyPair(keyPair);
                 await openWallet(true, entropyBytes, DEFAULT_DERIV_PATH);
                 inputs.each(function() { this.value = ''; });
                 seedReset();
@@ -2516,7 +2542,7 @@
                 raw = null;
                 const keyPair = bitcoin.ECPair.fromPrivateKey(bitcoin.Buffer.from(privBytes));
                 privBytes.fill(0); privBytes = null;
-                Keystore.setKeyPair(keyPair);
+                Keystore.setTempKeyPair(keyPair);
                 await openWallet(true, entropyBytes, path, true);
                 seedReset();
             } catch(err) {
@@ -2570,9 +2596,9 @@
             const desc          = getText('seed-pin-modal-desc');
             const canUsePasskey = isPasskeyEnabled() && hasSeedPkBackup();
             const seedPinValidator = async function(candidate) {
-                const pub = await loadEncryptedBytes(STORAGE_KEY_PUB, candidate);
-                if (!pub) return getText('pin-login-error');
-                pub.fill(0);
+                const priv = await loadEncryptedBytes(STORAGE_KEY_PRIV, candidate);
+                if (!priv) return getText('pin-login-error');
+                priv.fill(0);
                 return null;
             };
             let pin = await askPin(title, desc, seedPinValidator, false, canUsePasskey ? onPasskeyChosen : null);
