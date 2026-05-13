@@ -2416,9 +2416,7 @@
         function seedDoGenerate() {
             if (typeof bip39Bundle === 'undefined') { showMessage(escHtml(getText('bip39-not-loaded'))); return; }
             clearSeedState();
-            let mnemonic = bip39Bundle.generateMnemonic(seedStore.strength);
-            seedStore.entropy = bip39Bundle.mnemonicToEntropy(mnemonic);
-            mnemonic = null;
+            seedStore.entropy = crypto.getRandomValues(new Uint8Array(seedStore.strength / 8));
             const words = bip39Bundle.entropyToMnemonic(seedStore.entropy).split(' ');
             seedRenderGrid(words, '#seed-word-grid');
             words.fill('');
