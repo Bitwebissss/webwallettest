@@ -1,6 +1,6 @@
 (function() {
     'use strict';
-    const walletVersion      = '0.5';
+    const walletVersion      = '0.1';
     const DEFAULT_DERIV_PATH = "m/84'/738'/0'/0/0";
     const AUTO_LOCK_MS       = 20 * 60 * 1000;
     const UTXO_CACHE_TTL     = 60000;  // ms
