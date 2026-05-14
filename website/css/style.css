@@ -80,21 +80,19 @@ body {
 .disclaimer small { max-width: 1100px; display: inline-block; }
 /* ── Transaction history: 5-column adaptive grid ────────────────────────── */
 /*
- *  Minimum supported viewport: 320px (iPhone SE 1st gen, 2016)
- *  Target: devices with const/let support (Chrome 49+, Firefox 44+,
- *           Safari 10+, Edge 14+) — IE11 dropped.
- *
  *  Columns: [amount] [hash] [date] [copy] [confirmations]
- *  ≥768px  → full 64-char hash
- *  <768px  → truncated hash: first8…last8
+ *
+ *  KEY FIX: hash column uses minmax(0, 1fr) — never overflows into neighbours.
+ *
+ *  ≥768px  → full 64-char hash visible
+ *  480–767px → truncated hash (first8…last8), date still visible
+ *  <480px  → 2-row layout: row1 = amount | copy | badge
+ *                           row2 = hash | date (both always shown)
  */
 .history-item {
-    --hi-amt:  165px;
-    --hi-date:  96px;
-
     display: grid;
-    grid-template-columns: var(--hi-amt) max-content var(--hi-date) auto auto;
-    justify-content: space-between;
+    grid-template-columns: 165px minmax(0, 1fr) 96px auto auto;
+    column-gap: 8px;
     align-items: center;
     padding: 6px 0;
     font-size: 13px;
@@ -106,7 +104,8 @@ body {
     font-size: 13px;
     font-weight: 600;
     white-space: nowrap;
-    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Hash link */
@@ -115,11 +114,18 @@ body {
     min-width: 0;
     overflow: hidden;
 }
-.history-tx-hash a { color: var(--bs-link-color); text-decoration: none; }
+.history-tx-hash a {
+    color: var(--bs-link-color);
+    text-decoration: none;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 .history-tx-hash a:hover { text-decoration: underline; }
 /* full hash: show by default, hide on small screens */
-.hash-full  { display: inline; word-break: break-all; }
-.hash-short { display: none;   word-break: keep-all;  }
+.hash-full  { display: inline; }
+.hash-short { display: none;   }
 
 /* Date */
 .history-ts {
@@ -130,39 +136,53 @@ body {
     min-width: 0;
 }
 
+/* Copy button */
+.h-copy-btn { flex-shrink: 0; }
+
 /* Confirmations badge */
-.h-badge { white-space: nowrap; }
+.h-badge { white-space: nowrap; flex-shrink: 0; }
 
-/* ── 480–767px: tablet / large phone ─────────────────────────────────────── */
+/* ── 480–767px: tablet / large phone — truncate hash, keep date ───────── */
 @media (max-width: 767px) {
-    .history-item { --hi-amt: 120px; --hi-date: 80px; font-size: 12px; }
-    .tx-dir-label { font-size: 12px; }
+    .history-item {
+        grid-template-columns: 130px minmax(0, 1fr) 82px auto auto;
+        column-gap: 6px;
+        font-size: 12px;
+    }
+    .tx-dir-label    { font-size: 12px; }
     .history-tx-hash { font-size: 11px; }
-    .history-ts { font-size: 10px; }
-    .hash-full  { display: none; }
-    .hash-short { display: inline; }
+    .history-ts      { font-size: 10px; }
+    .hash-full       { display: none;   }
+    .hash-short      { display: inline; }
 }
 
-/* ── 360–479px: typical Android budget phone ─────────────────────────────── */
+/* ── <480px: 2-row layout — amount/copy/badge on row 1, hash+date on row 2 */
 @media (max-width: 479px) {
-    .history-item { --hi-amt: 90px; --hi-date: 64px; font-size: 11px; }
-    .tx-dir-label { font-size: 11px; }
-    .history-ts   { font-size: 9px; }
-    .history-tx-hash { font-size: 10px; }
-}
-
-/* ── 320–359px: iPhone SE 1st gen ────────────────────────────────────────── */
-@media (max-width: 359px) {
     .history-item {
         grid-template-columns: 1fr auto auto;
         grid-template-rows: auto auto;
-        row-gap: 2px;
+        column-gap: 6px;
+        row-gap: 3px;
+        font-size: 11px;
     }
-    .tx-dir-label    { grid-column: 1; grid-row: 1; font-size: 10px; }
+    /* Row 1 */
+    .tx-dir-label    { grid-column: 1; grid-row: 1; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .h-copy-btn      { grid-column: 2; grid-row: 1; }
     .h-badge         { grid-column: 3; grid-row: 1; }
-    .history-tx-hash { grid-column: 1 / -1; grid-row: 2; font-size: 9px; }
-    .history-ts      { grid-column: 1 / -1; grid-row: 3; text-align: left; font-size: 9px; }
+    /* Row 2 — hash left, date right */
+    .history-tx-hash { grid-column: 1;     grid-row: 2; font-size: 10px; }
+    .history-ts      { grid-column: 2 / 4; grid-row: 2; text-align: right; font-size: 9px; white-space: nowrap; }
+    /* always use short hash on mobile */
+    .hash-full       { display: none;   }
+    .hash-short      { display: inline; }
+}
+
+/* ── 320–359px: iPhone SE 1st gen — tighten further ─────────────────────── */
+@media (max-width: 359px) {
+    .history-item  { column-gap: 4px; font-size: 10px; }
+    .tx-dir-label  { font-size: 10px; }
+    .history-ts    { font-size: 8px; }
+    .history-tx-hash { font-size: 9px; }
 }
 /* Seed word canvas cell */
 .seed-canvas-cell { overflow: hidden; line-height: 0; }
