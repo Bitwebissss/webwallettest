@@ -22,7 +22,7 @@
   Cache-Control: public, max-age=172800
 
 /js/*
-  Cache-Control: public, max-age=172800
+  Cache-Control: no-cache, must-revalidate
 
 /images/*
   Cache-Control: public, max-age=172800
