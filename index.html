@@ -3,18 +3,19 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta http-equiv="X-Frame-Options" content="DENY">
         <meta name="referrer" content="no-referrer">
         <meta http-equiv="Content-Security-Policy" content="
             default-src 'self';
             script-src 'self';
             style-src 'self';
             connect-src 'self' https://api2.bitwebcore.net wss://api2.bitwebcore.net;
+            worker-src 'none';
             img-src 'self' data: blob:;
             media-src blob:;
             font-src 'self';
             frame-src 'none';
             object-src 'none';
+            upgrade-insecure-requests;
             base-uri 'self';
             form-action 'self';
         ">
@@ -27,7 +28,9 @@
                 integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
                 crossorigin="anonymous">
         <!-- Custom styles -->
-        <link rel="stylesheet" href="css/style.css">
+        <link rel="stylesheet" href="css/style.css"
+                integrity="sha512-7V9m1jf6P/kBHHbK0xZ49ax6dOUbo5dYZSVeOKtusDpD1xm8caPucnqJLYCv+m7YBwd7kbgmejXjcLHD88JRGg=="
+                crossorigin="anonymous">
         <!-- favicon -->
         <link rel="icon" type="image/svg+xml" href="images/logo.svg">
         <!-- Auto/Light/Dark theme controler -->
@@ -56,7 +59,7 @@
                 crossorigin="anonymous"></script>
         <!-- Translates -->
         <script src="js/multilang.js"
-                integrity="sha512-snXL89dPrMyCHEBUYr+BxY4twIRb0D3GEwhB0lxD5owxkn8NWl8ijMld4T9jfgzJ/wH3lVxeM8ddb1Ad2vpyCA=="
+                integrity="sha512-QxcBoWttNC26wgNLOg5EPbjZ8Hn/PEZQfRT3fkKUQxUI4z2KWHG7kueSBv+boLuTAJWLwZy0JijoUMPYAaxiWw=="
                 crossorigin="anonymous"></script>
         <!-- Self build see BUILD4_bip39.md -->
         <script src="js/bip39-bundle.min.js"
@@ -583,6 +586,8 @@
             </div>
         </footer>
         <!-- Wallet Logic -->
-        <script src="js/wallet.js"></script>
+        <script src="js/wallet.js"
+                integrity="sha512-KKUvW5UZhTE+z5LNeukWfORp0kGMPVSGdPDNSggP6Gsiy0aPmgLta5t6Bq3ApM8GdWD+L0x6Ls5LvcOjF0h3OQ=="
+                crossorigin="anonymous"></script>
     </body>
 </html>

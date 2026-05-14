@@ -1849,7 +1849,7 @@ const walletLanguages = {
         'tx-sign-pin-desc': 'トランザクションに署名するためにPINを入力',
         'tx-cancelled': 'トランザクションはキャンセルされました。',
     },
-    'kr': {
+    'ko': {
         'lang-alias': '한국어',
         'open-regular': '일반 지갑',
         'open-key': '개인키로 열기',

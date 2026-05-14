@@ -823,7 +823,7 @@
         let language; try { language = localStorage.getItem('bte_cfg_language'); } catch(e) {}
         let setLang = 'en';
         if (language == null || walletLanguages[language] == undefined) {
-            const userLang = navigator.language.substr(0, 2);
+            const userLang = navigator.language.slice(0, 2);
             if (userLang in walletLanguages) setLang = userLang;
             try { localStorage.setItem('bte_cfg_language', setLang); } catch(e) {}
             language = setLang;
