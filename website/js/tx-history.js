@@ -23,8 +23,8 @@
                 const $btn = $(this);
                 if (!url) return;
                 const done = () => {
-                    $btn.addClass('copied').text('✓');
-                    setTimeout(() => $btn.removeClass('copied').text('⧉'), 1500);
+                    $btn.addClass('btn-success').removeClass('btn-outline-secondary').text('✓');
+                    setTimeout(() => $btn.removeClass('btn-success').addClass('btn-outline-secondary').text('⧉'), 1500);
                 };
                 if (navigator.clipboard && navigator.clipboard.writeText) {
                     navigator.clipboard.writeText(url).then(done).catch(() => {
@@ -170,7 +170,7 @@
                     /* col 3 — date */
                     tsHtml +
                     /* col 4 — copy link button */
-                    '<button class="h-copy-btn" data-copy-url="' + txUrl + '" title="Copy explorer link">&#x29C7;</button>' +
+                    '<button class="btn btn-sm btn-outline-secondary h-copy-btn" data-copy-url="' + txUrl + '" title="Copy explorer link">&#x29C7;</button>' +
                     /* col 5 — confirmations */
                     '<div class="h-badge">' + confBadge + '</div>' +
                     '</div>';

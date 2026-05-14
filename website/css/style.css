@@ -91,21 +91,21 @@ body {
 .history-item {
     /* tuneable per breakpoint via custom props */
     --hi-amt:  165px;
-    --hi-date:  88px;
+    --hi-date:  96px;
     --hi-copy:  26px;
 
     display: grid;
     grid-template-columns: var(--hi-amt) minmax(0,1fr) var(--hi-date) var(--hi-copy) auto;
     column-gap: 6px;
     align-items: center;
-    padding: 5px 0;
-    font-size: 12px;
+    padding: 6px 0;
+    font-size: 13px;
 }
 .history-item:last-child { border-bottom: none !important; }
 
 /* Amount */
 .tx-dir-label {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     white-space: nowrap;
     min-width: 0;
@@ -113,11 +113,11 @@ body {
 
 /* Hash link */
 .history-tx-hash {
-    font-size: 10px;
+    font-size: 12px;
     min-width: 0;
     overflow: hidden;
 }
-.history-tx-hash a { color: inherit; text-decoration: none; }
+.history-tx-hash a { color: var(--bs-link-color); text-decoration: none; }
 .history-tx-hash a:hover { text-decoration: underline; }
 /* full hash: show by default, hide on small screens */
 .hash-full  { display: inline; word-break: break-all; }
@@ -125,50 +125,40 @@ body {
 
 /* Date */
 .history-ts {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--bs-secondary-color);
     white-space: nowrap;
     text-align: right;
     min-width: 0;
 }
 
-/* Copy button */
+/* Copy button — Bootstrap btn-outline-secondary handles colour/border/hover */
 .h-copy-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
     width: var(--hi-copy);
-    height: 20px;
-    padding: 0;
-    background: none;
-    border: 1px solid var(--bs-border-color);
-    border-radius: 3px;
-    font-size: 11px;
+    padding: 0 3px;
+    font-size: 12px;
     line-height: 1;
-    cursor: pointer;
-    color: var(--bs-secondary-color);
-    transition: color .15s, border-color .15s;
 }
-.h-copy-btn:hover  { color: var(--bs-primary);  border-color: var(--bs-primary); }
-.h-copy-btn.copied { color: var(--bs-success);  border-color: var(--bs-success); }
 
 /* Confirmations badge */
 .h-badge { white-space: nowrap; }
 
 /* ── 480–767px: tablet / large phone ─────────────────────────────────────── */
 @media (max-width: 767px) {
-    .history-item { --hi-amt: 120px; --hi-date: 74px; --hi-copy: 22px; }
-    .tx-dir-label { font-size: 11px; }
+    .history-item { --hi-amt: 120px; --hi-date: 80px; --hi-copy: 22px; font-size: 12px; }
+    .tx-dir-label { font-size: 12px; }
+    .history-tx-hash { font-size: 11px; }
+    .history-ts { font-size: 10px; }
     .hash-full  { display: none; }
     .hash-short { display: inline; }
 }
 
 /* ── 360–479px: typical Android budget phone ─────────────────────────────── */
 @media (max-width: 479px) {
-    .history-item { --hi-amt: 90px; --hi-date: 62px; --hi-copy: 18px; font-size: 11px; }
-    .tx-dir-label { font-size: 10px; }
+    .history-item { --hi-amt: 90px; --hi-date: 64px; --hi-copy: 18px; font-size: 11px; }
+    .tx-dir-label { font-size: 11px; }
     .history-ts   { font-size: 9px; }
-    .history-tx-hash { font-size: 9px; }
+    .history-tx-hash { font-size: 10px; }
 }
 
 /* ── 320–359px: iPhone SE 1st gen ────────────────────────────────────────── */
