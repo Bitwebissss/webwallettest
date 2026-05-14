@@ -1133,10 +1133,11 @@
             const col  = $(this).data('sort');
             const icon = $(this).find('.cc-sort-icon');
             if (col === ccSort.col) {
-                icon.text(ccSort.dir === 'asc' ? ' ▲' : ' ▼');
+                icon.removeClass('fa-sort fa-sort-up fa-sort-down')
+                    .addClass(ccSort.dir === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
                 $(this).addClass('cc-sort-active');
             } else {
-                icon.text(' ⇅');
+                icon.removeClass('fa-sort-up fa-sort-down').addClass('fa-sort');
                 $(this).removeClass('cc-sort-active');
             }
         });

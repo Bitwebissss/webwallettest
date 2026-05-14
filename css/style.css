@@ -108,8 +108,26 @@ body {
 }
 
 /* Coin control — sortable column headers */
-.cc-sort-th { cursor: pointer; user-select: none; white-space: nowrap; }
-.cc-sort-th:hover { opacity: 0.75; }
-.cc-sort-active { font-weight: 600; }
-.cc-sort-icon { font-size: 0.75em; opacity: 0.6; }
+.cc-sort-th { cursor: pointer; padding: 4px 2px !important; }
+.cc-sort-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    padding: 1px 6px;
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius-sm);
+    white-space: nowrap;
+    transition: border-color 0.15s, color 0.15s;
+}
+.cc-sort-th:hover .cc-sort-btn {
+    border-color: var(--bs-primary);
+    color: var(--bs-primary);
+}
+.cc-sort-th.cc-sort-active .cc-sort-btn {
+    border-color: var(--bs-primary);
+    color: var(--bs-primary);
+    font-weight: 600;
+}
+.cc-sort-icon { font-size: 0.85em; opacity: 0.5; }
 .cc-sort-active .cc-sort-icon { opacity: 1; }
