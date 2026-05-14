@@ -1357,15 +1357,20 @@
     function fillMaxAmount($row) {
         const feeStr  = $('#send-fee').val() !== '' ? $('#send-fee').val() : String(globalData.rfee);
         const feeSats = parseAmountSats(feeStr) || parseAmountSats(String(getConfig()['fee'])) || 0;
-        let spendableSats;
-        if (globalData.coinControl && globalData.selectedUtxos && globalData.selectedUtxos.size > 0) {
-            spendableSats = 0;
-            globalData.utxos.forEach(function(u) {
-                if (globalData.selectedUtxos.has(u.txid + ':' + u.index) && Number(u.height) > 0 && u.mature)
-                    spendableSats += u.value;
-            });
+        let spendableSats = 0;
+        if (globalData.coinControl && globalData.selectedUtxos !== null) {
+            // Coin Control активен: считаем только выбранные UTXO
+            // Пустой Set → spendableSats остаётся 0
+            if (globalData.selectedUtxos.size > 0) {
+                globalData.utxos.forEach(function(u) {
+                    if (globalData.selectedUtxos.has(u.txid + ':' + u.index) && Number(u.height) > 0 && u.mature)
+                        spendableSats += u.value;
+                });
+            }
         } else {
-            spendableSats = Math.max(0, globalData.balance - (globalData.immatureBalance || 0) - (globalData.pendingOut || 0));
+            globalData.utxos.forEach(function(u) {
+                if (Number(u.height) > 0 && u.mature) spendableSats += u.value;
+            });
         }
         let otherSats = 0;
         $('#send-outputs .send-outputs-item').each(function() {
@@ -1374,9 +1379,10 @@
             if (amt && amt > 0) otherSats += amt;
         });
         const maxSats = Math.max(0, spendableSats - feeSats - otherSats);
-        if (maxSats <= 0) return;
+        if (maxSats <= 0) return false;
         $row.find('[name="send-amount"]').val(amountFormat(maxSats));
         validateSendForm();
+        return true;
     }
     function sendTransaction() {
         if (isSending) return;
@@ -2300,6 +2306,7 @@
                 '<div class="send-additional-output send-outputs-item input-group mb-2">' +
                 '<input name="send-address" class="form-control" placeholder="' + escHtml(getText('enter-address')) + '" type="text" autocomplete="off">' +
                 '<input name="send-amount" class="form-control" placeholder="' + escHtml(getText('amount')) + '" type="text" autocomplete="off">' +
+                '<button class="send-max btn btn-outline-secondary" type="button" title="Max">MAX</button>' +
                 '<button class="btn btn-outline-danger remove-additional-output" type="button"><span class="fa-solid fa-minus"></span></button>' +
                 '</div>'
             );
@@ -2311,10 +2318,11 @@
             validateSendForm();
             e.preventDefault();
         });
-        $(document).on('click', '#send-max', function(e) {
+        $(document).on('click', '.send-max', function(e) {
             e.preventDefault();
             if (globalData.status !== 'unlocked') return;
-            fillMaxAmount($(this).closest('.send-outputs-item'));
+            const filled = fillMaxAmount($(this).closest('.send-outputs-item'));
+            if (!filled) showMessage(escHtml(getText('not-enough-funds')));
         });
         $('#send-reset').click(function(e) { resetTxForm(); e.preventDefault(); });
         $('#send-qr').click(function(e)    { showScanModal(); e.preventDefault(); });
