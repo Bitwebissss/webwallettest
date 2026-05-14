@@ -18,6 +18,9 @@
 /css/*
   Cache-Control: public, max-age=172800
 
+/webfonts/*
+  Cache-Control: public, max-age=172800
+
 /js/*
   Cache-Control: public, max-age=172800
 
