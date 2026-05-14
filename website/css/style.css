@@ -93,7 +93,7 @@ body {
     --hi-date:  96px;
 
     display: grid;
-    grid-template-columns: var(--hi-amt) minmax(0,1fr) var(--hi-date) auto auto;
+    grid-template-columns: var(--hi-amt) minmax(0, max-content) var(--hi-date) auto 1fr;
     column-gap: 6px;
     align-items: center;
     padding: 6px 0;
@@ -131,7 +131,7 @@ body {
 }
 
 /* Confirmations badge */
-.h-badge { white-space: nowrap; }
+.h-badge { white-space: nowrap; justify-self: end; }
 
 /* ── 480–767px: tablet / large phone ─────────────────────────────────────── */
 @media (max-width: 767px) {
