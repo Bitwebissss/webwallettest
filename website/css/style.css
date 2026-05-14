@@ -37,7 +37,6 @@ body {
 }
 .balance-small { font-size: 15px; }
 .break-word { word-wrap: break-word; }
-#history-list { max-height: 320px; overflow-y: auto; padding-right: 20px; }
 .pin-login-card .card-body { padding: 1.5rem; }
 .pin-login-title { font-size: 15px; color: var(--bs-secondary-color); margin-bottom: 12px; text-align: center; }
 /* ── Extracted from inline styles ─────────────────────────────────────────── */
@@ -78,42 +77,61 @@ body {
 .history-overflow { overflow: hidden; }
 /* Disclaimer max-width */
 .disclaimer small { max-width: 1100px; display: inline-block; }
-/* ── Transaction history: 5-column adaptive grid ────────────────────────── */
+/* ── Transaction history ──────────────────────────────────────────────────── */
 /*
- *  Columns: [amount] [hash] [date] [copy] [confirmations]
+ * ARCHITECTURE: #history-list is the ONE shared CSS Grid.
+ * .history-item → display:contents (transparent wrapper).
+ * Its 5 children become direct grid cells — ALL rows share the same columns.
+ * The widest content in each column sets the width for every row.
  *
- *  KEY FIX: hash column uses minmax(0, 1fr) — never overflows into neighbours.
+ * Columns: [amount] [hash 1fr] [date] [copy 34px] [badge]
  *
- *  ≥768px  → full 64-char hash visible
- *  480–767px → truncated hash (first8…last8), date still visible
- *  <480px  → 2-row layout: row1 = amount | copy | badge
- *                           row2 = hash | date (both always shown)
+ * ≥480px : single-row, hash truncated below 768px
+ * <480px : per-item 2-row grid (amount+copy+badge / hash+date)
  */
-.history-item {
+
+/* ── Shared grid container ──────────────────────────────────────────────── */
+#history-list {
     display: grid;
-    grid-template-columns: 165px minmax(0, 1fr) 96px auto auto;
-    column-gap: 8px;
+    grid-template-columns:
+        max-content       /* [1] amount  — widest row defines width for all */
+        minmax(0, 1fr)    /* [2] hash    — takes all remaining space        */
+        max-content       /* [3] date    — "dd.mm.yyyy hh:mm" fixed width   */
+        34px              /* [4] copy    — icon button                      */
+        max-content;      /* [5] badge   — widest badge defines width (!) */
+    column-gap: 10px;
     align-items: center;
-    padding: 6px 0;
-    font-size: 13px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 6px;
 }
-.history-item:last-child { border-bottom: none !important; }
+
+/* Loading / error / view-all divs span every column */
+#history-list > div:not(.history-item) {
+    grid-column: 1 / -1;
+}
+
+/* Transparent row wrapper — children become the actual grid cells */
+.history-item {
+    display: contents;
+}
+
+/* Every cell: row separator */
+.history-item > * {
+    padding: 7px 0;
+    border-bottom: 1px solid var(--bs-border-color);
+    min-width: 0;
+}
 
 /* Amount */
 .tx-dir-label {
     font-size: 13px;
     font-weight: 600;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
-/* Hash link */
-.history-tx-hash {
-    font-size: 12px;
-    min-width: 0;
-    overflow: hidden;
-}
+/* Hash */
+.history-tx-hash { font-size: 12px; overflow: hidden; }
 .history-tx-hash a {
     color: var(--bs-link-color);
     text-decoration: none;
@@ -123,7 +141,6 @@ body {
     white-space: nowrap;
 }
 .history-tx-hash a:hover { text-decoration: underline; }
-/* full hash: show by default, hide on small screens */
 .hash-full  { display: inline; }
 .hash-short { display: none;   }
 
@@ -133,56 +150,64 @@ body {
     color: var(--bs-secondary-color);
     white-space: nowrap;
     text-align: right;
-    min-width: 0;
 }
 
-/* Copy button */
-.h-copy-btn { flex-shrink: 0; }
+/* Copy btn */
+.h-copy-btn { justify-self: center; }
 
-/* Confirmations badge */
-.h-badge { white-space: nowrap; flex-shrink: 0; }
+/* Badge */
+.h-badge { white-space: nowrap; text-align: center; }
 
-/* ── 480–767px: tablet / large phone — truncate hash, keep date ───────── */
+/* ── 480–767px: truncate hash, shrink fonts — columns stay perfectly aligned */
 @media (max-width: 767px) {
-    .history-item {
-        grid-template-columns: 130px minmax(0, 1fr) 82px auto auto;
-        column-gap: 6px;
-        font-size: 12px;
-    }
-    .tx-dir-label    { font-size: 12px; }
+    #history-list  { column-gap: 7px; font-size: 12px; }
+    .tx-dir-label  { font-size: 12px; }
     .history-tx-hash { font-size: 11px; }
-    .history-ts      { font-size: 10px; }
-    .hash-full       { display: none;   }
-    .hash-short      { display: inline; }
+    .history-ts    { font-size: 10px; }
+    .hash-full     { display: none;   }
+    .hash-short    { display: inline; }
 }
 
-/* ── <480px: 2-row layout — amount/copy/badge on row 1, hash+date on row 2 */
+/* ── <480px: switch to per-item 2-row layout ─────────────────────────────── */
 @media (max-width: 479px) {
+    /* Restore block flow on the container */
+    #history-list { display: block; }
+
+    /* Each item becomes its own 2-row grid */
     .history-item {
+        display: grid;
         grid-template-columns: 1fr auto auto;
         grid-template-rows: auto auto;
         column-gap: 6px;
         row-gap: 3px;
-        font-size: 11px;
+        padding: 7px 0;
+        border-bottom: 1px solid var(--bs-border-color);
+        align-items: center;
     }
-    /* Row 1 */
-    .tx-dir-label    { grid-column: 1; grid-row: 1; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .h-copy-btn      { grid-column: 2; grid-row: 1; }
-    .h-badge         { grid-column: 3; grid-row: 1; }
-    /* Row 2 — hash left, date right */
+
+    /* Reset shared-grid cell styles */
+    .history-item > * { padding: 0; border-bottom: none; }
+
+    /* Row 1: [amount] [copy] [badge] */
+    .tx-dir-label { grid-column: 1; grid-row: 1; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .h-copy-btn   { grid-column: 2; grid-row: 1; align-self: center; }
+    .h-badge      { grid-column: 3; grid-row: 1; align-self: center; white-space: nowrap; text-align: right; }
+
+    /* Row 2: [hash] [date] */
     .history-tx-hash { grid-column: 1;     grid-row: 2; font-size: 10px; }
     .history-ts      { grid-column: 2 / 4; grid-row: 2; text-align: right; font-size: 9px; white-space: nowrap; }
-    /* always use short hash on mobile */
-    .hash-full       { display: none;   }
-    .hash-short      { display: inline; }
+
+    .hash-full  { display: none;   }
+    .hash-short { display: inline; }
+
+    .history-item:last-child { border-bottom: none; }
 }
 
-/* ── 320–359px: iPhone SE 1st gen — tighten further ─────────────────────── */
+/* ── 320–359px ──────────────────────────────────────────────────────────── */
 @media (max-width: 359px) {
-    .history-item  { column-gap: 4px; font-size: 10px; }
-    .tx-dir-label  { font-size: 10px; }
-    .history-ts    { font-size: 8px; }
-    .history-tx-hash { font-size: 9px; }
+    .tx-dir-label    { font-size: 10px; }
+    .history-ts      { font-size: 8px;  }
+    .history-tx-hash { font-size: 9px;  }
 }
 /* Seed word canvas cell */
 .seed-canvas-cell { overflow: hidden; line-height: 0; }
