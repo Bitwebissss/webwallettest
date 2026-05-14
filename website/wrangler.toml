@@ -1,11 +1,11 @@
 name = "webwallettest"
 compatibility_date = "2026-05-14"
 
+workers_dev = false
+
 [assets]
 directory = "."
+binding = "ASSETS"
 
-[build]
-minify = false
-
-[build.upload]
-format = "modules"
+[preview_urls]
+enabled = false
