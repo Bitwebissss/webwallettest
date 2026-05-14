@@ -17,6 +17,32 @@
             this.#getConfig     = deps.getConfig;
             this.#amountFormat  = deps.amountFormat;
             this.#blockExplorer = deps.blockExplorer;
+            /* copy-link handler — delegated, set once */
+            $(document).off('click.hcopy').on('click.hcopy', '.h-copy-btn', function () {
+                const url  = $(this).data('copy-url');
+                const $btn = $(this);
+                if (!url) return;
+                const done = () => {
+                    $btn.addClass('copied').text('✓');
+                    setTimeout(() => $btn.removeClass('copied').text('⧉'), 1500);
+                };
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(url).then(done).catch(() => {
+                        /* fallback for http or blocked clipboard */
+                        try { const ta = document.createElement('textarea');
+                              ta.value = url; ta.style.cssText = 'position:fixed;opacity:0';
+                              document.body.appendChild(ta); ta.select();
+                              document.execCommand('copy'); document.body.removeChild(ta); done();
+                        } catch (_) {}
+                    });
+                } else {
+                    try { const ta = document.createElement('textarea');
+                          ta.value = url; ta.style.cssText = 'position:fixed;opacity:0';
+                          document.body.appendChild(ta); ta.select();
+                          document.execCommand('copy'); document.body.removeChild(ta); done();
+                    } catch (_) {}
+                }
+            });
         }
         loadHistory() {
             const key = 'bte_history_' + this.#globalData.address;
@@ -62,6 +88,11 @@
                     );
                 }
             }
+        }
+        /* first8…last8 truncation for narrow screens */
+        #truncHash(hash) {
+            if (!hash || hash.length <= 20) return hash;
+            return hash.slice(0, 8) + '\u2026' + hash.slice(-8);
         }
         #formatTs(ts) {
             if (!ts) return '';
@@ -113,21 +144,36 @@
                     dirLabel = '<span class="text-muted tx-dir-label">— ? ' +
                                this.#escHtml(ticker) + '</span>';
                 }
-                const safeHash = this.#escHtml(tx.txid || '');
-                const txUrl = this.#escHtml(this.#blockExplorer.tx(tx.txid || ''));
-                const tsHtml = tx.timestamp
-                    ? ' <span class="text-muted history-ts">' +
-                      this.#escHtml(this.#formatTs(tx.timestamp)) + '</span>'
-                    : '';
-                html += '<div class="history-item border-bottom history-item-inner">' +
-                        dirLabel +
-                        '<div class="font-monospace flex-grow-1 history-tx-hash break-word">' +
-                            '<a href="' + txUrl + '" target="_blank" rel="noopener noreferrer">' +
-                            safeHash + '</a>' +
-                            tsHtml +
-                        '</div>' +
-                        '<div class="flex-shrink-0">' + confBadge + '</div>' +
-                        '</div>';
+                const safeHashFull  = this.#escHtml(tx.txid || '');
+                const safeHashShort = this.#escHtml(this.#truncHash(tx.txid || ''));
+                const rawTxUrl  = this.#blockExplorer.tx(tx.txid || '');
+                const txUrl     = this.#escHtml(rawTxUrl);
+                const tsHtml    = tx.timestamp
+                    ? '<span class="history-ts">' + this.#escHtml(this.#formatTs(tx.timestamp)) + '</span>'
+                    : '<span class="history-ts"></span>';
+
+                /*
+                 * 5 direct grid children → columns line up perfectly:
+                 *   [dirLabel] [hash] [date] [copy] [badge]
+                 */
+                html +=
+                    '<div class="history-item border-bottom">' +
+                    /* col 1 — amount */
+                    dirLabel +
+                    /* col 2 — hash (full on wide, short on narrow via CSS) */
+                    '<div class="font-monospace history-tx-hash">' +
+                        '<a href="' + txUrl + '" target="_blank" rel="noopener noreferrer">' +
+                            '<span class="hash-full">'  + safeHashFull  + '</span>' +
+                            '<span class="hash-short">' + safeHashShort + '</span>' +
+                        '</a>' +
+                    '</div>' +
+                    /* col 3 — date */
+                    tsHtml +
+                    /* col 4 — copy link button */
+                    '<button class="h-copy-btn" data-copy-url="' + txUrl + '" title="Copy explorer link">&#x29C7;</button>' +
+                    /* col 5 — confirmations */
+                    '<div class="h-badge">' + confBadge + '</div>' +
+                    '</div>';
             });
             if (txs.length >= HISTORY_LIMIT) {
                 const explorerUrl = this.#escHtml(this.#blockExplorer.address(this.#globalData.address));

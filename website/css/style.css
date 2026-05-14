@@ -80,35 +80,112 @@ body {
 .history-overflow { overflow: hidden; }
 /* Disclaimer max-width */
 .disclaimer small { max-width: 1100px; display: inline-block; }
-/* Transaction history direction labels */
-.tx-dir-label {
-    min-width: 175px;          /* ≥ "↑ −46 000 000.00000000 BTE" */
-    display: inline-block;
-    white-space: nowrap;
-    flex-shrink: 0;
+/* ── Transaction history: 5-column adaptive grid ────────────────────────── */
+/*
+ *  Minimum supported viewport: 320px (iPhone SE 1st gen, 2016)
+ *  Target: devices with const/let support (Chrome 49+, Firefox 44+,
+ *           Safari 10+, Edge 14+) — IE11 dropped.
+ *
+ *  Columns: [amount] [hash] [date] [copy] [confirmations]
+ *  ≥768px  → full 64-char hash
+ *  <768px  → truncated hash: first8…last8
+ */
+.history-item {
+    /* tuneable per breakpoint via custom props */
+    --hi-amt:  165px;
+    --hi-date:  88px;
+    --hi-copy:  26px;
+
+    display: grid;
+    grid-template-columns: var(--hi-amt) minmax(0,1fr) var(--hi-date) var(--hi-copy) auto;
+    column-gap: 6px;
+    align-items: center;
+    padding: 5px 0;
     font-size: 12px;
 }
-/* Transaction history item — 3-column grid: amount | hash+date | conf */
-.history-item-inner {
-    display: grid !important;
-    grid-template-columns: 175px 1fr auto;
-    gap: 4px 8px;
-    align-items: center;
+.history-item:last-child { border-bottom: none !important; }
+
+/* Amount */
+.tx-dir-label {
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    min-width: 0;
 }
-/* Transaction hash font */
-.history-tx-hash { font-size: 11px; overflow: hidden; }
-/* Date shown inline after hash */
-.history-ts {
-    display: inline;
-    margin-left: 6px;
+
+/* Hash link */
+.history-tx-hash {
     font-size: 10px;
+    min-width: 0;
+    overflow: hidden;
 }
-/* Mobile: slightly narrower amount column, hash wraps */
-@media (max-width: 575px) {
-    .tx-dir-label          { min-width: 130px; font-size: 11px; }
-    .history-item-inner    { grid-template-columns: 130px 1fr auto; }
-    .history-tx-hash       { font-size: 10px; word-break: break-all; }
-    .history-ts            { display: block; margin-left: 0; }
+.history-tx-hash a { color: inherit; text-decoration: none; }
+.history-tx-hash a:hover { text-decoration: underline; }
+/* full hash: show by default, hide on small screens */
+.hash-full  { display: inline; word-break: break-all; }
+.hash-short { display: none;   word-break: keep-all;  }
+
+/* Date */
+.history-ts {
+    font-size: 10px;
+    color: var(--bs-secondary-color);
+    white-space: nowrap;
+    text-align: right;
+    min-width: 0;
+}
+
+/* Copy button */
+.h-copy-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--hi-copy);
+    height: 20px;
+    padding: 0;
+    background: none;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 3px;
+    font-size: 11px;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--bs-secondary-color);
+    transition: color .15s, border-color .15s;
+}
+.h-copy-btn:hover  { color: var(--bs-primary);  border-color: var(--bs-primary); }
+.h-copy-btn.copied { color: var(--bs-success);  border-color: var(--bs-success); }
+
+/* Confirmations badge */
+.h-badge { white-space: nowrap; }
+
+/* ── 480–767px: tablet / large phone ─────────────────────────────────────── */
+@media (max-width: 767px) {
+    .history-item { --hi-amt: 120px; --hi-date: 74px; --hi-copy: 22px; }
+    .tx-dir-label { font-size: 11px; }
+    .hash-full  { display: none; }
+    .hash-short { display: inline; }
+}
+
+/* ── 360–479px: typical Android budget phone ─────────────────────────────── */
+@media (max-width: 479px) {
+    .history-item { --hi-amt: 90px; --hi-date: 62px; --hi-copy: 18px; font-size: 11px; }
+    .tx-dir-label { font-size: 10px; }
+    .history-ts   { font-size: 9px; }
+    .history-tx-hash { font-size: 9px; }
+}
+
+/* ── 320–359px: iPhone SE 1st gen ────────────────────────────────────────── */
+@media (max-width: 359px) {
+    .history-item {
+        grid-template-columns: 1fr var(--hi-copy) auto;
+        grid-template-rows: auto auto;
+        row-gap: 2px;
+        --hi-copy: 18px;
+    }
+    .tx-dir-label    { grid-column: 1; grid-row: 1; font-size: 10px; }
+    .h-copy-btn      { grid-column: 2; grid-row: 1; }
+    .h-badge         { grid-column: 3; grid-row: 1; }
+    .history-tx-hash { grid-column: 1 / -1; grid-row: 2; font-size: 9px; }
+    .history-ts      { grid-column: 1 / -1; grid-row: 3; text-align: left; font-size: 9px; }
 }
 /* Seed word canvas cell */
 .seed-canvas-cell { overflow: hidden; line-height: 0; }
