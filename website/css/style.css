@@ -89,13 +89,11 @@ body {
  *  <768px  → truncated hash: first8…last8
  */
 .history-item {
-    /* tuneable per breakpoint via custom props */
     --hi-amt:  165px;
     --hi-date:  96px;
-    --hi-copy:  26px;
 
     display: grid;
-    grid-template-columns: var(--hi-amt) minmax(0,1fr) var(--hi-date) var(--hi-copy) auto;
+    grid-template-columns: var(--hi-amt) minmax(0,1fr) var(--hi-date) auto auto;
     column-gap: 6px;
     align-items: center;
     padding: 6px 0;
@@ -140,7 +138,7 @@ body {
 
 /* ── 480–767px: tablet / large phone ─────────────────────────────────────── */
 @media (max-width: 767px) {
-    .history-item { --hi-amt: 120px; --hi-date: 80px; --hi-copy: 22px; font-size: 12px; }
+    .history-item { --hi-amt: 120px; --hi-date: 80px; font-size: 12px; }
     .tx-dir-label { font-size: 12px; }
     .history-tx-hash { font-size: 11px; }
     .history-ts { font-size: 10px; }
@@ -150,7 +148,7 @@ body {
 
 /* ── 360–479px: typical Android budget phone ─────────────────────────────── */
 @media (max-width: 479px) {
-    .history-item { --hi-amt: 90px; --hi-date: 64px; --hi-copy: 18px; font-size: 11px; }
+    .history-item { --hi-amt: 90px; --hi-date: 64px; font-size: 11px; }
     .tx-dir-label { font-size: 11px; }
     .history-ts   { font-size: 9px; }
     .history-tx-hash { font-size: 10px; }
@@ -159,10 +157,9 @@ body {
 /* ── 320–359px: iPhone SE 1st gen ────────────────────────────────────────── */
 @media (max-width: 359px) {
     .history-item {
-        grid-template-columns: 1fr var(--hi-copy) auto;
+        grid-template-columns: 1fr auto auto;
         grid-template-rows: auto auto;
         row-gap: 2px;
-        --hi-copy: 18px;
     }
     .tx-dir-label    { grid-column: 1; grid-row: 1; font-size: 10px; }
     .h-copy-btn      { grid-column: 2; grid-row: 1; }
