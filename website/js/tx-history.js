@@ -116,10 +116,10 @@
                 const safeHash = this.#escHtml(tx.txid || '');
                 const txUrl = this.#escHtml(this.#blockExplorer.tx(tx.txid || ''));
                 const tsHtml = tx.timestamp
-                    ? '<div class="text-muted history-ts">' +
-                      this.#escHtml(this.#formatTs(tx.timestamp)) + '</div>'
+                    ? ' <span class="text-muted history-ts">' +
+                      this.#escHtml(this.#formatTs(tx.timestamp)) + '</span>'
                     : '';
-                html += '<div class="history-item d-flex align-items-center border-bottom history-item-inner">' +
+                html += '<div class="history-item border-bottom history-item-inner">' +
                         dirLabel +
                         '<div class="font-monospace flex-grow-1 history-tx-hash break-word">' +
                             '<a href="' + txUrl + '" target="_blank" rel="noopener noreferrer">' +
