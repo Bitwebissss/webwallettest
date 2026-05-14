@@ -11,7 +11,15 @@
     const STORAGE_KEY_PRIV_PK = 'bte_wallet_privkey_pk';
     const STORAGE_KEY_SEED_PK = 'bte_wallet_seed_pk';
     const STORAGE_KEY_PK_ID   = 'bte_pk_credential_id';
+    const STORAGE_KEY_CC_SORT  = 'bte_cc_sort';
     const PK_PRF_SALT = new TextEncoder().encode('bitweb-wallet-v1');
+    let ccSort = (function() {
+        try {
+            const s = JSON.parse(localStorage.getItem(STORAGE_KEY_CC_SORT));
+            if (s && ['amount','confs','type','status'].indexOf(s.col) >= 0 && ['asc','desc'].indexOf(s.dir) >= 0) return s;
+        } catch(e) {}
+        return { col: 'amount', dir: 'desc' };
+    })();
     const networkConfigs = {
         'BTE': {
             'uri':     'bitweb:',
@@ -1117,18 +1125,62 @@
         });
         validateSendForm();
     }
+    function saveCcSort() {
+        try { localStorage.setItem(STORAGE_KEY_CC_SORT, JSON.stringify(ccSort)); } catch(e) {}
+    }
+    function updateCcSortIcons() {
+        $('.cc-sort-th').each(function() {
+            const col  = $(this).data('sort');
+            const icon = $(this).find('.cc-sort-icon');
+            if (col === ccSort.col) {
+                icon.text(ccSort.dir === 'asc' ? ' ▲' : ' ▼');
+                $(this).addClass('cc-sort-active');
+            } else {
+                icon.text(' ⇅');
+                $(this).removeClass('cc-sort-active');
+            }
+        });
+    }
+    function sortUtxos(utxos) {
+        const height = globalData.height;
+        const col = ccSort.col;
+        const dir = ccSort.dir === 'asc' ? 1 : -1;
+        return utxos.slice().sort(function(a, b) {
+            let va, vb;
+            if (col === 'amount') {
+                va = a.value; vb = b.value;
+            } else if (col === 'confs') {
+                va = (height > 0 && a.height > 0) ? (height - a.height + 1) : -1;
+                vb = (height > 0 && b.height > 0) ? (height - b.height + 1) : -1;
+            } else if (col === 'type') {
+                va = a.coinbase ? 1 : 0; vb = b.coinbase ? 1 : 0;
+            } else if (col === 'status') {
+                function statusRank(u) {
+                    if (Number(u.height) === 0) return 2;
+                    if (!u.mature)              return 1;
+                    return 0;
+                }
+                va = statusRank(a); vb = statusRank(b);
+            }
+            if (va < vb) return -1 * dir;
+            if (va > vb) return  1 * dir;
+            return 0;
+        });
+    }
     function renderCoinControl() {
         const utxos  = globalData.utxos;
         const height = globalData.height;
         const tbody  = $('#coin-control-tbody');
         tbody.empty();
+        updateCcSortIcons();
         if (utxos.length === 0) {
             tbody.append('<tr><td colspan="5" class="text-muted text-center">' + escHtml(getText('coin-control-no-utxo')) + '</td></tr>');
             updateCoinControlInfo();
             return;
         }
         $('#coin-control-enable').prop('checked', globalData.coinControl);
-        utxos.forEach(function(u) {
+        const sorted = sortUtxos(utxos);
+        sorted.forEach(function(u) {
             const key       = escHtml(u.txid + ':' + u.index);
             const confirmed = Number(u.height) > 0;
             const mature    = u.mature;
@@ -2273,6 +2325,17 @@
             renderCoinControl();
             validateSendForm();
             e.preventDefault();
+        });
+        $(document).on('click', '.cc-sort-th', function() {
+            const col = $(this).data('sort');
+            if (ccSort.col === col) {
+                ccSort.dir = ccSort.dir === 'asc' ? 'desc' : 'asc';
+            } else {
+                ccSort.col = col;
+                ccSort.dir = col === 'amount' ? 'desc' : 'asc';
+            }
+            saveCcSort();
+            renderCoinControl();
         });
         $(document).on('change', '.cc-utxo-check', function() {
             if (!globalData.coinControl || !globalData.selectedUtxos) return;

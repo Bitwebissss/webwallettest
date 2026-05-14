@@ -27,9 +27,7 @@
                 integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
                 crossorigin="anonymous">
         <!-- Custom styles -->
-        <link rel="stylesheet" href="css/style.css"
-                integrity="sha512-GDVzMdMixnlCiJnoeEaLglRTpxW6j7MRdV/6IyRNGhmrcYcKs040EUkWbeQZb8J5lKFXQmKUqRIaPCKbn/nnSg=="
-                crossorigin="anonymous">
+        <link rel="stylesheet" href="css/style.css">
         <!-- favicon -->
         <link rel="icon" type="image/svg+xml" href="images/logo.svg">
         <!-- Auto/Light/Dark theme controler -->
@@ -373,10 +371,10 @@
                                             <thead>
                                                 <tr>
                                                     <th class="cc-th-check"></th>
-                                                    <th tkey="amount">Amount</th>
-                                                    <th tkey="coin-control-confs">Confs</th>
-                                                    <th tkey="coin-control-type">Type</th>
-                                                    <th tkey="coin-control-status">Status</th>
+                                                    <th class="cc-sort-th" data-sort="amount" tkey="amount">Amount <span class="cc-sort-icon"></span></th>
+                                                    <th class="cc-sort-th" data-sort="confs" tkey="coin-control-confs">Confs <span class="cc-sort-icon"></span></th>
+                                                    <th class="cc-sort-th" data-sort="type" tkey="coin-control-type">Type <span class="cc-sort-icon"></span></th>
+                                                    <th class="cc-sort-th" data-sort="status" tkey="coin-control-status">Status <span class="cc-sort-icon"></span></th>
                                                 </tr>
                                             </thead>
                                             <tbody id="coin-control-tbody"></tbody>

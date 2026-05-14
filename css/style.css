@@ -106,3 +106,10 @@ body {
     background-color: var(--bs-danger);
     color: #fff;
 }
+
+/* Coin control — sortable column headers */
+.cc-sort-th { cursor: pointer; user-select: none; white-space: nowrap; }
+.cc-sort-th:hover { opacity: 0.75; }
+.cc-sort-active { font-weight: 600; }
+.cc-sort-icon { font-size: 0.75em; opacity: 0.6; }
+.cc-sort-active .cc-sort-icon { opacity: 1; }
