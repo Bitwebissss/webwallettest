@@ -37,8 +37,6 @@ body {
 }
 .balance-small { font-size: 15px; }
 .break-word { word-wrap: break-word; }
-.history-item { font-size: 13px; padding: 6px 0; }
-.history-item:last-child { border-bottom: none !important; }
 #history-list { max-height: 320px; overflow-y: auto; padding-right: 20px; }
 .pin-login-card .card-body { padding: 1.5rem; }
 .pin-login-title { font-size: 15px; color: var(--bs-secondary-color); margin-bottom: 12px; text-align: center; }
