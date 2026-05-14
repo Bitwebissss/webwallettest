@@ -3,3 +3,9 @@ compatibility_date = "2026-05-14"
 
 [assets]
 directory = "."
+
+[build]
+minify = false
+
+[build.upload]
+format = "modules"
