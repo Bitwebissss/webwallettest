@@ -8,13 +8,3 @@
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: same-origin
   Cross-Origin-Embedder-Policy: require-corp
-  Cache-Control: no-store, no-cache, must-revalidate
-  
-/css/*
-  Cache-Control: public, max-age=172800
-
-/js/*
-  Cache-Control: public, max-age=172800
-
-/images/*
-  Cache-Control: public, max-age=172800
