@@ -132,13 +132,8 @@ body {
     min-width: 0;
 }
 
-/* Copy button — Bootstrap btn-outline-secondary handles colour/border/hover */
-.h-copy-btn {
-    width: var(--hi-copy);
-    padding: 0 3px;
-    font-size: 12px;
-    line-height: 1;
-}
+/* Copy button — Bootstrap btn-sm btn-outline-secondary handles all sizing */
+.h-copy-btn { font-size: 12px; }
 
 /* Confirmations badge */
 .h-badge { white-space: nowrap; }
