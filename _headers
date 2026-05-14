@@ -7,3 +7,4 @@
   Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://api2.bitwebcore.net wss://api2.bitwebcore.net; worker-src 'none'; img-src 'self' data: blob:; media-src blob:; font-src 'self'; frame-src 'none'; object-src 'none'; upgrade-insecure-requests; base-uri 'self'; form-action 'self'
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
