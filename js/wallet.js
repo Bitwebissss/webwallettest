@@ -1354,6 +1354,30 @@
         try { bitcoin.address.fromBech32(address); if (address.toLowerCase().startsWith(network.bech32 + '1p')) return true; } catch(e) {}
         return false;
     }
+    function fillMaxAmount($row) {
+        const feeStr  = $('#send-fee').val() !== '' ? $('#send-fee').val() : String(globalData.rfee);
+        const feeSats = parseAmountSats(feeStr) || parseAmountSats(String(getConfig()['fee'])) || 0;
+        let spendableSats;
+        if (globalData.coinControl && globalData.selectedUtxos && globalData.selectedUtxos.size > 0) {
+            spendableSats = 0;
+            globalData.utxos.forEach(function(u) {
+                if (globalData.selectedUtxos.has(u.txid + ':' + u.index) && Number(u.height) > 0 && u.mature)
+                    spendableSats += u.value;
+            });
+        } else {
+            spendableSats = Math.max(0, globalData.balance - (globalData.immatureBalance || 0) - (globalData.pendingOut || 0));
+        }
+        let otherSats = 0;
+        $('#send-outputs .send-outputs-item').each(function() {
+            if ($(this).is($row)) return;
+            const amt = parseAmountSats($('[name="send-amount"]', this).val());
+            if (amt && amt > 0) otherSats += amt;
+        });
+        const maxSats = Math.max(0, spendableSats - feeSats - otherSats);
+        if (maxSats <= 0) return;
+        $row.find('[name="send-amount"]').val(amountFormat(maxSats));
+        validateSendForm();
+    }
     function sendTransaction() {
         if (isSending) return;
         isSending = true;
@@ -2286,6 +2310,11 @@
             });
             validateSendForm();
             e.preventDefault();
+        });
+        $(document).on('click', '#send-max', function(e) {
+            e.preventDefault();
+            if (globalData.status !== 'unlocked') return;
+            fillMaxAmount($(this).closest('.send-outputs-item'));
         });
         $('#send-reset').click(function(e) { resetTxForm(); e.preventDefault(); });
         $('#send-qr').click(function(e)    { showScanModal(); e.preventDefault(); });

@@ -131,3 +131,6 @@ body {
 }
 .cc-sort-icon { font-size: 0.85em; opacity: 0.5; }
 .cc-sort-active .cc-sort-icon { opacity: 1; }
+
+/* Send form — MAX button */
+#send-max { font-size: 11px; padding: 0 8px; font-weight: 600; letter-spacing: 0.03em; }
