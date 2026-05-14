@@ -130,9 +130,6 @@ body {
     min-width: 0;
 }
 
-/* Copy button — Bootstrap btn-sm btn-outline-secondary handles all sizing */
-.h-copy-btn { font-size: 12px; }
-
 /* Confirmations badge */
 .h-badge { white-space: nowrap; }
 

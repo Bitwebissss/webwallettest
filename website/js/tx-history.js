@@ -19,28 +19,33 @@
             this.#blockExplorer = deps.blockExplorer;
             /* copy-link handler — delegated, set once */
             $(document).off('click.hcopy').on('click.hcopy', '.h-copy-btn', function () {
-                const url  = $(this).data('copy-url');
-                const $btn = $(this);
+                const url       = $(this).data('copy-url');
+                const $btn      = $(this);
                 if (!url) return;
-                const done = () => {
-                    $btn.addClass('btn-success').removeClass('btn-outline-secondary').text('✓');
-                    setTimeout(() => $btn.removeClass('btn-success').addClass('btn-outline-secondary').text('⧉'), 1500);
+                const $icon     = $btn.find('.fa-solid, .fa-regular').first();
+                const origClass = $icon.attr('class');
+                const done = (ok) => {
+                    if ($icon.length) $icon.attr('class', 'fa-solid ' + (ok ? 'fa-check' : 'fa-times'));
+                    $btn.addClass(ok ? 'btn-success' : 'btn-danger').removeClass('btn-outline-secondary');
+                    setTimeout(() => {
+                        if ($icon.length) $icon.attr('class', origClass);
+                        $btn.removeClass('btn-success btn-danger').addClass('btn-outline-secondary');
+                    }, 1500);
                 };
                 if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(url).then(done).catch(() => {
-                        /* fallback for http or blocked clipboard */
+                    navigator.clipboard.writeText(url).then(() => done(true)).catch(() => {
                         try { const ta = document.createElement('textarea');
                               ta.value = url; ta.style.cssText = 'position:fixed;opacity:0';
                               document.body.appendChild(ta); ta.select();
-                              document.execCommand('copy'); document.body.removeChild(ta); done();
-                        } catch (_) {}
+                              document.execCommand('copy'); document.body.removeChild(ta); done(true);
+                        } catch (_) { done(false); }
                     });
                 } else {
                     try { const ta = document.createElement('textarea');
                           ta.value = url; ta.style.cssText = 'position:fixed;opacity:0';
                           document.body.appendChild(ta); ta.select();
-                          document.execCommand('copy'); document.body.removeChild(ta); done();
-                    } catch (_) {}
+                          document.execCommand('copy'); document.body.removeChild(ta); done(true);
+                    } catch (_) { done(false); }
                 }
             });
         }
@@ -89,7 +94,6 @@
                 }
             }
         }
-        /* first8…last8 truncation for narrow screens */
         #truncHash(hash) {
             if (!hash || hash.length <= 20) return hash;
             return hash.slice(0, 8) + '\u2026' + hash.slice(-8);
@@ -109,11 +113,11 @@
                 );
                 return;
             }
-            let html     = '';
-            const ticker = this.#getConfig()['ticker'];
+            let html          = '';
+            const ticker      = this.#getConfig()['ticker'];
             const chainHeight = Number(this.#globalData.height);
             txs.forEach(tx => {
-                const h = Number(tx.height);
+                const h         = Number(tx.height);
                 const confirmed = h > 0;
                 const confBadge = confirmed
                     ? '<span class="badge text-bg-success ms-1">' +
@@ -124,7 +128,7 @@
                       ) + '</span>'
                     : '<span class="badge text-bg-warning ms-1"><span tkey="history-pending">' +
                       this.#escHtml(this.#getText('history-pending')) + '</span></span>';
-        
+
                 const dir = tx.direction || 'unknown';
                 const amt = (tx.amount != null) ? this.#amountFormat(tx.amount) : '?';
                 let dirLabel;
@@ -146,32 +150,26 @@
                 }
                 const safeHashFull  = this.#escHtml(tx.txid || '');
                 const safeHashShort = this.#escHtml(this.#truncHash(tx.txid || ''));
-                const rawTxUrl  = this.#blockExplorer.tx(tx.txid || '');
-                const txUrl     = this.#escHtml(rawTxUrl);
-                const tsHtml    = tx.timestamp
+                const rawTxUrl      = this.#blockExplorer.tx(tx.txid || '');
+                const txUrl         = this.#escHtml(rawTxUrl);
+                const tsHtml        = tx.timestamp
                     ? '<span class="history-ts">' + this.#escHtml(this.#formatTs(tx.timestamp)) + '</span>'
                     : '<span class="history-ts"></span>';
 
-                /*
-                 * 5 direct grid children → columns line up perfectly:
-                 *   [dirLabel] [hash] [date] [copy] [badge]
-                 */
+                /* 5 grid children: [amount] [hash] [date] [copy] [badge] */
                 html +=
                     '<div class="history-item border-bottom">' +
-                    /* col 1 — amount */
                     dirLabel +
-                    /* col 2 — hash (full on wide, short on narrow via CSS) */
                     '<div class="font-monospace history-tx-hash">' +
                         '<a href="' + txUrl + '" target="_blank" rel="noopener noreferrer">' +
                             '<span class="hash-full">'  + safeHashFull  + '</span>' +
                             '<span class="hash-short">' + safeHashShort + '</span>' +
                         '</a>' +
                     '</div>' +
-                    /* col 3 — date */
                     tsHtml +
-                    /* col 4 — copy link button */
-                    '<button class="btn btn-sm btn-outline-secondary h-copy-btn" data-copy-url="' + txUrl + '" title="Copy explorer link">&#x29C7;</button>' +
-                    /* col 5 — confirmations */
+                    '<button class="btn btn-sm btn-outline-secondary h-copy-btn" data-copy-url="' + txUrl + '" title="Copy explorer link">' +
+                        '<span class="fa-solid fa-copy"></span>' +
+                    '</button>' +
                     '<div class="h-badge">' + confBadge + '</div>' +
                     '</div>';
             });
