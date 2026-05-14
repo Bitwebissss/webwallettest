@@ -93,8 +93,8 @@ body {
     --hi-date:  96px;
 
     display: grid;
-    grid-template-columns: var(--hi-amt) minmax(0, max-content) var(--hi-date) auto 1fr;
-    column-gap: 6px;
+    grid-template-columns: var(--hi-amt) max-content var(--hi-date) auto auto;
+    justify-content: space-between;
     align-items: center;
     padding: 6px 0;
     font-size: 13px;
@@ -131,7 +131,7 @@ body {
 }
 
 /* Confirmations badge */
-.h-badge { white-space: nowrap; justify-self: end; }
+.h-badge { white-space: nowrap; }
 
 /* ── 480–767px: tablet / large phone ─────────────────────────────────────── */
 @media (max-width: 767px) {
