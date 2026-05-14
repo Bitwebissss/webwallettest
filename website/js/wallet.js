@@ -240,7 +240,7 @@
                     psbt.signAllInputs(kp);
                     return;
                 }
-                makeTaprootSignerWith(kp, function(tapSigner) {
+                bitcoin.taproot.makeKeySigner(kp, function(tapSigner) {
                     psbt.data.inputs.forEach(function(inp, idx) {
                         if (inp.tapInternalKey && inp.tapInternalKey.length === 32) {
                             psbt.signInput(idx, tapSigner);
@@ -317,39 +317,6 @@
         clear() {
             this.clearTempKeyPair();
             if (this.#pubKeyBytes) { this.#pubKeyBytes.fill(0); this.#pubKeyBytes = null; }
-        }
-    }
-    function makeTaprootSignerWith(kp, onSigned) {
-        const ecc = bitcoin.ecc;
-        if (!ecc || typeof ecc.privateAdd !== 'function' ||
-                    typeof ecc.privateNegate !== 'function' ||
-                    typeof ecc.signSchnorr !== 'function' ||
-                    typeof ecc.xOnlyPointAddTweak !== 'function') {
-            throw new Error('bitcoin.ecc unavailable — rebuild bundle (see BUILDBitcoinjs.md)');
-        }
-        const xOnlyPub = kp.publicKey.slice(1);
-        const tweak    = bitcoin.crypto.taggedHash('TapTweak', xOnlyPub);
-        const rawD     = new Uint8Array(kp.privateKey);
-        let effectiveD = null;
-        let tweakedD   = null;
-        try {
-            const oddY = (kp.publicKey[0] === 0x03);
-            effectiveD = oddY ? ecc.privateNegate(rawD) : new Uint8Array(rawD);
-            tweakedD   = ecc.privateAdd(effectiveD, tweak);
-            if (!tweakedD) throw new Error('Taproot tweak produced an invalid private key');
-            const tweakedPubResult = ecc.xOnlyPointAddTweak(xOnlyPub, tweak);
-            if (!tweakedPubResult) throw new Error('Taproot xOnlyPointAddTweak failed');
-            const tweakedXOnly = tweakedPubResult.xOnlyPubkey;
-            const td = tweakedD;
-            const signer = {
-                publicKey:   tweakedXOnly,
-                signSchnorr: function(hash) { return ecc.signSchnorr(hash, td); }
-            };
-            onSigned(signer);
-        } finally {
-            rawD.fill(0);
-            if (effectiveD) effectiveD.fill(0);
-            if (tweakedD)   tweakedD.fill(0);
         }
     }
     const Keystore = new KeystoreClass();
