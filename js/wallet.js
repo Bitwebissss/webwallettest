@@ -2,6 +2,8 @@
     'use strict';
     const walletVersion      = '0.1';
     const DEFAULT_DERIV_PATH = "m/84'/738'/0'/0/0";
+    // P2TR dust threshold: DUST_RELAY_TX_FEE(3000) * (43 output + 67 input) / 1000 = 330 sat
+    const DUST_LIMIT_SATS    = 330;
     const AUTO_LOCK_MS       = 20 * 60 * 1000;
     const UTXO_CACHE_TTL     = 60000;  // ms
     const STORAGE_KEY_PUB     = 'bte_wallet_pubkey';
@@ -1276,7 +1278,7 @@
             const amtSats    = parseAmountSats(amtStr);
             const addrOk     = address !== '' && validateAddress(address);
             if (!address || !amtStr) allFilled = false;
-            if (!amtSats || amtSats <= 0) allAmtOk = false;
+            if (!amtSats || amtSats <= 0 || (amtSats > 0 && amtSats < DUST_LIMIT_SATS)) allAmtOk = false;
             if (address !== '' && !addrOk) allAddrOk = false;
             if (amtSats && amtSats > 0) outputsSats += amtSats;
             $addrInput.toggleClass('is-invalid', address !== '' && !addrOk);
@@ -1305,7 +1307,7 @@
         $('#send-outputs [name="send-amount"]').each(function() {
             const amtSats = parseAmountSats($(this).val());
             const typed   = $(this).val() !== '';
-            $(this).toggleClass('is-invalid', typed && (!amtSats || amtSats <= 0 || overLimit));
+            $(this).toggleClass('is-invalid', typed && (!amtSats || amtSats <= 0 || (amtSats > 0 && amtSats < DUST_LIMIT_SATS) || overLimit));
         });
     }
     function showConfirmation(amount, totalSats, feeSats, outputsSats) {
