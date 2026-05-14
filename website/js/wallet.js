@@ -672,26 +672,32 @@
     async function saveWalletWif(pin) {
         const privBytes = Keystore.getTempPrivBytes();
         if (!privBytes) throw new Error('Private key is not available');
-        const pubCopy   = new Uint8Array(globalData.pubKey);
-        savePublicKeyPlain(pubCopy);                              // pub → plain
-        await saveEncryptedBytes(STORAGE_KEY_PRIV, privBytes, pin); // priv → encrypted
-        pubCopy.fill(0);
-        privBytes.fill(0);
-        localStorage.removeItem(STORAGE_KEY_SEED);
-        localStorage.removeItem(STORAGE_KEY_PATH);
+        const pubCopy = new Uint8Array(globalData.pubKey);
+        try {
+            savePublicKeyPlain(pubCopy);
+            await saveEncryptedBytes(STORAGE_KEY_PRIV, privBytes, pin);
+            localStorage.removeItem(STORAGE_KEY_SEED);
+            localStorage.removeItem(STORAGE_KEY_PATH);
+        } finally {
+            pubCopy.fill(0);
+            privBytes.fill(0);
+        }
     }
     async function saveWalletBip39(entropyBytes, pin, path) {
         const privBytes = Keystore.getTempPrivBytes();
         if (!privBytes) throw new Error('Private key is not available');
-        const pubCopy   = new Uint8Array(globalData.pubKey);
-        savePublicKeyPlain(pubCopy);                              // pub → plain
-        await Promise.all([
-            saveEncryptedBytes(STORAGE_KEY_PRIV, privBytes,    pin),
-            saveEncryptedBytes(STORAGE_KEY_SEED, entropyBytes, pin)
-        ]);
-        try { localStorage.setItem(STORAGE_KEY_PATH, path || DEFAULT_DERIV_PATH); } catch(e) {}
-        pubCopy.fill(0);
-        privBytes.fill(0);
+        const pubCopy = new Uint8Array(globalData.pubKey);
+        try {
+            savePublicKeyPlain(pubCopy);
+            await Promise.all([
+                saveEncryptedBytes(STORAGE_KEY_PRIV, privBytes,    pin),
+                saveEncryptedBytes(STORAGE_KEY_SEED, entropyBytes, pin)
+            ]);
+            try { localStorage.setItem(STORAGE_KEY_PATH, path || DEFAULT_DERIV_PATH); } catch(e) {}
+        } finally {
+            pubCopy.fill(0);
+            privBytes.fill(0);
+        }
     }
     function resetAutoLock() {
         if (!Keystore.isUnlocked()) return;
