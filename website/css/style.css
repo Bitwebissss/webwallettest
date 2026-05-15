@@ -92,12 +92,14 @@ body {
         min-width: 10rem;
     }
 
-    /* Hide "Bitweb" brand text on very small screens to save space for nav items */
-    .brand-text {
-        display: none;
+    /* Scale down brand text to match compact nav row — logo stays visible */
+    .navbar-brand {
+        font-size: 14px;
     }
     #logo {
-        margin-right: 0;
+        max-width: 22px;
+        max-height: 22px;
+        margin-right: 4px;
     }
 }
 .balance-small { font-size: 15px; }
