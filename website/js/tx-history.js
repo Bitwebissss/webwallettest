@@ -17,7 +17,6 @@
             this.#getConfig     = deps.getConfig;
             this.#amountFormat  = deps.amountFormat;
             this.#blockExplorer = deps.blockExplorer;
-            /* copy-link handler — delegated, set once */
             $(document).off('click.hcopy').on('click.hcopy', '.h-copy-btn', function () {
                 const url       = $(this).data('copy-url');
                 const $btn      = $(this);
@@ -111,7 +110,6 @@
             }
             const ticker = this.#getConfig()['ticker'];
             const chainHeight = Number(this.#globalData.height);
-            
             let html = '<div class="history-overflow"><table id="history-table"><thead>' +
                        '<tr><th>' + this.#escHtml(this.#getText('amount')) + '</th>' +
                        '<th>' + this.#escHtml(this.#getText('transaction')) + '</th>' +
@@ -150,14 +148,12 @@
                 const dirLabel = '<span class="tx-dir-label ' + dirLabelClass + '">' +
                                  dirSymbol + ' ' + this.#escHtml(String(amt)) + ' ' + this.#escHtml(ticker) +
                                  '</span>';
-                
                 const safeHashFull  = this.#escHtml(tx.txid || '');
                 const rawTxUrl      = this.#blockExplorer.tx(tx.txid || '');
                 const txUrl         = this.#escHtml(rawTxUrl);
                 const tsHtml        = tx.timestamp
                     ? '<span class="history-ts">' + this.#escHtml(this.#formatTs(tx.timestamp)) + '</span>'
                     : '<span class="history-ts"></span>';
-                
                 const copyBtn = '<button class="btn btn-sm btn-outline-secondary h-copy-btn" data-copy-url="' + txUrl + '">' +
                                '<span class="fa-solid fa-copy"></span></button>';
                 /* desktop: one row */

@@ -1334,8 +1334,6 @@
         const feeSats = parseAmountSats(feeStr) || parseAmountSats(String(getConfig()['fee'])) || 0;
         let spendableSats = 0;
         if (globalData.coinControl && globalData.selectedUtxos !== null) {
-            // Coin Control активен: считаем только выбранные UTXO
-            // Пустой Set → spendableSats остаётся 0
             if (globalData.selectedUtxos.size > 0) {
                 globalData.utxos.forEach(function(u) {
                     if (globalData.selectedUtxos.has(u.txid + ':' + u.index) && Number(u.height) > 0 && u.mature)

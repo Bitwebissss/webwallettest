@@ -147,7 +147,6 @@ body {
 /* Mobile: allow horizontal scroll, no layout breaking */
 /* Mobile: two-row layout per transaction */
 .tx-row-mob { display: none; }
-
 @media (max-width: 767px) {
     #history-table {
         font-size: 12px;
@@ -166,7 +165,6 @@ body {
     .tx-row-mob-2 td {
         padding-top: 2px;
     }
-
     /* Hash cell: ellipsis via inner div */
     .history-tx-hash-m {
         max-width: 0;        /* forces table cell to shrink so inner div can ellipsis */
