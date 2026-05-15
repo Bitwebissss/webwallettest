@@ -1,0 +1,18 @@
+{
+    "name": "Bitweb Wallet",
+    "short_name": "Bitweb",
+    "description": "Bitweb Web Wallet",
+    "start_url": "/",
+    "display": "standalone",
+    "orientation": "portrait-primary",
+    "theme_color": "#212529",
+    "background_color": "#212529",
+    "icons": [
+        {
+            "src": "images/logo.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ]
+}

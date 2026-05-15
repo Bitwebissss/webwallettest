@@ -2,14 +2,21 @@
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
         <meta name="referrer" content="no-referrer">
+        <!-- PWA -->
+        <link rel="manifest" href="manifest.json">
+        <meta name="theme-color" content="#212529">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+        <meta name="apple-mobile-web-app-title" content="Bitweb">
         <meta http-equiv="Content-Security-Policy" content="
             default-src 'self';
             script-src 'self';
             style-src 'self';
             connect-src 'self' https://api2.bitwebcore.net wss://api2.bitwebcore.net;
-            worker-src 'none';
+            worker-src 'self';
             img-src 'self' data: blob:;
             media-src blob:;
             font-src 'self';
@@ -29,7 +36,7 @@
                 crossorigin="anonymous">
         <!-- Custom styles -->
         <link rel="stylesheet" href="css/style.css"
-                integrity="sha512-dPIctFBIRs7z+6XPktjJvkOPXF3aslfwHmrZ1IKdMHOOAW8azDcxkJJZ8FAy7sHpT5+Mn0AEAeTYBiqYNQt5Uw=="
+                integrity="sha512-zQiCkzVsS1L/sop4Z0/emFRR1C7Dow3Ju/QCeRnspd9XExhsvcOE8fSpA/LVXPfV+JndEelVWrUO8TIM5Hs5tQ=="
                 crossorigin="anonymous">
         <!-- favicon -->
         <link rel="icon" type="image/svg+xml" href="images/logo.svg">
@@ -603,7 +610,7 @@
         </footer>
         <!-- Wallet Logic -->
         <script src="js/wallet.js"
-                integrity="sha512-LP3BDVvhr5pblKYA+3fEoIs0rqrQALeIc3kSYWP7YS3tZ21xi4RWT/xzNClQnNMTHTOq4iU8rrlNJfxWSKln7A=="
+                integrity="sha512-2wOvVoVm5vscy6ikeO+vGJVPXNyyz7/adYYsPsgDbeUXgvBaKZv4RTwAHFpynprj8XKGBwtZdFAtCU3ZniX2YQ=="
                 crossorigin="anonymous"></script>
     </body>
 </html>
