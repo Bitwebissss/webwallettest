@@ -92,14 +92,14 @@ body {
         min-width: 10rem;
     }
 
-    /* Scale down brand text to match compact nav row — logo stays visible */
-    .navbar-brand {
-        font-size: 14px;
+    /* Mobile brand: icon only — hide text, keep logo at a clean size */
+    .brand-text {
+        display: none;
     }
     #logo {
-        max-width: 22px;
-        max-height: 22px;
-        margin-right: 4px;
+        max-width: 28px;
+        max-height: 28px;
+        margin-right: 0;
     }
 }
 .balance-small { font-size: 15px; }
