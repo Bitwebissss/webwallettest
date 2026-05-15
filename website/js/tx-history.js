@@ -94,6 +94,10 @@
                 }
             }
         }
+        #truncHash(hash) {
+            if (!hash || hash.length <= 20) return hash;
+            return hash.slice(0, 8) + '\u2026' + hash.slice(-8);
+        }
         #formatTs(ts) {
             if (!ts) return '';
             const d   = new Date(ts * 1000);
@@ -152,6 +156,7 @@
                                  '</span>';
                 
                 const safeHashFull  = this.#escHtml(tx.txid || '');
+                const safeHashShort = this.#escHtml(this.#truncHash(tx.txid || ''));
                 const rawTxUrl      = this.#blockExplorer.tx(tx.txid || '');
                 const txUrl         = this.#escHtml(rawTxUrl);
                 const tsHtml        = tx.timestamp
@@ -162,7 +167,8 @@
                         '<td class="tx-dir-cell">' + dirLabel + '</td>' +
                         '<td class="history-tx-hash">' +
                             '<a href="' + txUrl + '" target="_blank" rel="noopener noreferrer">' +
-                                safeHashFull +
+                                '<span class="hash-full">'  + safeHashFull  + '</span>' +
+                                '<span class="hash-short">' + safeHashShort + '</span>' +
                             '</a>' +
                         '</td>' +
                         '<td class="history-ts-cell">' + tsHtml + '</td>' +
