@@ -115,15 +115,14 @@
             }
             const ticker = this.#getConfig()['ticker'];
             const chainHeight = Number(this.#globalData.height);
-
-            let html = '<table id="history-table"><thead><tr>' +
-                       '<th>' + this.#escHtml(this.#getText('amount')) + '</th>' +
+            
+            let html = '<div class="history-overflow"><table id="history-table"><thead>' +
+                       '<tr><th>' + this.#escHtml(this.#getText('amount')) + '</th>' +
                        '<th>' + this.#escHtml(this.#getText('transaction')) + '</th>' +
                        '<th>' + this.#escHtml(this.#getText('date')) + '</th>' +
                        '<th></th>' +
                        '<th>' + this.#escHtml(this.#getText('status')) + '</th>' +
-                       '</tr></thead><tbody>';
-
+                       '</thead><tbody>';
             txs.forEach(tx => {
                 const h = Number(tx.height);
                 const confirmed = h > 0;
@@ -136,7 +135,6 @@
                 } else {
                     confBadge = '<span class="badge text-bg-warning">' + this.#escHtml(this.#getText('history-pending')) + '</span>';
                 }
-
                 const dir = tx.direction || 'unknown';
                 const amt = (tx.amount != null) ? this.#amountFormat(tx.amount) : '?';
                 let dirLabelClass = '', dirSymbol = '';
@@ -156,7 +154,7 @@
                 const dirLabel = '<span class="tx-dir-label ' + dirLabelClass + '">' +
                                  dirSymbol + ' ' + this.#escHtml(String(amt)) + ' ' + this.#escHtml(ticker) +
                                  '</span>';
-
+                
                 const safeHashFull  = this.#escHtml(tx.txid || '');
                 const safeHashShort = this.#escHtml(this.#truncHash(tx.txid || ''));
                 const rawTxUrl      = this.#blockExplorer.tx(tx.txid || '');
@@ -164,7 +162,7 @@
                 const tsHtml        = tx.timestamp
                     ? '<span class="history-ts">' + this.#escHtml(this.#formatTs(tx.timestamp)) + '</span>'
                     : '<span class="history-ts"></span>';
-
+                
                 html += '<tr>' +
                         '<td class="tx-dir-cell">' + dirLabel + '</td>' +
                         '<td class="history-tx-hash">' +
@@ -180,17 +178,16 @@
                         '<td class="h-badge-cell">' + confBadge + '</td>' +
                         '</tr>';
             });
-
-            if (txs.length >= this.HISTORY_LIMIT) {
+            html += '</tbody></table></div>';
+            // Add explorer link below the table (view all)
+            if (txs.length >= HISTORY_LIMIT) {
                 const explorerUrl = this.#escHtml(this.#blockExplorer.address(this.#globalData.address));
-                html += '<tr><td colspan="5" class="text-center py-2"><small>' +
+                html += '<div class="text-center py-2"><small>' +
                         '<a href="' + explorerUrl + '" target="_blank" rel="noopener noreferrer">' +
                         this.#escHtml(this.#getText('history-view-all')) + ' &#x2197;' +
-                        '</a></small></td></tr>';
+                        '</a></small></div>';
             }
-            html += '</tbody></table>';
             $('#history-list').html(html);
         }
-    }
     window.TxHistory = new TxHistoryManager();
 })();
