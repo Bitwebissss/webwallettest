@@ -150,10 +150,19 @@ body {
 @media (max-width: 767px) {
     #history-table {
         font-size: 12px;
-        min-width: 480px;
+        min-width: 0;
     }
     .history-tx-hash {
-        max-width: 180px;
+        max-width: 130px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .history-tx-hash a {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
     .history-ts {
         font-size: 10px;
