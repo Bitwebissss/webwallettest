@@ -197,6 +197,8 @@ body {
 [data-bs-target="#restore-advanced"] { font-size: 11px; padding: 2px 7px; line-height: 1.4; }
 /* Manual Fee collapse toggle */
 [data-bs-target="#send-fee-panel"] { font-size: 11px; padding: 2px 7px; line-height: 1.4; }
+/* Fee input — centered, narrow enough for "46.000.000.00000000" */
+.send-fee-input { max-width: 210px; text-align: center; }
 /* Clipboard scratch textarea — off-screen, invisible, non-interactive */
 .clip-scratch {
     position: fixed;

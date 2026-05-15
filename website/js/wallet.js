@@ -2278,11 +2278,13 @@
         });
         $('#add-output').click(function(e) {
             $('#send-outputs').append(
-                '<div class="send-additional-output send-outputs-item input-group mb-2">' +
-                '<input name="send-address" class="form-control" placeholder="' + escHtml(getText('enter-address')) + '" type="text" autocomplete="off">' +
+                '<div class="send-additional-output send-outputs-item mb-2">' +
+                '<input name="send-address" class="form-control mb-1" placeholder="' + escHtml(getText('enter-address')) + '" type="text" autocomplete="off">' +
+                '<div class="input-group">' +
                 '<input name="send-amount" class="form-control" placeholder="' + escHtml(getText('amount')) + '" type="text" autocomplete="off">' +
                 '<button class="send-max btn btn-outline-secondary" type="button">MAX</button>' +
                 '<button class="btn btn-outline-danger remove-additional-output" type="button"><span class="fa-solid fa-minus"></span></button>' +
+                '</div>' +
                 '</div>'
             );
             $('.remove-additional-output').off('click').on('click', function(e) {
