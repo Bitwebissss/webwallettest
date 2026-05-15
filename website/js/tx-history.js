@@ -158,7 +158,7 @@
                     ? '<span class="history-ts">' + this.#escHtml(this.#formatTs(tx.timestamp)) + '</span>'
                     : '<span class="history-ts"></span>';
                 
-                const copyBtn = '<button class="btn btn-sm btn-outline-secondary h-copy-btn" data-copy-url="' + txUrl +
+                const copyBtn = '<button class="btn btn-sm btn-outline-secondary h-copy-btn" data-copy-url="' + txUrl + '">' +
                                '<span class="fa-solid fa-copy"></span></button>';
                 /* desktop: one row */
                 html += '<tr class="tx-row-desk">' +
