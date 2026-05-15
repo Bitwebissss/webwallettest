@@ -189,5 +189,6 @@
             }
             $('#history-list').html(html);
         }
+    }
     window.TxHistory = new TxHistoryManager();
 })();
