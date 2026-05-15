@@ -51,8 +51,8 @@ body {
 /* Restore word-count select */
 #restore-wordcount { max-width: 100px; }
 /* Address display */
-#wallet-address { font-size: 18px; word-break: break-all; }
-#copy-address-btn { padding: 1px 7px; font-size: 13px; line-height: 1.6; }
+#wallet-address { font-size: 14px; word-break: break-all; }
+#copy-address-btn { padding: 1px 7px; font-size: 18px; line-height: 1.6; }
 /* Immature balance label (send tab) — same size as unconfirmed */
 /* Coin control */
 #coin-control-toggle { font-size: 14px; padding: 2px 8px; }
