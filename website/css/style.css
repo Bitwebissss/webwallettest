@@ -27,7 +27,7 @@ body {
     margin-bottom: 8px;
 }
 .qr-code canvas, .qr-code img { max-width: 100%; display: block; }
-.wallet-balance { font-size: 23px; }
+.wallet-balance { font-size: 19px; }
 .wallet-balance .font-monospace { font-size: 20px; }
 @media (max-width: 991.98px) {
     .navbar-expand-lg>.container, .navbar-expand-lg>.container-fluid {
@@ -51,7 +51,7 @@ body {
 /* Restore word-count select */
 #restore-wordcount { max-width: 100px; }
 /* Address display */
-#wallet-address { font-size: 13px; word-break: break-all; }
+#wallet-address { font-size: 18px; word-break: break-all; }
 #copy-address-btn { padding: 1px 7px; font-size: 13px; line-height: 1.6; }
 /* Immature balance label (send tab) — same size as unconfirmed */
 /* Coin control */
