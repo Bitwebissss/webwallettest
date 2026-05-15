@@ -30,33 +30,59 @@ body {
 .wallet-balance { font-size: 19px; }
 .wallet-balance .font-monospace { font-size: 20px; }
 @media (max-width: 991.98px) {
-    .navbar-expand-lg>.container, .navbar-expand-lg>.container-fluid {
-        padding-right: 15px;
-        padding-left: 15px;
+    /* Hide hamburger — all items are always visible in a single row */
+    .navbar-toggler {
+        display: none !important;
     }
-    /* Right-align all nav items in collapsed mobile state.
-       width:100% на navbar-nav обязателен — без него ul сжимается до
-       ширины контента и align-items:flex-end ничего не делает. */
+
+    /* Force the collapse panel to always show as an inline flex row */
+    #navbarResponsive {
+        display: flex !important;
+        flex-basis: auto;
+        align-items: center;
+    }
+
+    /* Compact horizontal padding so brand + nav fit on small screens */
+    .navbar-expand-lg > .container,
+    .navbar-expand-lg > .container-fluid {
+        padding-right: 10px;
+        padding-left: 10px;
+        flex-wrap: nowrap;
+        justify-content: space-between;
+    }
+
+    /* Nav items in a horizontal row — reset all vertical/full-width overrides */
     .navbar-collapse .navbar-nav {
-        width: 100%;
-        align-items: flex-end;
+        flex-direction: row !important;
+        align-items: center;
+        width: auto;
+        flex-wrap: nowrap;
+        gap: 0;
     }
-    /* Каждый nav-item тоже должен быть 100% ширины */
+
+    /* Each item back to auto width */
     .navbar-collapse .nav-item {
-        width: 100%;
-        text-align: right;
+        width: auto;
+        text-align: left;
     }
+
+    /* Compact nav links */
     .navbar-collapse .nav-link {
-        text-align: right;
-        width: 100%;
-        display: block;
+        padding: 0.3rem 0.45rem;
+        font-size: 13px;
+        white-space: nowrap;
+        width: auto;
+        display: inline-block;
+        text-align: left;
     }
-    /* Dropdown: relative + 100% ширины, чтобы right:0 был у правого края экрана */
+
+    /* Dropdown wrapper — auto width, relative so menu anchors to it */
     .navbar-collapse .navbar-nav .dropdown {
         position: relative;
-        width: 100%;
+        width: auto;
     }
-    /* Меню выпадает вниз-вправо относительно родителя dropdown */
+
+    /* Dropdown menu opens downward, aligned to the right edge of its trigger */
     .navbar-collapse .navbar-nav .dropdown-menu {
         position: absolute !important;
         right: 0 !important;
@@ -64,6 +90,14 @@ body {
         top: 100% !important;
         float: none !important;
         min-width: 10rem;
+    }
+
+    /* Hide "Bitweb" brand text on very small screens to save space for nav items */
+    .brand-text {
+        display: none;
+    }
+    #logo {
+        margin-right: 0;
     }
 }
 .balance-small { font-size: 15px; }
