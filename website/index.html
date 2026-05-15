@@ -29,7 +29,7 @@
                 crossorigin="anonymous">
         <!-- Custom styles -->
         <link rel="stylesheet" href="css/style.css"
-                integrity="sha512-sOc5FWIdKsvQhanBpcRyvaCUtaT9lZX7syLV3HDRz6U1PF1e4MJikwR5kqQA7EI5mxutYH+gZ2tTNv3vYZ9XVg=="
+                integrity="sha512-lJFNsiTZeWYt71BN0dXUl2Inh6igzK/DXjEuIMljTZ4f6Nzw6+iv1xuYgbI3hZfNM7dZ+VxeNInUgOF2OF1yYg=="
                 crossorigin="anonymous">
         <!-- favicon -->
         <link rel="icon" type="image/svg+xml" href="images/logo.svg">
@@ -353,11 +353,16 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="text-center text-md-start mb-2">
-                                    <button class="btn btn-primary px-4" type="submit" id="send-tx" tkey="send" disabled></button>
-                                </div>
-                                <div class="text-center text-md-start mb-2">
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#send-fee-panel" tkey="manual-fee">Manual Fee</button>
+                                <div class="mb-2">
+                                    <!-- Mobile: Send first, Manual Fee second. Desktop: Manual Fee left, Send right. -->
+                                    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-md-between gap-2">
+                                        <div class="order-1 order-md-0 text-center text-md-start">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#send-fee-panel" tkey="manual-fee">Manual Fee</button>
+                                        </div>
+                                        <div class="order-0 order-md-1 text-center text-md-end">
+                                            <button class="btn btn-primary px-4" type="submit" id="send-tx" tkey="send" disabled></button>
+                                        </div>
+                                    </div>
                                     <div class="collapse" id="send-fee-panel">
                                         <div class="d-flex justify-content-center justify-content-md-start mt-2">
                                             <input id="send-fee" class="form-control send-fee-input" placeholder="Fee" type="text" value="" autocomplete="off">

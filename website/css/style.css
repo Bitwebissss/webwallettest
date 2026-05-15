@@ -34,14 +34,18 @@ body {
         padding-right: 15px;
         padding-left: 15px;
     }
-    /* Navbar dropdowns: absolute-positioned, open to the right on mobile */
-    .navbar-collapse .dropdown {
+    /* Navbar dropdowns: absolute-positioned, open to the right on mobile.
+       Must target .navbar-nav .dropdown-menu to override Bootstrap 5's
+       own `.navbar-nav .dropdown-menu { position: static; }` rule. */
+    .navbar-nav .dropdown {
         position: relative;
     }
-    .navbar-collapse .dropdown-menu {
+    .navbar-nav .dropdown-menu {
         position: absolute !important;
         right: 0 !important;
         left: auto !important;
+        top: 100% !important;
+        float: none !important;
         min-width: 10rem;
     }
 }
