@@ -29,7 +29,7 @@
                 crossorigin="anonymous">
         <!-- Custom styles -->
         <link rel="stylesheet" href="css/style.css"
-                integrity="sha512-XkdYKoI1NbB8XwrNsAj3Tm8z+j/IExfBEM4pW/UvKtOcm1LnswfBfpcjRPKeDlTLJhCx4JNhy0s1ma3uH//mfA=="
+                integrity="sha512-sOc5FWIdKsvQhanBpcRyvaCUtaT9lZX7syLV3HDRz6U1PF1e4MJikwR5kqQA7EI5mxutYH+gZ2tTNv3vYZ9XVg=="
                 crossorigin="anonymous">
         <!-- favicon -->
         <link rel="icon" type="image/svg+xml" href="images/logo.svg">
@@ -306,29 +306,31 @@
                                 </div>
                             </div>
                             <div id="wallet-send" class="tab-item d-none" data-tab="wallet-send">
-                                <div class="mb-3 text-center">
-                                    <div>
-                                        <span tkey="available-balance"></span>
-                                        <b class="wallet-balance balance-small">
-                                            <span class="amount"></span>
-                                            <span class="ticker"></span>
-                                        </b>
+                                <div class="mb-3 d-md-flex justify-content-between align-items-end">
+                                    <div class="text-center text-md-start">
+                                        <div>
+                                            <span tkey="available-balance"></span>
+                                            <b class="wallet-balance balance-small">
+                                                <span class="amount"></span>
+                                                <span class="ticker"></span>
+                                            </b>
+                                        </div>
+                                        <div id="immature-balance-row" class="d-none mt-1">
+                                            <span class="text-warning immature-balance-label">
+                                                <span class="fa-solid fa-lock"></span>
+                                                <span tkey="immature-mining">Immature (mining):</span>
+                                                <b class="immature-amount"></b>
+                                            </span>
+                                        </div>
+                                        <div id="unconfirmed-balance-row" class="d-none mt-1">
+                                            <span class="text-info">
+                                                <span class="fa-solid fa-clock"></span>
+                                                <span tkey="unconfirmed-balance">Unconfirmed:</span>
+                                                <b class="unconfirmed-amount"></b>
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div id="immature-balance-row" class="d-none mt-1">
-                                        <span class="text-warning immature-balance-label">
-                                            <span class="fa-solid fa-lock"></span>
-                                            <span tkey="immature-mining">Immature (mining):</span>
-                                            <b class="immature-amount"></b>
-                                        </span>
-                                    </div>
-                                    <div id="unconfirmed-balance-row" class="d-none mt-1">
-                                        <span class="text-info">
-                                            <span class="fa-solid fa-clock"></span>
-                                            <span tkey="unconfirmed-balance">Unconfirmed:</span>
-                                            <b class="unconfirmed-amount"></b>
-                                        </span>
-                                    </div>
-                                    <div class="mt-2">
+                                    <div class="text-center text-md-end mt-2 mt-md-0 flex-shrink-0">
                                         <a href="#" id="send-qr" class="text-body pe-2">
                                             <span tkey="scan-qr"></span>
                                             <span class="fa-solid fa-camera"></span>
@@ -362,7 +364,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="text-center mt-2">
+                                <div class="text-center text-md-start mt-2">
                                     <button type="button" id="coin-control-toggle" class="btn btn-sm btn-outline-primary">
                                         <span class="fa-solid fa-sliders"></span>
                                         <span id="coin-control-toggle-text" tkey="coin-control">Coin Control</span>
