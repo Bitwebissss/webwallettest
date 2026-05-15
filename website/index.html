@@ -302,14 +302,14 @@
                                 </div>
                             </div>
                             <div id="wallet-send" class="tab-item d-none" data-tab="wallet-send">
-                                <div class="mb-2">
-                                    <span>
+                                <div class="mb-3 text-center">
+                                    <div>
                                         <span tkey="available-balance"></span>
                                         <b class="wallet-balance balance-small">
                                             <span class="amount"></span>
                                             <span class="ticker"></span>
                                         </b>
-                                    </span>
+                                    </div>
                                     <div id="immature-balance-row" class="d-none mt-1">
                                         <span class="text-warning immature-balance-label">
                                             <span class="fa-solid fa-lock"></span>
@@ -324,8 +324,8 @@
                                             <b class="unconfirmed-amount"></b>
                                         </span>
                                     </div>
-                                    <div class="float-md-end">
-                                        <a href="#" id="send-qr" class="text-body pe-1">
+                                    <div class="mt-2">
+                                        <a href="#" id="send-qr" class="text-body pe-2">
                                             <span tkey="scan-qr"></span>
                                             <span class="fa-solid fa-camera"></span>
                                         </a>
@@ -591,6 +591,8 @@
             </div>
         </footer>
         <!-- Wallet Logic -->
-        <script src="js/wallet.js"></script>
+        <script src="js/wallet.js"
+                integrity="sha512-DpozrOqv+bUO6FOk+MHLnYezUszKXUlT34qGcMFaYhF8/BYCijP27OTnpzZDHa97v0f36AklXtPa9ZfOHnGNTg=="
+                crossorigin="anonymous"></script>
     </body>
 </html>
