@@ -40,34 +40,36 @@ body {
         display: none !important;
     }
 
-    /* Force the collapse panel to always show as an inline flex row */
-    #navbarResponsive {
-        display: flex !important;
-        flex: 1;              /* fill all space to the right of the logo */
-        flex-basis: auto;
-        align-items: center;
-    }
-
-    /* Compact horizontal padding so brand + nav fit on small screens */
+    /* Container becomes the single space-evenly distributor for ALL items:
+       logo + 4 nav items all get equal spacing without an extra gap at brand */
     .navbar-expand-lg > .container,
     .navbar-expand-lg > .container-fluid {
         padding-right: 10px;
         padding-left: 10px;
         flex-wrap: nowrap;
-        justify-content: space-between;
-    }
-
-    /* Nav items fill the full collapse width and spread evenly */
-    .navbar-collapse .navbar-nav {
-        flex-direction: row !important;
+        justify-content: space-evenly;
         align-items: center;
-        width: 100%;          /* occupy full collapse area */
-        flex-wrap: nowrap;
-        justify-content: space-evenly; /* equal gaps between all items */
-        margin-left: 0 !important;     /* override ms-auto from HTML */
     }
 
-    /* Each item back to auto width; reset ms-* utility classes from HTML */
+    /* Remove Bootstrap's default right margin from brand so logo
+       participates in space-evenly just like every nav item */
+    .navbar-expand-lg .navbar-brand {
+        margin-right: 0;
+    }
+
+    /* Make the collapse wrapper transparent to flex layout —
+       its children become direct flex items of .container */
+    #navbarResponsive {
+        display: contents !important;
+    }
+
+    /* Make the nav list transparent to flex layout —
+       li.nav-item elements become direct flex items of .container */
+    .navbar-collapse .navbar-nav {
+        display: contents;
+    }
+
+    /* Each nav item: auto size, no extra margins */
     .navbar-collapse .nav-item {
         width: auto;
         text-align: center;
@@ -84,7 +86,7 @@ body {
         text-align: left;
     }
 
-    /* Dropdown wrapper — auto width, relative so menu anchors to it */
+    /* Dropdown: keep position context so menu anchors correctly */
     .navbar-collapse .navbar-nav .dropdown {
         position: relative;
         width: auto;
