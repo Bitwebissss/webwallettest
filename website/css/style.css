@@ -34,13 +34,30 @@ body {
         padding-right: 15px;
         padding-left: 15px;
     }
-    /* Navbar dropdowns: absolute-positioned, open to the right on mobile.
-       Must target .navbar-nav .dropdown-menu to override Bootstrap 5's
-       own `.navbar-nav .dropdown-menu { position: static; }` rule. */
-    .navbar-nav .dropdown {
-        position: relative;
+    /* Right-align all nav items in collapsed mobile state.
+       width:100% на navbar-nav обязателен — без него ul сжимается до
+       ширины контента и align-items:flex-end ничего не делает. */
+    .navbar-collapse .navbar-nav {
+        width: 100%;
+        align-items: flex-end;
     }
-    .navbar-nav .dropdown-menu {
+    /* Каждый nav-item тоже должен быть 100% ширины */
+    .navbar-collapse .nav-item {
+        width: 100%;
+        text-align: right;
+    }
+    .navbar-collapse .nav-link {
+        text-align: right;
+        width: 100%;
+        display: block;
+    }
+    /* Dropdown: relative + 100% ширины, чтобы right:0 был у правого края экрана */
+    .navbar-collapse .navbar-nav .dropdown {
+        position: relative;
+        width: 100%;
+    }
+    /* Меню выпадает вниз-вправо относительно родителя dropdown */
+    .navbar-collapse .navbar-nav .dropdown-menu {
         position: absolute !important;
         right: 0 !important;
         left: auto !important;
