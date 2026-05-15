@@ -7,7 +7,8 @@ body {
     position: relative;
 }
 /* Logo — explicit size so SVG doesn't collapse */
-#logo { width: 28px; height: 28px; max-width: 28px; max-height: 28px; margin-top: -3px; margin-right: 6px; flex-shrink: 0; }
+/* vertical alignment handled by parent d-flex align-items-center */
+#logo { width: 28px; height: 28px; max-width: 28px; max-height: 28px; margin-right: 6px; flex-shrink: 0; }
 /* Brand text: hidden on mobile, shown on desktop */
 .brand-text { display: none; }
 @media (min-width: 992px) { .brand-text { display: inline; } }
@@ -61,13 +62,14 @@ body {
         align-items: center;
         width: auto;
         flex-wrap: nowrap;
-        gap: 0;
+        gap: 2px;
     }
 
-    /* Each item back to auto width */
+    /* Each item back to auto width; reset ms-* utility classes from HTML */
     .navbar-collapse .nav-item {
         width: auto;
         text-align: left;
+        margin-left: 0 !important;
     }
 
     /* Compact nav links */
