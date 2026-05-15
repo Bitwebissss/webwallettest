@@ -16,7 +16,7 @@
   Cache-Control: no-store, no-cache, must-revalidate
 
 /css/*
-  Cache-Control: public, max-age=172800
+  Cache-Control: no-cache, must-revalidate
 
 /webfonts/*
   Cache-Control: public, max-age=172800
