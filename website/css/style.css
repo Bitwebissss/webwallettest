@@ -6,7 +6,11 @@ body {
     padding-bottom: 56px;
     position: relative;
 }
-#logo { max-width: 30px; max-height: 30px; margin-top: -5px; margin-right: 5px; }
+/* Logo — explicit size so SVG doesn't collapse */
+#logo { width: 28px; height: 28px; max-width: 28px; max-height: 28px; margin-top: -3px; margin-right: 6px; flex-shrink: 0; }
+/* Brand text: hidden on mobile, shown on desktop */
+.brand-text { display: none; }
+@media (min-width: 992px) { .brand-text { display: inline; } }
 .b-width { min-width: 100px; }
 .navbar-dark .navbar-nav .nav-link.active { color: rgba(255,255,255,.75); }
 .router-page { display: none; }
@@ -92,15 +96,6 @@ body {
         min-width: 10rem;
     }
 
-    /* Mobile brand: icon only — hide text, keep logo at a clean size */
-    .brand-text {
-        display: none;
-    }
-    #logo {
-        max-width: 28px;
-        max-height: 28px;
-        margin-right: 0;
-    }
 }
 .balance-small { font-size: 15px; }
 .break-word { word-wrap: break-word; }
