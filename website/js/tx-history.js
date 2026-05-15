@@ -158,18 +158,31 @@
                     ? '<span class="history-ts">' + this.#escHtml(this.#formatTs(tx.timestamp)) + '</span>'
                     : '<span class="history-ts"></span>';
                 
-                html += '<tr>' +
+                const copyBtn = '<button class="btn btn-sm btn-outline-secondary h-copy-btn" data-copy-url="' + txUrl + '" title="Copy explorer link">' +
+                               '<span class="fa-solid fa-copy"></span></button>';
+                /* desktop: one row */
+                html += '<tr class="tx-row-desk">' +
                         '<td class="tx-dir-cell">' + dirLabel + '</td>' +
                         '<td class="history-tx-hash">' +
-                            '<a href="' + txUrl + '" target="_blank" rel="noopener noreferrer">' +
-                                safeHashFull +
-                            '</a>' +
+                            '<a href="' + txUrl + '" target="_blank" rel="noopener noreferrer">' + safeHashFull + '</a>' +
                         '</td>' +
                         '<td class="history-ts-cell">' + tsHtml + '</td>' +
-                        '<td class="h-copy-cell"><button class="btn btn-sm btn-outline-secondary h-copy-btn" data-copy-url="' + txUrl + '" title="Copy explorer link">' +
-                            '<span class="fa-solid fa-copy"></span>' +
-                        '</button></td>' +
+                        '<td class="h-copy-cell">' + copyBtn + '</td>' +
                         '<td class="h-badge-cell">' + confBadge + '</td>' +
+                        '</tr>';
+                /* mobile: two rows */
+                html += '<tr class="tx-row-mob tx-row-mob-1">' +
+                        '<td class="tx-dir-cell" colspan="4">' + dirLabel + '</td>' +
+                        '<td class="h-badge-cell">' + confBadge + '</td>' +
+                        '</tr>';
+                html += '<tr class="tx-row-mob tx-row-mob-2">' +
+                        '<td class="history-tx-hash-m" colspan="3">' +
+                            '<div class="hash-m-inner">' +
+                                '<a href="' + txUrl + '" target="_blank" rel="noopener noreferrer">' + safeHashFull + '</a>' +
+                            '</div>' +
+                        '</td>' +
+                        '<td class="history-ts-cell">' + tsHtml + '</td>' +
+                        '<td class="h-copy-cell">' + copyBtn + '</td>' +
                         '</tr>';
             });
             html += '</tbody></table></div>';

@@ -147,26 +147,47 @@ body {
     border-bottom: none;
 }
 /* Mobile: allow horizontal scroll, no layout breaking */
+/* Mobile: two-row layout per transaction */
+.tx-row-mob { display: none; }
+
 @media (max-width: 767px) {
     #history-table {
         font-size: 12px;
         min-width: 0;
     }
-    .history-tx-hash {
-        max-width: 130px;
-        white-space: nowrap;
+    #history-table thead { display: none; }
+    .tx-row-desk { display: none; }
+    .tx-row-mob  { display: table-row; }
+
+    /* Row 1: amount + status — no bottom border, tight padding */
+    .tx-row-mob-1 td {
+        border-bottom: none;
+        padding-bottom: 2px;
+    }
+    /* Row 2: hash + date + copy — bottom border closes the group */
+    .tx-row-mob-2 td {
+        padding-top: 2px;
+    }
+
+    /* Hash cell: ellipsis via inner div */
+    .history-tx-hash-m {
+        max-width: 0;        /* forces table cell to shrink so inner div can ellipsis */
+        width: 60%;
+    }
+    .hash-m-inner {
+        font-family: monospace;
+        font-size: 12px;
         overflow: hidden;
         text-overflow: ellipsis;
-    }
-    .history-tx-hash a {
-        display: block;
-        overflow: hidden;
-        text-overflow: ellipsis;
         white-space: nowrap;
     }
-    .history-ts {
-        font-size: 10px;
+    .hash-m-inner a {
+        color: var(--bs-link-color);
+        text-decoration: none;
     }
+    .hash-m-inner a:hover { text-decoration: underline; }
+
+    .history-ts { font-size: 10px; }
 }
 /* Seed word canvas cell */
 .seed-canvas-cell { overflow: hidden; line-height: 0; }
