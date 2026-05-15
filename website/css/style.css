@@ -43,6 +43,7 @@ body {
     /* Force the collapse panel to always show as an inline flex row */
     #navbarResponsive {
         display: flex !important;
+        flex: 1;              /* fill all space to the right of the logo */
         flex-basis: auto;
         align-items: center;
     }
@@ -56,19 +57,20 @@ body {
         justify-content: space-between;
     }
 
-    /* Nav items in a horizontal row — reset all vertical/full-width overrides */
+    /* Nav items fill the full collapse width and spread evenly */
     .navbar-collapse .navbar-nav {
         flex-direction: row !important;
         align-items: center;
-        width: auto;
+        width: 100%;          /* occupy full collapse area */
         flex-wrap: nowrap;
-        gap: 2px;
+        justify-content: space-evenly; /* equal gaps between all items */
+        margin-left: 0 !important;     /* override ms-auto from HTML */
     }
 
     /* Each item back to auto width; reset ms-* utility classes from HTML */
     .navbar-collapse .nav-item {
         width: auto;
-        text-align: left;
+        text-align: center;
         margin-left: 0 !important;
     }
 
