@@ -2281,7 +2281,7 @@
                 '<div class="send-additional-output send-outputs-item input-group mb-2">' +
                 '<input name="send-address" class="form-control" placeholder="' + escHtml(getText('enter-address')) + '" type="text" autocomplete="off">' +
                 '<input name="send-amount" class="form-control" placeholder="' + escHtml(getText('amount')) + '" type="text" autocomplete="off">' +
-                '<button class="send-max btn btn-outline-secondary" type="button" title="Max">MAX</button>' +
+                '<button class="send-max btn btn-outline-secondary" type="button">MAX</button>' +
                 '<button class="btn btn-outline-danger remove-additional-output" type="button"><span class="fa-solid fa-minus"></span></button>' +
                 '</div>'
             );

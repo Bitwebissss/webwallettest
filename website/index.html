@@ -275,9 +275,9 @@
                             <div class="text-center">
                                 <div class="tab-item" data-tab="wallet-balance">
                                     <div id="qr-code-addres" class="qr-code"></div>
-                                    <div class="d-inline-flex align-items-center justify-content-center address-display-wrapper">
-                                        <div id="wallet-address" class="break-word"></div>
-                                        <button id="copy-address-btn" class="btn btn-sm btn-outline-secondary flex-shrink-0" data-tkey-title="copy-address" title="Copy address">
+                                    <div id="wallet-address" class="break-word mb-1"></div>
+                                    <div class="mb-1">
+                                        <button id="copy-address-btn" class="btn btn-sm btn-outline-secondary">
                                             <span class="fa-solid fa-copy"></span>
                                         </button>
                                     </div>
@@ -339,15 +339,22 @@
                                     <div class="input-group send-outputs-item mb-2">
                                         <input name="send-address" class="form-control" type="text" value="" autocomplete="off" tkey="enter-address">
                                         <input name="send-amount" class="form-control" type="text" value="" autocomplete="off" tkey="amount">
-                                        <button class="send-max btn btn-outline-secondary" type="button" title="Max">MAX</button>
+                                        <button class="send-max btn btn-outline-secondary" type="button">MAX</button>
                                         <button id="add-output" class="btn btn-outline-success">
                                         <span class="fa-solid fa-plus"></span>
                                         </button>
                                     </div>
                                 </div>
-                                <div class="input-group">
-                                    <input id="send-fee" class="form-control" placeholder="Fee" type="text" value="" autocomplete="off">
-                                    <button class="btn btn-primary b-width" type="submit" id="send-tx" tkey="send" disabled></button>
+                                <div class="d-grid mb-2">
+                                    <button class="btn btn-primary" type="submit" id="send-tx" tkey="send" disabled></button>
+                                </div>
+                                <div class="mb-2">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#send-fee-panel" tkey="manual-fee">Manual Fee</button>
+                                    <div class="collapse" id="send-fee-panel">
+                                        <div class="mt-2">
+                                            <input id="send-fee" class="form-control" placeholder="Fee" type="text" value="" autocomplete="off">
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="mt-2">
                                     <button type="button" id="coin-control-toggle" class="btn btn-sm btn-outline-primary">
@@ -405,7 +412,7 @@
                                         <div id="privkey-reveal-row" class="d-none pb-2">
                                             <div class="d-flex align-items-center gap-2 mb-2">
                                                 <canvas id="wallet-privkey-canvas" class="privkey-canvas"></canvas>
-                                                <button id="wallet-privkey-copy-btn" class="btn btn-outline-secondary flex-shrink-0" type="button" title="Copy"><span class="fa-solid fa-copy"></span></button>
+                                                <button id="wallet-privkey-copy-btn" class="btn btn-outline-secondary flex-shrink-0" type="button"><span class="fa-solid fa-copy"></span></button>
                                             </div>
                                             <button id="privkey-hide-btn" class="btn btn-primary b-width" type="button" tkey="hide"></button>
                                         </div>
@@ -582,8 +589,6 @@
             </div>
         </footer>
         <!-- Wallet Logic -->
-        <script src="js/wallet.js"
-                integrity="sha512-DpozrOqv+bUO6FOk+MHLnYezUszKXUlT34qGcMFaYhF8/BYCijP27OTnpzZDHa97v0f36AklXtPa9ZfOHnGNTg=="
-                crossorigin="anonymous"></script>
+        <script src="js/wallet.js"></script>
     </body>
 </html>
