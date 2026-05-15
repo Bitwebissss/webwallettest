@@ -197,7 +197,7 @@ body {
 /* Manual Fee collapse toggle */
 [data-bs-target="#send-fee-panel"] { font-size: 11px; padding: 2px 7px; line-height: 1.4; }
 /* Fee input — centered container, narrow enough for "46.000.000.00000000" */
-.send-fee-input { max-width: 210px; }
+.send-fee-input { max-width: 310px; }
 /* Clipboard scratch textarea — off-screen, invisible, non-interactive */
 .clip-scratch {
     position: fixed;
