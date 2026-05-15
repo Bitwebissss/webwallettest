@@ -79,41 +79,41 @@ body {
 .disclaimer small { max-width: 1100px; display: inline-block; }
 /* ── Transaction history ──────────────────────────────────────────────────── */
 /*
- * ARCHITECTURE: #history-list is the ONE shared CSS Grid.
- * .history-item → display:contents (transparent wrapper).
- * Its 5 children become direct grid cells — ALL rows share the same columns.
- * The widest content in each column sets the width for every row.
+ * Stable row layout:
+ * - the list stacks rows vertically;
+ * - each .history-item is its own grid;
+ * - every important cell gets an explicit column so a missing date never shifts
+ *   the copy button or badge.
  *
- * Columns: [amount] [hash 1fr] [date] [copy 34px] [badge]
- *
- * ≥480px : single-row, hash truncated below 768px
- * <480px : per-item 2-row grid (amount+copy+badge / hash+date)
+ * Desktop: [amount] [hash] [date] [copy] [badge]
+ * Mobile:   [amount] [copy] [badge]
+ *           [hash]   [date]
  */
 
-/* ── Shared grid container ──────────────────────────────────────────────── */
+/* ── Shared history container ───────────────────────────────────────────── */
 #history-list {
-    display: grid;
-    grid-template-columns:
-        max-content       /* [1] amount  — widest row defines width for all */
-        minmax(0, 1fr)    /* [2] hash    — takes all remaining space        */
-        max-content       /* [3] date    — "dd.mm.yyyy hh:mm" fixed width   */
-        34px              /* [4] copy    — icon button                      */
-        max-content;      /* [5] badge   — widest badge defines width (!) */
-    column-gap: 10px;
-    align-items: center;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
     max-height: 320px;
     overflow-y: auto;
     padding-right: 6px;
+    scrollbar-gutter: stable;
 }
 
-/* Loading / error / view-all divs span every column */
+/* Loading / error / view-all blocks keep full width */
 #history-list > div:not(.history-item) {
-    grid-column: 1 / -1;
+    width: 100%;
 }
 
-/* Transparent row wrapper — children become the actual grid cells */
+/* One transaction row = one grid */
 .history-item {
-    display: contents;
+    display: grid;
+    grid-template-columns: 118px 1fr 130px 40px 86px;
+    column-gap: 10px;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
 }
 
 /* Every cell: row separator */
@@ -125,13 +125,19 @@ body {
 
 /* Amount */
 .tx-dir-label {
+    grid-column: 1;
     font-size: 13px;
     font-weight: 600;
     white-space: nowrap;
 }
 
 /* Hash */
-.history-tx-hash { font-size: 12px; overflow: hidden; }
+.history-tx-hash {
+    grid-column: 2;
+    font-size: 12px;
+    overflow: hidden;
+    min-width: 0;
+}
 .history-tx-hash a {
     color: var(--bs-link-color);
     text-decoration: none;
@@ -146,33 +152,52 @@ body {
 
 /* Date */
 .history-ts {
+    grid-column: 3;
     font-size: 11px;
     color: var(--bs-secondary-color);
     white-space: nowrap;
     text-align: right;
+    justify-self: end;
 }
 
 /* Copy btn */
-.h-copy-btn { justify-self: center; }
+.h-copy-btn {
+    grid-column: 4;
+    justify-self: center;
+    width: 40px;
+    min-width: 40px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
 
 /* Badge */
-.h-badge { white-space: nowrap; text-align: center; }
+.h-badge {
+    grid-column: 5;
+    white-space: nowrap;
+    text-align: center;
+    justify-self: end;
+    min-width: 86px;
+}
 
-/* ── 480–767px: truncate hash, shrink fonts — columns stay perfectly aligned */
+/* ── 480–767px: tighten spacing and fonts, keep alignment exact ─────────── */
 @media (max-width: 767px) {
-    #history-list  { column-gap: 7px; font-size: 12px; }
+    .history-item {
+        grid-template-columns: 104px 1fr 120px 38px 76px;
+        column-gap: 7px;
+    }
     .tx-dir-label  { font-size: 12px; }
     .history-tx-hash { font-size: 11px; }
     .history-ts    { font-size: 10px; }
+    .h-copy-btn    { width: 38px; min-width: 38px; }
+    .h-badge       { min-width: 76px; }
     .hash-full     { display: none;   }
     .hash-short    { display: inline; }
 }
 
 /* ── <480px: switch to per-item 2-row layout ─────────────────────────────── */
 @media (max-width: 479px) {
-    /* Restore block flow on the container */
-    #history-list { display: block; }
-
     /* Each item becomes its own 2-row grid */
     .history-item {
         display: grid;
@@ -191,11 +216,11 @@ body {
     /* Row 1: [amount] [copy] [badge] */
     .tx-dir-label { grid-column: 1; grid-row: 1; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .h-copy-btn   { grid-column: 2; grid-row: 1; align-self: center; }
-    .h-badge      { grid-column: 3; grid-row: 1; align-self: center; white-space: nowrap; text-align: right; }
+    .h-badge      { grid-column: 3; grid-row: 1; align-self: center; white-space: nowrap; text-align: right; justify-self: end; min-width: 0; }
 
     /* Row 2: [hash] [date] */
     .history-tx-hash { grid-column: 1;     grid-row: 2; font-size: 10px; }
-    .history-ts      { grid-column: 2 / 4; grid-row: 2; text-align: right; font-size: 9px; white-space: nowrap; }
+    .history-ts      { grid-column: 2 / 4; grid-row: 2; text-align: right; font-size: 9px; white-space: nowrap; justify-self: end; }
 
     .hash-full  { display: none;   }
     .hash-short { display: inline; }
