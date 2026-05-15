@@ -113,41 +113,50 @@
                 );
                 return;
             }
-            let html          = '';
-            const ticker      = this.#getConfig()['ticker'];
+            const ticker = this.#getConfig()['ticker'];
             const chainHeight = Number(this.#globalData.height);
+
+            let html = '<table id="history-table"><thead><tr>' +
+                       '<th>' + this.#escHtml(this.#getText('amount')) + '</th>' +
+                       '<th>' + this.#escHtml(this.#getText('transaction')) + '</th>' +
+                       '<th>' + this.#escHtml(this.#getText('date')) + '</th>' +
+                       '<th></th>' +
+                       '<th>' + this.#escHtml(this.#getText('status')) + '</th>' +
+                       '</tr></thead><tbody>';
+
             txs.forEach(tx => {
-                const h         = Number(tx.height);
+                const h = Number(tx.height);
                 const confirmed = h > 0;
-                const confBadge = confirmed
-                    ? '<span class="badge text-bg-success ms-1">' +
-                      (chainHeight > 0
-                          ? this.#escHtml(String(Math.max(0, chainHeight - h + 1))) +
-                            ' <span tkey="history-conf">' + this.#escHtml(this.#getText('history-conf')) + '</span>'
-                          : '<span tkey="history-confirmed">' + this.#escHtml(this.#getText('history-confirmed')) + '</span>'
-                      ) + '</span>'
-                    : '<span class="badge text-bg-warning ms-1"><span tkey="history-pending">' +
-                      this.#escHtml(this.#getText('history-pending')) + '</span></span>';
+                let confBadge = '';
+                if (confirmed) {
+                    let confText = (chainHeight > 0)
+                        ? String(Math.max(0, chainHeight - h + 1)) + ' ' + this.#getText('history-conf')
+                        : this.#getText('history-confirmed');
+                    confBadge = '<span class="badge text-bg-success">' + this.#escHtml(confText) + '</span>';
+                } else {
+                    confBadge = '<span class="badge text-bg-warning">' + this.#escHtml(this.#getText('history-pending')) + '</span>';
+                }
 
                 const dir = tx.direction || 'unknown';
                 const amt = (tx.amount != null) ? this.#amountFormat(tx.amount) : '?';
-                let dirLabel;
+                let dirLabelClass = '', dirSymbol = '';
                 if (dir === 'in') {
-                    dirLabel = '<span class="fw-bold text-success tx-dir-label">' +
-                               '&#x2193; +' + this.#escHtml(String(amt)) + ' ' + this.#escHtml(ticker) +
-                               '</span>';
+                    dirLabelClass = 'text-success';
+                    dirSymbol = '↓ +';
                 } else if (dir === 'out') {
-                    dirLabel = '<span class="fw-bold text-danger tx-dir-label">' +
-                               '&#x2191; &minus;' + this.#escHtml(String(amt)) + ' ' + this.#escHtml(ticker) +
-                               '</span>';
+                    dirLabelClass = 'text-danger';
+                    dirSymbol = '↑ −';
                 } else if (dir === 'self') {
-                    dirLabel = '<span class="fw-bold text-info tx-dir-label">' +
-                               '&#x21C5; ' + this.#escHtml(String(amt)) + ' ' + this.#escHtml(ticker) +
-                               '</span>';
+                    dirLabelClass = 'text-info';
+                    dirSymbol = '↻';
                 } else {
-                    dirLabel = '<span class="text-muted tx-dir-label">— ? ' +
-                               this.#escHtml(ticker) + '</span>';
+                    dirLabelClass = 'text-muted';
+                    dirSymbol = '?';
                 }
+                const dirLabel = '<span class="tx-dir-label ' + dirLabelClass + '">' +
+                                 dirSymbol + ' ' + this.#escHtml(String(amt)) + ' ' + this.#escHtml(ticker) +
+                                 '</span>';
+
                 const safeHashFull  = this.#escHtml(tx.txid || '');
                 const safeHashShort = this.#escHtml(this.#truncHash(tx.txid || ''));
                 const rawTxUrl      = this.#blockExplorer.tx(tx.txid || '');
@@ -156,30 +165,30 @@
                     ? '<span class="history-ts">' + this.#escHtml(this.#formatTs(tx.timestamp)) + '</span>'
                     : '<span class="history-ts"></span>';
 
-                /* 5 grid children: [amount] [hash] [date] [copy] [badge] */
-                html +=
-                    '<div class="history-item border-bottom">' +
-                    dirLabel +
-                    '<div class="font-monospace history-tx-hash">' +
-                        '<a href="' + txUrl + '" target="_blank" rel="noopener noreferrer">' +
-                            '<span class="hash-full">'  + safeHashFull  + '</span>' +
-                            '<span class="hash-short">' + safeHashShort + '</span>' +
-                        '</a>' +
-                    '</div>' +
-                    tsHtml +
-                    '<button class="btn btn-sm btn-outline-secondary h-copy-btn" data-copy-url="' + txUrl + '" title="Copy explorer link">' +
-                        '<span class="fa-solid fa-copy"></span>' +
-                    '</button>' +
-                    '<div class="h-badge">' + confBadge + '</div>' +
-                    '</div>';
+                html += '<tr>' +
+                        '<td class="tx-dir-cell">' + dirLabel + '</td>' +
+                        '<td class="history-tx-hash">' +
+                            '<a href="' + txUrl + '" target="_blank" rel="noopener noreferrer">' +
+                                '<span class="hash-full">'  + safeHashFull  + '</span>' +
+                                '<span class="hash-short">' + safeHashShort + '</span>' +
+                            '</a>' +
+                        '</td>' +
+                        '<td class="history-ts-cell">' + tsHtml + '</td>' +
+                        '<td class="h-copy-cell"><button class="btn btn-sm btn-outline-secondary h-copy-btn" data-copy-url="' + txUrl + '" title="Copy explorer link">' +
+                            '<span class="fa-solid fa-copy"></span>' +
+                        '</button></td>' +
+                        '<td class="h-badge-cell">' + confBadge + '</td>' +
+                        '</tr>';
             });
-            if (txs.length >= HISTORY_LIMIT) {
+
+            if (txs.length >= this.HISTORY_LIMIT) {
                 const explorerUrl = this.#escHtml(this.#blockExplorer.address(this.#globalData.address));
-                html += '<div class="text-center py-2"><small>' +
+                html += '<tr><td colspan="5" class="text-center py-2"><small>' +
                         '<a href="' + explorerUrl + '" target="_blank" rel="noopener noreferrer">' +
                         this.#escHtml(this.#getText('history-view-all')) + ' &#x2197;' +
-                        '</a></small></div>';
+                        '</a></small></td></tr>';
             }
+            html += '</tbody></table>';
             $('#history-list').html(html);
         }
     }
