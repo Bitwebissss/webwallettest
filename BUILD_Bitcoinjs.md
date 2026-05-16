@@ -23,13 +23,13 @@ file, so the bundle is built from source).
 
 ## Requirements
 
-| Tool     | Minimum version                        | Verified build   | Check            |
-|----------|----------------------------------------|------------------|------------------|
-| Node.js  | **≥ 20.0.0** (ecpair requires ≥ 20)    | v24.15.0         | `node --version` |
-| npm      | **≥ 10**                               | 11.13.0          | `npm --version`  |
-| Internet | registry.npmjs.org                     | —                | —                |
+| Tool     | Minimum version                     | Verified build   | Check            |
+|----------|-------------------------------------|------------------|------------------|
+| Node.js  | **≥ 20.0.0** (ecpair requires ≥ 20) | v24.15.0         | `node --version` |
+| npm      | **≥ 10**                            | 11.13.0          | `npm --version`  |
+| Internet | registry.npmjs.org                  | —                | —                |
 
-The SRI hash in Step 7 was produced on **Node v24.15.0 + npm 11.13.0**. Any environment satisfying the minimum versions will produce a functionally equivalent bundle; the byte-for-byte hash matches only when built on the same Node + npm pair.
+The SRI hash in Step 7 was produced on **Node v24.15.0 + npm 11.13.0**. Any environment satisfying the minimum versions will produce a functionally equivalent bundle.
 
 ---
 
