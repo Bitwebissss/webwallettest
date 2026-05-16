@@ -17,7 +17,7 @@
 
 /css/*
   Content-Type: text/css; charset=utf-8
-  Cache-Control: no-cache, must-revalidate
+  Cache-Control: public, max-age=172800
 
 /webfonts/*
   Cache-Control: public, max-age=172800
