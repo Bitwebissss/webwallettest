@@ -16,6 +16,7 @@
   Cache-Control: no-store, no-cache, must-revalidate
 
 /css/*
+  Content-Type: text/css; charset=utf-8
   Cache-Control: no-cache, must-revalidate
 
 /webfonts/*
