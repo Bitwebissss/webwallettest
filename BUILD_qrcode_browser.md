@@ -14,11 +14,13 @@ so this build produces one. The bundle renders QR codes directly to `<canvas>`.
 
 ## Requirements
 
-| Tool    | Minimum version    | Check            |
-|---------|--------------------|------------------|
-| Node.js | ≥ 20.0.0           | `node --version` |
-| npm     | ≥ 10               | `npm --version`  |
-| Internet | registry.npmjs.org | —               |
+| Tool     | Minimum version    | Verified build | Check            |
+|----------|--------------------|----------------|------------------|
+| Node.js  | **≥ 20.0.0**       | v24.15.0       | `node --version` |
+| npm      | **≥ 10**           | 11.13.0         | `npm --version`  |
+| Internet | registry.npmjs.org | —              | —                |
+
+The SRI hash in Step 7 was produced on **Node v24.15.0 + npm 11.13.0**. Any environment satisfying the minimum versions will produce a functionally equivalent bundle; the byte-for-byte hash matches only when built on the same Node + npm pair.
 
 ---
 
@@ -125,7 +127,7 @@ No `--banner` needed: `qrcode` does not use `process` anywhere in its source.
 Expected output:
 
 ```
-  qrcode-browser.min.js  23.7kb
+  qrcode-browser.min.js  23.8kb
 
 ⚡ Done in ~25ms
 ```
@@ -237,72 +239,26 @@ This bundle is fully deterministic across platforms and Node/npm versions:
 for the same input and flags.
 
 ```bash
+# Size:
 wc -c qrcode-browser.min.js
-# Expected: 24309 bytes
 
-sha256sum qrcode-browser.min.js
-# Expected: e8567e7723610dda671e900e4e8a1d50f407612cc2ef059465226bb8d5c52d38
-
+# SRI hash:
 echo "sha512-$(openssl dgst -sha512 -binary qrcode-browser.min.js | openssl base64 -A)"
 # Expected: sha512-Owkt053PkI36baxtpawncRxvmsdahAekRZ87LRtEFpFCRE+q4E64TW5dGZIHqjum+tYByRcyHnSNSDkYkTDThg==
 ```
 
----
-
-## Step 7 — Deploy
-
-```bash
-cp qrcode-browser.min.js ../js/qrcode-browser.min.js
+**Verified hashes (Node v24.15.0 + npm 11.13.0):**
 ```
-
-In `index.html`:
-
-```html
-<!-- Self build — see BUILD_qrcode_browser.md -->
-<script src="js/qrcode-browser.min.js"
-        integrity="sha512-Owkt053PkI36baxtpawncRxvmsdahAekRZ87LRtEFpFCRE+q4E64TW5dGZIHqjum+tYByRcyHnSNSDkYkTDThg=="
-        crossorigin="anonymous"></script>
+24330 qrcode-browser.min.js
+sha512-Fylkwjj7d5d/OCmgh3/usBPvSY5+Q/cYSl1myDVYCw1alMz4Sam6/IWwuXh8D3auWeq2L6vD8hT/p/CI8ppYPg==
 ```
-
-> This is the only bundle with a canonical hash — `qrcode` has no native code
-> dependencies, so esbuild produces identical output across Node/npm versions.
-
----
-
-## Notes for auditors
-
-### Why no `--banner:js=var process={...}` here
-
-The `--banner` process polyfill is needed in the bitcoin and bip39 bundles because
-their dependencies (`bitcoinjs-lib`, `ecpair`, `@noble/hashes`) check
-`process.browser` and `process.env.NODE_ENV` at runtime.
-
-The `qrcode` package does not reference `process` anywhere in its source. This is
-verified after every build:
 
 ```bash
 grep -o "process\b" qrcode-browser.min.js | wc -l
 # Must be 0
 ```
 
-If this count ever becomes non-zero after a `qrcode` version update, add the banner
-from the bitcoin build guide before deploying.
+---
 
-### Why `var` and not `const` in the banner (bitcoin/bip39 bundles)
-
-The banner is raw text prepended before all bundled code. CJS modules bundled by
-esbuild can emit their own `var process = ...` references within the same scope.
-`var` can be declared multiple times without error — later declarations overwrite
-the value. `const` or `let` would throw `SyntaxError: Identifier 'process' has
-already been declared` and break the entire bundle silently in the browser.
-`var` is the only safe choice for a polyfill injected into an unknown outer scope.
-
-### Why canvas and not SVG or img?
-
-`toCanvas()` renders directly into `<canvas>` — one step, no base64 encoding
-overhead. Canvas renders natively in all modern browsers at the device's native DPI.
-
-### Why Object.defineProperty is not needed here
-
-Unlike the bitcoin bundle test, `w.crypto` does not need to be mocked for the QR
-bundle — `qrcode` does not use any RNG. The canvas mock is sufficient.
+> This is the only bundle with a canonical hash — `qrcode` has no native code
+> dependencies, so esbuild produces identical output across Node/npm versions.

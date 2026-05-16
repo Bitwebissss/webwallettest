@@ -68,12 +68,6 @@ npm init -y
 
 ## Step 2 — Install exact pinned versions
 
-> **Important:** install only these packages before building the bundle.
-> Do NOT run `npm install jsdom` at this stage — jsdom is a test dependency only
-> and must be installed after the bundle is built (Step 6). While esbuild only
-> bundles what is explicitly imported in the entry point, keeping `package.json`
-> clean during the build step makes the audit unambiguous.
-
 Install one package at a time for reliability:
 
 ```bash
@@ -1401,6 +1395,3 @@ effectiveD = (y(P) odd) ? -d : d             // lift_x
 tweakedD   = effectiveD + t  (mod n)          // d + t
 Q          = xOnlyPointAddTweak(xOnlyPub, t)  // P + tG
 ```
-
-
-

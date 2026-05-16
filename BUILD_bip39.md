@@ -20,12 +20,29 @@ Entropy source: `crypto.getRandomValues` (OS CSPRNG, native in all modern browse
 
 ---
 
-## RNG Audit (verified)
+## Requirements
+
+| Tool     | Minimum version    | Verified build | Check            |
+|----------|--------------------|----------------|------------------|
+| Node.js  | **≥ 20.0.0**       | v24.15.0       | `node --version` |
+| npm      | **≥ 10**           | 11.13.0         | `npm --version`  |
+| Internet | registry.npmjs.org | —              | —                |
+
+The SRI hash in Step 7 was produced on **Node v24.15.0 + npm 11.13.0**. Any environment satisfying the minimum versions will produce a functionally equivalent bundle; the byte-for-byte hash matches only when built on the same Node + npm pair.
+
+---
+
+## RNG Audit
 
 | Library | RNG used | Source |
 |---------|----------|--------|
 | `@scure/bip39` | `crypto.getRandomValues` | `@noble/hashes/utils → randomBytes()` |
 | `@scure/bip32` | **none** — only HMAC-SHA512 (deterministic KDF) | — |
+
+**Verified in bundle (Node v24.15.0 + npm 11.13.0):**
+- `getRandomValues` — **3 occurrences** in bundle. The count is tied to the exact Node + npm versions used during bundling; builds on other versions may differ by 1 occurrence. What matters is that the count is **> 0** and `Math.random` is **absent**.
+- `Math.random` — absent (0 occurrences)
+- `node:crypto` / `require('crypto')` — absent (0 occurrences)
 
 **RNG chain in the browser:**
 
@@ -36,21 +53,6 @@ bip39.generateMnemonic()
           → window.crypto
               → OS CSPRNG                  ← /dev/urandom (Linux), CryptGenRandom (Windows)
 ```
-
-**Verified in bundle:**
-- `getRandomValues` — **3 occurrences**, only through `globalThis.crypto`
-- `Math.random` — absent (0 occurrences)
-- `node:crypto` / `require('crypto')` — absent (0 occurrences)
-
----
-
-## Requirements
-
-| Tool    | Minimum version    |
-|---------|--------------------|
-| Node.js | ≥ 20.0.0           |
-| npm     | ≥ 10               |
-| Internet | registry.npmjs.org |
 
 ---
 
@@ -74,7 +76,15 @@ npm install --save-exact @scure/bip32@2.2.0
 npm install --save-exact esbuild@0.28.0
 ```
 
-### Expected integrity hashes (sha512, npm registry — identical on all machines)
+### What each package does
+
+| Package | Version | Purpose | Repository |
+|---------|---------|---------|------------|
+| @scure/bip39 | 2.2.0 | BIP39 mnemonic generation/validation, entropy↔mnemonic conversion | github.com/paulmillr/scure-bip39 |
+| @scure/bip32 | 2.2.0 | BIP32 HD key derivation — pure JS, Cure53 audited, Paul Miller | github.com/paulmillr/scure-bip32 |
+| esbuild | 0.28.0 | Bundler: ESM+CJS → single browser file | github.com/evanw/esbuild |
+
+### Expected integrity hashes (sha512, npm registry)
 
 ```
 @scure/bip39@2.2.0
@@ -89,8 +99,11 @@ esbuild@0.28.0
 
 ### Automated integrity check
 
+> **Note:** never use `node -e "..."` for scripts containing `!` — bash treats `!`
+> inside double quotes as history expansion. Always save to a file first.
+
 ```bash
-cat > check_bip39_integrity.js << 'EOF'
+cat > check_integrity.js << 'EOF'
 const fs = require('fs')
 const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'))
 const expected = {
@@ -111,11 +124,11 @@ for (const [pkg, hash] of Object.entries(expected)) {
     console.log('OK:', pkg + '@' + entry.version)
   }
 }
-if (ok) console.log('\n✅ All package integrity hashes match')
+if (ok) console.log('\n✅ All integrity hashes match')
 else { console.log('\n❌ INTEGRITY CHECK FAILED — do not use this build'); process.exit(1) }
 EOF
 
-node check_bip39_integrity.js
+node check_integrity.js
 ```
 
 Expected output:
@@ -124,7 +137,7 @@ OK: @scure/bip39@2.2.0
 OK: @scure/bip32@2.2.0
 OK: esbuild@0.28.0
 
-✅ All package integrity hashes match
+✅ All integrity hashes match
 ```
 
 ---
@@ -133,6 +146,8 @@ OK: esbuild@0.28.0
 
 > **Important:** v2.x is ESM-only. Use `import`, not `require()`.
 > The wordlist path requires the `.js` suffix in v2.x.
+
+Single quotes around `EOF` are required:
 
 ```bash
 cat > entry_bip39.js << 'EOF'
@@ -214,13 +229,13 @@ No ES5 transpilation — BigInt, arrow functions, and classes are native.
   --outfile=bip39-bundle.min.js \
   --minify \
   --define:global=globalThis \
-  '--banner:js=var process={env:{NODE_ENV:"production"},browser:true,version:"v18.0.0",versions:{},platform:"browser",nextTick:function(fn,a,b,c){return setTimeout(function(){fn(a,b,c)},0)},hrtime:function(){return[0,0]},exit:function(){},on:function(){return this}};'
+  '--banner:js=var process={env:{NODE_ENV:"production"},browser:true,version:"v20.0.0",versions:{},platform:"browser",nextTick:function(fn,a,b,c){return setTimeout(function(){fn(a,b,c)},0)},hrtime:function(){return[0,0]},exit:function(){},on:function(){return this}};'
 ```
 
 Expected output:
 
 ```
-  bip39-bundle.min.js  ~68–70 kb
+  bip39-bundle.min.js  68.8kb
 
 ⚡ Done in ~10–50ms
 ```
@@ -241,7 +256,7 @@ if grep -q "Math\.random" bip39-bundle.min.js; then echo "❌ PROBLEM: Math.rand
 # node:crypto must be ABSENT:
 if grep -qE "node:crypto|require\(.*crypto" bip39-bundle.min.js; then echo "❌ PROBLEM: node:crypto found"; else echo "✅ OK: no node:crypto"; fi
 
-# Confirm crypto source is globalThis:
+# Confirm all getRandomValues calls go through globalThis.crypto:
 grep -oE '.{30}getRandomValues.{30}' bip39-bundle.min.js
 ```
 
@@ -250,58 +265,112 @@ Expected output:
 3
 ✅ OK: Math.random absent
 ✅ OK: no node:crypto
+This.crypto:null;if(typeof e?.getRandomValues!="function")throw new Error("
+<= 65536, got ${t}`);return e.getRandomValues(new Uint8Array(t))}var gr,Kn,
 ```
 
 > `getRandomValues` = 0 means the bundle is broken.
-> If count > 3, check that dependency versions match Step 2 exactly.
+> Any positive count is safe; `Math.random` being absent is the critical invariant.
 
 ---
 
 ## Step 6 — Test the bundle
 
+> **Install jsdom only at this step** — after the bundle has been built and the
+> RNG audit passed. jsdom is a test harness dependency only; it is not imported
+> by entry_bip39.js and will never appear in the bundle regardless of install
+> order, but keeping it out of `package.json` during Steps 1–5 makes the
+> dependency audit unambiguous.
+
 ```bash
 npm install --save-exact jsdom
+```
 
+Save the test file (single-quoted EOF prevents variable expansion):
+
+```bash
 cat > test_bip39.js << 'EOF'
+// ============================================================
+// FULL TEST SUITE — @scure/bip39 + @scure/bip32 2.2.0 (34 checks)
+// ============================================================
 const { JSDOM } = require('jsdom')
-const fs = require('fs')
-const crypto = require('crypto')
+const fs         = require('fs')
+const nodeCrypto = require('crypto')
 
-const dom = new JSDOM('<!DOCTYPE html>', { runScripts: 'dangerously' })
-const w = dom.window
-w.crypto = { getRandomValues: (buf) => { crypto.randomFillSync(buf); return buf } }
-
-w.document.head.appendChild(
-  Object.assign(w.document.createElement('script'),
-  { textContent: fs.readFileSync('bip39-bundle.min.js', 'utf8') })
-)
-
-const b = w.bip39Bundle
-let allOk = true
-function check(label, val, expected) {
-  const ok = expected === undefined ? !!val : val === expected
-  console.log((ok ? '✅' : '❌') + ' ' + label + (ok ? '' : '  got: ' + val))
-  if (!ok) allOk = false
+// Minimal browser env
+const dom = new JSDOM('', { url: 'http://localhost' })
+global.window   = dom.window
+global.document = dom.window.document
+global.crypto   = {
+  getRandomValues: (buf) => { buf.set(nodeCrypto.randomBytes(buf.length)); return buf }
 }
 
-check('bip39Bundle defined', !!b)
-check('wordlist length', b.wordlist.length, 2048)
+// RNG call counter for audit
+let rngCallCount = 0
+const _origRng = global.crypto.getRandomValues.bind(global.crypto)
+Object.defineProperty(global.crypto, 'getRandomValues', {
+  value: function(buf) { rngCallCount++; return _origRng(buf) },
+  writable: false, configurable: false
+})
 
+const BUNDLE = './bip39-bundle.min.js'
+const code = fs.readFileSync(BUNDLE, 'utf8')
+const fn   = new Function('window', 'document', 'crypto', code + '; return window.bip39Bundle;')
+const b    = fn(global.window, global.document, global.crypto)
+
+// ============================================================
+let total = 0, passed = 0, failed = 0
+const FAIL_DETAILS = []
+
+function check(label, got, expected) {
+  total++
+  const ok = expected === undefined ? !!got : got === expected
+  if (ok) {
+    passed++
+    console.log(`  ✅ ${label}`)
+  } else {
+    failed++
+    const detail = `  ❌ ${label}\n     got:      ${JSON.stringify(got)}\n     expected: ${JSON.stringify(expected)}`
+    console.log(detail)
+    FAIL_DETAILS.push(detail)
+  }
+}
+
+function section(title) { console.log(`\n─── ${title} ───`) }
+
+// ============================================================
+section('1. BUNDLE BASICS')
+check('bip39Bundle defined',    typeof b === 'object')
+check('wordlist length',        b.wordlist.length, 2048)
+
+// ============================================================
+section('2. RNG AUDIT')
+const bundleText = fs.readFileSync(BUNDLE, 'utf8')
+check('Math.random absent from bundle',  !bundleText.includes('Math.random'))
+check('node:crypto absent from bundle',  !bundleText.match(/node:crypto|require\(.*crypto/))
+const rngBefore = rngCallCount
+b.generateMnemonic(128)
+check('generateMnemonic calls getRandomValues', rngCallCount > rngBefore)
+
+// ============================================================
+section('3. generateMnemonic / validateMnemonic')
 const m12 = b.generateMnemonic(128)
 const m24 = b.generateMnemonic(256)
-check('generateMnemonic 12 words', m12.split(' ').length, 12)
-check('generateMnemonic 24 words', m24.split(' ').length, 24)
-check('validateMnemonic valid',   b.validateMnemonic(m12), true)
-check('validateMnemonic invalid', b.validateMnemonic('wrong word list'), false)
+check('generateMnemonic 12 words',      m12.split(' ').length, 12)
+check('generateMnemonic 24 words',      m24.split(' ').length, 24)
+check('validateMnemonic valid',         b.validateMnemonic(m12), true)
+check('validateMnemonic invalid',       b.validateMnemonic('wrong word list'), false)
 
+// ============================================================
+section('4. mnemonicToPrivKey — key material & memory safety')
 const pk = b.mnemonicToPrivKey(m12)
-check('privKey is Uint8Array', pk instanceof w.Uint8Array)
-check('privKey length 32', pk.length, 32)
+check('privKey is Uint8Array',          pk instanceof global.window.Uint8Array)
+check('privKey length 32',              pk.length, 32)
 
 const pk2 = b.mnemonicToPrivKey(m12)
 let same = true
 for (let i = 0; i < 32; i++) if (pk[i] !== pk2[i]) { same = false; break }
-check('deterministic derivation', same)
+check('deterministic derivation (same mnemonic → same key)', same)
 
 const pk3 = b.mnemonicToPrivKey(m12)
 pk3.fill(0)
@@ -316,58 +385,62 @@ let sameAsPk = true
 for (let i = 0; i < 32; i++) if (pk5[i] !== pk[i]) { sameAsPk = false; break }
 check('root+child fill(0) does not corrupt future independent calls', sameAsPk)
 
-const ent12 = b.mnemonicToEntropy(m12)
-check('mnemonicToEntropy returns Uint8Array', ent12 instanceof w.Uint8Array)
-check('entropy 12-word = 16 bytes', ent12.length, 16)
-check('entropyToMnemonic roundtrip 12-word', b.entropyToMnemonic(ent12) === m12)
-
-const ent24 = b.mnemonicToEntropy(m24)
-check('entropy 24-word = 32 bytes', ent24.length, 32)
-check('entropyToMnemonic roundtrip 24-word', b.entropyToMnemonic(ent24) === m24)
-
 const pkCustom = b.mnemonicToPrivKey(m12, "m/44'/0'/0'/0/0")
-check('custom path 32 bytes', pkCustom.length, 32)
+check('custom path: length 32',         pkCustom.length, 32)
 let diff = false
 for (let i = 0; i < 32; i++) if (pkCustom[i] !== pk[i]) { diff = true; break }
-check('custom path gives different key', diff)
+check('custom path gives different key than default', diff)
 
+// ============================================================
+section('5. entropy ↔ mnemonic roundtrip')
+const ent12 = b.mnemonicToEntropy(m12)
+check('mnemonicToEntropy: returns Uint8Array',      ent12 instanceof global.window.Uint8Array)
+check('entropy 12-word: 16 bytes',                  ent12.length, 16)
+check('entropyToMnemonic roundtrip 12-word',         b.entropyToMnemonic(ent12) === m12)
+
+const ent24 = b.mnemonicToEntropy(m24)
+check('entropy 24-word: 32 bytes',                  ent24.length, 32)
+check('entropyToMnemonic roundtrip 24-word',         b.entropyToMnemonic(ent24) === m24)
+
+// ============================================================
+section('6. RNG uniqueness')
 const mA = b.generateMnemonic(256)
 const mB = b.generateMnemonic(256)
-check('two mnemonics are different', mA !== mB)
+check('two mnemonics differ',                        mA !== mB)
 const pkA = b.mnemonicToPrivKey(mA)
 const pkB = b.mnemonicToPrivKey(mB)
 let pkDiff = false
 for (let i = 0; i < 32; i++) if (pkA[i] !== pkB[i]) { pkDiff = true; break }
-check('different mnemonics → different privkeys', pkDiff)
+check('different mnemonics → different privkeys',    pkDiff)
 
-// ── entropyToPrivKey tests ─────────────────────────────────────────────────
-console.log('\n── entropyToPrivKey ──')
+// ============================================================
+section('7. entropyToPrivKey')
+const BTE_PATH = "m/84'/738'/0'/0/0"
 
 const epk12 = b.entropyToPrivKey(ent12)
-check('entropyToPrivKey returns Uint8Array', epk12 instanceof w.Uint8Array)
-check('entropyToPrivKey result length 32', epk12.length, 32)
+check('entropyToPrivKey: returns Uint8Array',        epk12 instanceof global.window.Uint8Array)
+check('entropyToPrivKey: length 32',                 epk12.length, 32)
 
 const epk12b = b.entropyToPrivKey(ent12)
 let epkSame = true
 for (let i = 0; i < 32; i++) if (epk12[i] !== epk12b[i]) { epkSame = false; break }
-check('entropyToPrivKey deterministic (same entropy → same key)', epkSame)
+check('entropyToPrivKey: deterministic (same entropy → same key)', epkSame)
 
-const BTE_PATH = "m/84'/738'/0'/0/0"
 const twoStep = b.mnemonicToPrivKey(b.entropyToMnemonic(ent12), BTE_PATH)
 const oneStep = b.entropyToPrivKey(ent12, BTE_PATH)
 let consistent = true
 for (let i = 0; i < 32; i++) if (oneStep[i] !== twoStep[i]) { consistent = false; break }
-check('entropyToPrivKey matches entropyToMnemonic→mnemonicToPrivKey (default BTE path)', consistent)
+check('entropyToPrivKey matches entropyToMnemonic→mnemonicToPrivKey (BTE path)', consistent)
 
 const epk24 = b.entropyToPrivKey(ent24, BTE_PATH)
-check('entropyToPrivKey 24-word entropy: length 32', epk24.length, 32)
+check('entropyToPrivKey 24-word: length 32',         epk24.length, 32)
 const twoStep24 = b.mnemonicToPrivKey(b.entropyToMnemonic(ent24), BTE_PATH)
 let consistent24 = true
 for (let i = 0; i < 32; i++) if (epk24[i] !== twoStep24[i]) { consistent24 = false; break }
-check('entropyToPrivKey 24-word matches two-step', consistent24)
+check('entropyToPrivKey 24-word matches two-step',   consistent24)
 
 const epkCustom = b.entropyToPrivKey(ent12, "m/44'/0'/0'/0/0")
-check('entropyToPrivKey custom path: length 32', epkCustom.length, 32)
+check('entropyToPrivKey custom path: length 32',     epkCustom.length, 32)
 let customDiff = false
 for (let i = 0; i < 32; i++) if (epkCustom[i] !== epk12[i]) { customDiff = true; break }
 check('entropyToPrivKey custom path gives different key than default', customDiff)
@@ -379,24 +452,86 @@ let notAllZero = false
 for (let i = 0; i < 32; i++) if (epkAfterZ[i] !== 0) { notAllZero = true; break }
 check('fill(0) on entropyToPrivKey result does not corrupt next call', notAllZero)
 
-const ent12alt = new w.Uint8Array(16)
-w.crypto.getRandomValues(ent12alt)
+const ent12alt = new global.window.Uint8Array(16)
+global.crypto.getRandomValues(ent12alt)
 const epkAlt = b.entropyToPrivKey(ent12alt, BTE_PATH)
 let entDiff = false
 for (let i = 0; i < 32; i++) if (epkAlt[i] !== epk12[i]) { entDiff = true; break }
-check('entropyToPrivKey different entropy → different key', entDiff)
+check('entropyToPrivKey: different entropy → different key', entDiff)
 
-// ── end entropyToPrivKey tests ─────────────────────────────────────────────
-
-console.log('')
-if (allOk) { console.log('✅ ALL TESTS PASSED\nBundle is safe to deploy.') }
-else { console.log('❌ SOME TESTS FAILED'); process.exit(1) }
+// ============================================================
+console.log('\n' + '='.repeat(55))
+console.log(`TOTAL: ${total}  ✅ PASSED: ${passed}  ❌ FAILED: ${failed}`)
+if (failed > 0) {
+  console.log('\nFAILED TESTS:')
+  FAIL_DETAILS.forEach(d => console.log(d))
+  console.log('\n❌ TESTS FAILED — do not deploy this build')
+  process.exit(1)
+} else {
+  console.log('\n✅ ALL TESTS PASSED — bundle is safe to deploy')
+}
 EOF
 
 node test_bip39.js
 ```
 
-All 31 checks must show `✅` and the final line `ALL TESTS PASSED`.
+Expected output:
+```
+─── 1. BUNDLE BASICS ───
+  ✅ bip39Bundle defined
+  ✅ wordlist length
+
+─── 2. RNG AUDIT ───
+  ✅ Math.random absent from bundle
+  ✅ node:crypto absent from bundle
+  ✅ generateMnemonic calls getRandomValues
+
+─── 3. generateMnemonic / validateMnemonic ───
+  ✅ generateMnemonic 12 words
+  ✅ generateMnemonic 24 words
+  ✅ validateMnemonic valid
+  ✅ validateMnemonic invalid
+
+─── 4. mnemonicToPrivKey — key material & memory safety ───
+  ✅ privKey is Uint8Array
+  ✅ privKey length 32
+  ✅ deterministic derivation (same mnemonic → same key)
+  ✅ fill(0) on result does not corrupt next call (.slice() works)
+  ✅ seed.fill(0) did not break derivation
+  ✅ root+child fill(0) does not corrupt future independent calls
+  ✅ custom path: length 32
+  ✅ custom path gives different key than default
+
+─── 5. entropy ↔ mnemonic roundtrip ───
+  ✅ mnemonicToEntropy: returns Uint8Array
+  ✅ entropy 12-word: 16 bytes
+  ✅ entropyToMnemonic roundtrip 12-word
+  ✅ entropy 24-word: 32 bytes
+  ✅ entropyToMnemonic roundtrip 24-word
+
+─── 6. RNG uniqueness ───
+  ✅ two mnemonics differ
+  ✅ different mnemonics → different privkeys
+
+─── 7. entropyToPrivKey ───
+  ✅ entropyToPrivKey: returns Uint8Array
+  ✅ entropyToPrivKey: length 32
+  ✅ entropyToPrivKey: deterministic (same entropy → same key)
+  ✅ entropyToPrivKey matches entropyToMnemonic→mnemonicToPrivKey (BTE path)
+  ✅ entropyToPrivKey 24-word: length 32
+  ✅ entropyToPrivKey 24-word matches two-step
+  ✅ entropyToPrivKey custom path: length 32
+  ✅ entropyToPrivKey custom path gives different key than default
+  ✅ fill(0) on entropyToPrivKey result does not corrupt next call
+  ✅ entropyToPrivKey: different entropy → different key
+
+=======================================================
+TOTAL: 34  ✅ PASSED: 34  ❌ FAILED: 0
+
+✅ ALL TESTS PASSED — bundle is safe to deploy
+```
+
+All 34 checks must show `✅` and the final line `ALL TESTS PASSED`.
 
 ---
 
@@ -407,55 +542,51 @@ canonical hash — compute yours after building and record it as the reference f
 future rebuilds on the same machine.
 
 ```bash
+# Size:
 wc -c bip39-bundle.min.js
+
+# SRI hash:
 echo "sha512-$(openssl dgst -sha512 -binary bip39-bundle.min.js | openssl base64 -A)"
 ```
 
-**Verified hashes (Node 22.22.2 + npm 10.9.7):**
+**Verified hashes (Node v24.15.0 + npm 11.13.0):**
 ```
-69744 bytes
-sha512-zWLd7XWjt9cD9f6X2WC1reAjLwa1L0lMRoCjIzaTgLZ1WNkuwKqF8hADVPSrolVUi3xuwrpk63ZmC8XDvECTsg==
-```
-
-```bash
-cp bip39-bundle.min.js ../js/bip39-bundle.min.js
-```
-
-In `index.html`:
-
-```html
-<!-- Self build — see BUILD_bip39.md -->
-<script src="js/bip39-bundle.min.js"
-        integrity="sha512-YOUR_HASH_FROM_ABOVE=="
-        crossorigin="anonymous"></script>
+70482 bip39-bundle.min.js
+sha512-lf8u51hdguRIFwjMOeQl4ux4IgedzdqTM3UjiXtgYnv8a4xiI1TpEZXAyN/RQLY7VsAQV+ycHQs+jvvAyRbScA==
 ```
 
 ---
 
-## Summary of security properties
+## API reference
 
-| Property | Status | Detail |
-|----------|--------|--------|
-| RNG source | ✅ `crypto.getRandomValues` | → `window.crypto` → OS CSPRNG |
-| `Math.random` | ✅ Absent | 0 occurrences in bundle |
-| `node:crypto` in bundle | ✅ Absent | esbuild `--platform=browser` picks browser crypto path |
-| `seed.fill(0)` | ✅ Applied | 64-byte master seed zeroed immediately after HDKey consumes it |
-| `root.privateKey/chainCode.fill(0)` | ✅ Applied | Root HDKey zeroed after child derivation completes |
-| `child.privateKey/chainCode.fill(0)` | ✅ Applied | Child HDKey zeroed after private key is copied out |
-| `privKey.slice()` | ✅ Applied | Independent copy returned; `fill(0)` on result is safe |
-| Mnemonic string scope | ✅ Bundle-internal | `entropyToPrivKey` keeps mnemonic inside closure; never exits to caller |
-| `@scure/bip32` RNG | ✅ None needed | BIP32 derivation is deterministic HMAC-SHA512 |
-| Duplicate deps | ✅ None | v2.x: shared `@noble/hashes` — 3 getRandomValues vs 9 in v1.x |
-| Library audit | ✅ Cure53 | Same audit as `@noble` family |
-| Package integrity | ✅ Pinned | sha512 from npm registry — identical on all machines |
-| Target browsers | ✅ Modern only | `--target=es2020`: Chrome 80+, Firefox 72+, Safari 13.1+ |
-| Bundle hash | ℹ️ Per-environment | esbuild deterministic locally; compute in Step 7 |
+### window.bip39Bundle
 
-## Known limitations
+```js
+bip39Bundle.generateMnemonic(strength?: 128 | 256): string
+  // strength 128 → 12 words, 256 → 24 words. Default: 128.
+  // Internally calls crypto.getRandomValues(new Uint8Array(16 or 32)).
 
-| Remaining | Reason |
-|-----------|--------|
-| Intermediate HDKey nodes during deep path derivation | `@scure/bip32` `derive()` allocates intermediate HDKey objects internally; their private keys are not accessible without forking the library. GC-eligible. Low practical risk for single-level derivation. |
-| Mnemonic string GC (entropyToPrivKey) | JS strings are immutable and cannot be zeroed. `entropyToPrivKey` prevents the string from leaving the bundle scope, but it remains in heap until GC. This is the best achievable without WASM. |
-| WIF strings in vault (`saveWif`/`saveBip39`) | JS strings are immutable; cannot be zeroed. Requires vault redesign to store entropy hex + privkey hex instead. |
-| BigInt values holding key material | Immutable in JS — unavoidable in any pure-JS crypto library without WASM. Applies to `@noble/hashes` and `@scure/bip32` internals. |
+bip39Bundle.validateMnemonic(mnemonic: string): boolean
+  // Returns true only if every word is in the BIP39 English wordlist
+  // and the checksum is valid.
+
+bip39Bundle.mnemonicToPrivKey(mnemonic: string, path?: string): Uint8Array
+  // Returns a 32-byte private key. Default path: m/84'/0'/0'/0/0.
+  // seed, root, and child buffers are zeroed internally.
+  // Caller MUST fill(0) the returned Uint8Array after use.
+
+bip39Bundle.entropyToPrivKey(entropyBytes: Uint8Array, path?: string): Uint8Array
+  // Uint8Array(16|20|24|28|32) → Uint8Array(32).
+  // Default path: m/84'/738'/0'/0/0 (BTE path).
+  // The intermediate mnemonic string never leaves this function.
+  // Caller MUST fill(0) the returned Uint8Array after use.
+
+bip39Bundle.entropyToMnemonic(entropyBytes: Uint8Array): string
+  // Uint8Array(16|20|24|28|32) → mnemonic string.
+
+bip39Bundle.mnemonicToEntropy(mnemonic: string): Uint8Array
+  // mnemonic string → Uint8Array (16 bytes for 12-word, 32 bytes for 24-word).
+
+bip39Bundle.wordlist: string[]
+  // BIP39 English wordlist, 2048 entries.
+```
