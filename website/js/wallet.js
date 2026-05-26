@@ -2085,7 +2085,6 @@
         if (window.location.hash) $(window).trigger('hashchange');
         $('#send-tx').click(function() {
             let error       = false;
-            const decimals  = getConfig()['decimals'];
             const feeStr    = $('#send-fee').val() !== '' ? $('#send-fee').val() : String(globalData.rfee);
             const feeSats   = parseAmountSats(feeStr);
             const minFeeSats = parseAmountSats(String(getConfig()['fee']));
