@@ -982,7 +982,7 @@
         }
     }
     function showQrAddress(text) {
-        const container = document.getElementById('qr-code-addres');
+        const container = document.getElementById('qr-code-address');
         container.innerHTML = '';
         const canvas = document.createElement('canvas');
         container.appendChild(canvas);
@@ -1556,7 +1556,7 @@
         $('#wallet-keys-pubkey input').val('');
         $('#wallet-keys-script input').val('');
         $('#wallet-address').text('');
-        $('#qr-code-addres').empty();
+        $('#qr-code-address').empty();
         resetTxForm();
         hideSeedReveal();
         $('#wallet-block').addClass('d-none');
@@ -1699,7 +1699,7 @@
         $('#wallet-keys-pubkey input').val('');
         $('#wallet-keys-script input').val('');
         $('#wallet-address').text('');
-        $('#qr-code-addres').empty();
+        $('#qr-code-address').empty();
         resetTxForm();
         hideSeedReveal();
         clearSensitiveInputs();
@@ -1826,8 +1826,8 @@
         const canvasElement = document.getElementById('scan-canvas');
         if (canvasElement) {
             try {
-                const canvas = canvasElement.getContext('2d');
-                if (canvas) canvas.clearRect(0, 0, canvasElement.width || 0, canvasElement.height || 0);
+                const ctx = canvasElement.getContext('2d');
+                if (ctx) ctx.clearRect(0, 0, canvasElement.width || 0, canvasElement.height || 0);
             } catch(e) {}
             canvasElement.hidden = true;
             canvasElement.width = 0;
@@ -1836,7 +1836,7 @@
     }
     function startStream() {
         const canvasElement = document.getElementById('scan-canvas');
-        const canvas  = canvasElement.getContext('2d');
+        const ctx     = canvasElement.getContext('2d');
         const video   = document.createElement('video');
         const session = ++scanSession;
         canvasElement.hidden = true;
@@ -1873,8 +1873,8 @@
                 canvasElement.hidden = false;
                 canvasElement.height = video.videoHeight;
                 canvasElement.width  = video.videoWidth;
-                canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
-                const imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
+                ctx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+                const imageData = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
                 const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
                 if (code) {
                     let address = code.data;
@@ -2190,8 +2190,8 @@
                         const regnums    = (pass.match(/[0-9]+/g)) ? pass.match(/[0-9]+/g).length   : 1;
                         s += ((regnums + regchars) + regupchars) * pass.length + '3571';
                         s += (s + '' + s);
-                        for (let i = 0; i <= 50; i++) s = sha256.update(s).hex();
-                        const privBytes = new Uint8Array(sha256.update(s).array());
+                        for (let i = 0; i <= 50; i++) s = sha256(s);
+                        const privBytes = new Uint8Array(bitcoin.Buffer.from(sha256(s), 'hex'));
                         s = '';
                         $('#open-email').val('');
                         $('#open-password').val('');
