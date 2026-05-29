@@ -22,6 +22,7 @@
         } catch(e) {}
         return { col: 'amount', dir: 'desc' };
     })();
+    let cachedLanguage = null;
     const networkConfigs = {
         'BTE': {
             'uri':     'bitweb:',
@@ -823,11 +824,19 @@
         });
         messages = initMessages();
         setHomeTitle();
+        cachedLanguage = language;
         return language;
     }
     function getText(token) {
-        let language; try { language = localStorage.getItem('bte_cfg_language'); } catch(e) {}
-        if (language == undefined) language = initLang();
+        let language = cachedLanguage;
+        if (language == null) {
+            try { language = localStorage.getItem('bte_cfg_language'); } catch(e) {}
+            if (language == null || walletLanguages[language] == undefined) {
+                language = initLang();
+            } else {
+                cachedLanguage = language;
+            }
+        }
         if (token in walletLanguages[language]) return walletLanguages[language][token];
         return walletLanguages['en'][token];
     }
@@ -1325,8 +1334,7 @@
     function validateAddress(address) {
         const network = getConfig()['network'];
         try { bitcoin.address.fromBase58Check(address, network); return true; } catch(e) {}
-        try { bitcoin.address.fromBech32(address, network); return true; } catch(e) {}
-        try { bitcoin.address.fromBech32(address); if (address.toLowerCase().startsWith(network.bech32 + '1p')) return true; } catch(e) {}
+        try { const dec = bitcoin.address.fromBech32(address); if (dec && dec.prefix === network.bech32) return true; } catch(e) {}
         return false;
     }
     function fillMaxAmount($row) {
