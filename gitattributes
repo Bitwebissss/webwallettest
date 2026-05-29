@@ -1,0 +1,17 @@
+# Force LF line endings for all text files — prevents hash drift on cross-platform clones
+* text=auto eol=lf
+
+# Explicitly mark binary files — never touch their bytes
+*.min.js   binary
+*.min.css  binary
+*.woff     binary
+*.woff2    binary
+*.ttf      binary
+*.eot      binary
+*.png      binary
+*.jpg      binary
+*.jpeg     binary
+*.gif      binary
+*.ico      binary
+*.webp     binary
+*.pdf      binary

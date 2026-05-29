@@ -953,23 +953,11 @@
                 $btn.removeClass('btn-success btn-danger').addClass('btn-outline-secondary');
             }, 1500);
         };
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            try {
-                await navigator.clipboard.writeText(text);
-                doFeedback(true);
-            } catch(e) {
-                doFeedback(false);
-            }
-        } else {
-            const ta = document.createElement('textarea');
-            ta.value = text;
-            ta.className = 'clip-scratch';
-            document.body.appendChild(ta);
-            ta.focus(); ta.select();
-            let ok = false;
-            try { ok = document.execCommand('copy'); } catch(e) {}
-            document.body.removeChild(ta);
-            doFeedback(ok);
+        try {
+            await navigator.clipboard.writeText(text);
+            doFeedback(true);
+        } catch(e) {
+            doFeedback(false);
         }
     }
     function showMessage(message) {
@@ -1315,7 +1303,7 @@
     async function getRawTx(txid) {
         const r    = await fetch(getBackend() + '/rawtx/' + txid);
         const data = await r.json();
-        if (data.error !== null) throw new Error('rawtx fetch failed');
+        if (data.error != null) throw new Error('rawtx fetch failed');
         return data.result;
     }
     function getScriptType(script) {
@@ -2248,23 +2236,12 @@
                         $b.removeClass('btn-success btn-danger').addClass('btn-outline-secondary');
                     }, 1500);
                 };
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    try {
-                        await navigator.clipboard.writeText(wif);
-                        doFeedback(true);
-                        setTimeout(function() { navigator.clipboard.writeText('').catch(function(){}); }, 60000);
-                    } catch(e) { doFeedback(false); }
-                } else {
-                    const ta = document.createElement('textarea');
-                    ta.value = wif;
-                    ta.className = 'clip-scratch';
-                    document.body.appendChild(ta);
-                    ta.focus(); ta.select();
-                    let ok = false;
-                    try { ok = document.execCommand('copy'); } catch(e) {}
-                    ta.value = '';
-                    document.body.removeChild(ta);
-                    doFeedback(ok);
+                try {
+                    await navigator.clipboard.writeText(wif);
+                    doFeedback(true);
+                    setTimeout(function() { navigator.clipboard.writeText('').catch(function(){}); }, 60000);
+                } catch(e) {
+                    doFeedback(false);
                 }
             }
             const privBytes = await askPrivKeyBytes(
