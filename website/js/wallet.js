@@ -811,6 +811,7 @@
                 escHtml(walletLanguages[key]['lang-alias']) + '</a></li>'
             );
         }
+        cachedLanguage = language;
         $('#lang-label').text('🌐 ' + (walletLanguages[language] ? walletLanguages[language]['lang-alias'] : language));
         $('[tkey]').each(function() {
             if (['INPUT', 'TEXTAREA'].indexOf($(this).prop('tagName')) >= 0) {
@@ -824,7 +825,6 @@
         });
         messages = initMessages();
         setHomeTitle();
-        cachedLanguage = language;
         return language;
     }
     function getText(token) {
