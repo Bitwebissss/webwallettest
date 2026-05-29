@@ -1333,7 +1333,7 @@
     }
     function validateAddress(address) {
         const network = getConfig()['network'];
-        try { bitcoin.address.fromBase58Check(address, network); return true; } catch(e) {}
+        try { const dec = bitcoin.address.fromBase58Check(address); if (dec.version === network.pubKeyHash || dec.version === network.scriptHash) return true; } catch(e) {}
         try { const dec = bitcoin.address.fromBech32(address); if (dec && dec.prefix === network.bech32) return true; } catch(e) {}
         return false;
     }
